@@ -66,27 +66,32 @@ const App: React.FC = () => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
 
+    let mediaQuery: MediaQueryList | null = null;
+    let handleChange: ((e: MediaQueryListEvent) => void) | null = null;
+
     if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       const systemTheme = mediaQuery.matches ? 'dark' : 'light';
       root.classList.add(systemTheme);
       
       // Add listener for system theme changes
-      const handleChange = (e: MediaQueryListEvent) => {
+      handleChange = (e: MediaQueryListEvent) => {
         root.classList.remove('light', 'dark');
         root.classList.add(e.matches ? 'dark' : 'light');
       };
       
       mediaQuery.addEventListener('change', handleChange);
-      
-      // Cleanup listener on unmount or theme change
-      return () => {
-        mediaQuery.removeEventListener('change', handleChange);
-      };
     } else {
       root.classList.add(theme);
     }
     localStorage.setItem('theme', theme);
+
+    // Cleanup listener on unmount or theme change
+    return () => {
+      if (mediaQuery && handleChange) {
+        mediaQuery.removeEventListener('change', handleChange);
+      }
+    };
   }, [theme]);
 
   const handleLogin = (name: string, isNewUser: boolean) => {

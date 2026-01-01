@@ -57,8 +57,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(holdings));
-    onUpdateUser({ ...user, credits: { ...user.credits, assets: holdings.length } });
-  }, [holdings, user, onUpdateUser]);
+  }, [holdings]);
+
+  useEffect(() => {
+    // Only update user credits when holdings count changes
+    if (user.credits.assets !== holdings.length) {
+      onUpdateUser({ ...user, credits: { ...user.credits, assets: holdings.length } });
+    }
+  }, [holdings.length]);
 
   const handleAddOrUpdateAsset = (e: React.FormEvent) => {
     e.preventDefault();
