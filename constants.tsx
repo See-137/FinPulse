@@ -2,6 +2,8 @@
 import React from 'react';
 import { PlanType } from './types';
 
+// TODO: Replace with API calls to fetch real-time exchange rates
+// For production, consider using a service like exchangerate-api.io or similar
 export const CURRENCY_RATES = {
   USD: 1,
   ILS: 3.62
@@ -10,20 +12,14 @@ export const CURRENCY_RATES = {
 export const Logo: React.FC<{ className?: string }> = ({ className = "h-8" }) => (
   <div className={`flex items-center gap-3 ${className}`}>
     <svg viewBox="0 0 120 120" className="h-full aspect-square filter drop-shadow-sm">
-      <defs>
-        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="2" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
-      </defs>
       <rect x="15" y="25" width="90" height="70" rx="30" stroke="#ffffff" strokeWidth="8" fill="none" />
       <line x1="40" y1="40" x2="40" y2="80" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
       <rect x="36" y="50" width="8" height="20" rx="1.5" fill="#ffffff" />
       <line x1="55" y1="35" x2="55" y2="75" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
       <rect x="51" y="42" width="8" height="24" rx="1.5" fill="#ffffff" />
-      <path d="M70 60 Q 80 20 90 60 T 110 60" stroke="#00e5ff" strokeWidth="6" fill="none" strokeLinecap="round" filter="url(#glow)" />
-      <path d="M10 60 H 25" stroke="#00e5ff" strokeWidth="4" strokeLinecap="round" filter="url(#glow)" />
-      <circle cx="15" cy="60" r="3" fill="#ffffff" filter="url(#glow)" />
+      <path d="M70 60 Q 80 20 90 60 T 110 60" stroke="#00e5ff" strokeWidth="6" fill="none" strokeLinecap="round" />
+      <path d="M10 60 H 25" stroke="#00e5ff" strokeWidth="4" strokeLinecap="round" />
+      <circle cx="15" cy="60" r="3" fill="#ffffff" />
     </svg>
     <span className="text-2xl font-black tracking-tighter text-white">
       Fin<span className="text-[#00e5ff]">Pulse</span>
@@ -58,6 +54,10 @@ export const SaaS_PLANS = {
   }
 };
 
+// TODO: Replace with API calls to fetch real-time stock/crypto data
+// For production, consider using services like:
+// - Alpha Vantage, Yahoo Finance, or Finnhub for stocks
+// - CoinGecko or CoinMarketCap for crypto prices
 // Fixed MVP Asset Universe
 export const MOCK_STOCKS = [
   { symbol: 'BTC', price: 94231.50, change: 1240.20, changePercent: 1.35 },

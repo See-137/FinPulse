@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { User, Currency } from '../types';
 import { CURRENCY_RATES } from '../constants';
+import { usePortfolioStore } from '../store/portfolioStore';
 
 const STORAGE_KEY = 'finpulse_mirror_holdings';
 
@@ -31,14 +32,14 @@ interface PortfolioViewProps {
 }
 
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser, currency, onCurrencyChange }) => {
+  // Use Zustand store for shared state
+  const { isPrivate, search, filterType, setIsPrivate, setSearch, setFilterType } = usePortfolioStore();
+  
   const [holdings, setHoldings] = useState<Holding[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Holding | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -57,7 +58,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(holdings));
     onUpdateUser({ ...user, credits: { ...user.credits, assets: holdings.length } });
-  }, [holdings]);
+  }, [holdings, user, onUpdateUser]);
 
   const handleAddOrUpdateAsset = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,30 +104,36 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   const exportCSV = () => {
     if (user.plan === 'FREE') return; 
     
-    const headers = ['Asset Name', 'Symbol', 'Type', 'Quantity', 'Market Price', 'Total Value', '24h Gain/Loss %'];
-    const csvContent = [
-      headers.join(','),
-      ...holdings.map(h => [
-        `"${h.name}"`,
-        h.symbol,
-        h.type,
-        h.quantity,
-        h.currentPrice,
-        (h.quantity * h.currentPrice).toFixed(2),
-        h.dayPL.toFixed(2)
-      ].join(','))
-    ].join('\n');
+    try {
+      const headers = ['Asset Name', 'Symbol', 'Type', 'Quantity', 'Market Price', 'Total Value', '24h Gain/Loss %'];
+      const csvContent = [
+        headers.join(','),
+        ...holdings.map(h => [
+          `"${h.name}"`,
+          h.symbol,
+          h.type,
+          h.quantity,
+          h.currentPrice,
+          (h.quantity * h.currentPrice).toFixed(2),
+          h.dayPL.toFixed(2)
+        ].join(','))
+      ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', 'finpulse_holdings.csv');
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'finpulse_holdings.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url); // Clean up the URL object
+      }
+    } catch (error) {
+      console.error('Failed to export CSV:', error);
+      alert('Export failed. Please check your browser permissions and try again.');
     }
   };
 
@@ -138,6 +145,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     { name: 'Commodities', type: 'COMMODITY', value: holdings.filter(h => h.type === 'COMMODITY').reduce((sum, h) => sum + h.quantity * h.currentPrice, 0), color: '#fbbf24' },
   ].filter(d => d.value > 0);
 
+  // TODO: For scalability with large portfolios, consider implementing:
+  // - Server-side filtering, sorting, and pagination
+  // - Virtual scrolling for large datasets
+  // - Debounced search input to reduce re-renders
   const filteredHoldings = useMemo(() => {
     return holdings.filter(h => {
       const matchesSearch = h.symbol.toLowerCase().includes(search.toLowerCase()) || 
@@ -213,6 +224,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
               <button
                 key={c}
                 onClick={() => onCurrencyChange(c)}
+                aria-label={`Switch to ${c} currency`}
                 className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${
                   currency === c 
                     ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' 
@@ -227,6 +239,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
           <button 
             disabled={user.plan === 'FREE'}
             onClick={exportCSV}
+            aria-label={user.plan === 'FREE' ? 'Export CSV (PRO feature)' : 'Export portfolio to CSV'}
             className={`p-3 sm:p-4 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center gap-3 transition-all ${user.plan === 'FREE' ? 'opacity-30 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-[#00e5ff] hover:border-[#00e5ff]/30'}`}
           >
             {user.plan === 'FREE' ? <Lock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
@@ -238,6 +251,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
               setFormData({ symbol: '', name: '', type: 'STOCK', quantity: '', avgCost: '' });
               setIsAddModalOpen(true);
             }}
+            aria-label="Add new asset to portfolio"
             className="flex items-center gap-3 px-8 py-4 bg-[#00e5ff] text-[#0b0e14] font-black uppercase tracking-widest text-[11px] rounded-[24px] shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-all"
           >
             <Plus className="w-5 h-5" /> Capture Asset
@@ -255,6 +269,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                   <button
                     key={type}
                     onClick={() => setFilterType(type === 'ALL' ? null : type)}
+                    aria-label={`Filter by ${type.toLowerCase()} assets`}
                     className={`px-4 py-2.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap flex-1 sm:flex-none ${
                       (filterType === type) || (type === 'ALL' && filterType === null)
                         ? 'bg-[#00e5ff] text-[#0b0e14] shadow-sm'
@@ -279,6 +294,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
               
               <button 
                 onClick={() => setIsPrivate(!isPrivate)}
+                aria-label={isPrivate ? 'Show portfolio values' : 'Hide portfolio values'}
                 className={`p-3 rounded-xl border transition-all ${isPrivate ? 'bg-[#00e5ff]/10 border-[#00e5ff]/50 text-[#00e5ff]' : 'bg-slate-50 dark:bg-[#0b0e14] border-slate-200 dark:border-white/5 text-slate-500'}`}
               >
                 {isPrivate ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -352,10 +368,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                             </td>
                             <td className="p-6">
                               <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => { setEditingAsset(asset); setFormData({...asset, type: asset.type, quantity: asset.quantity.toString(), avgCost: asset.avgCost.toString()}); setIsAddModalOpen(true); }} className="p-2 hover:bg-blue-500/10 text-slate-400 hover:text-blue-500 rounded-lg">
+                                <button onClick={() => { setEditingAsset(asset); setFormData({...asset, type: asset.type, quantity: asset.quantity.toString(), avgCost: asset.avgCost.toString()}); setIsAddModalOpen(true); }} aria-label={`Edit ${asset.symbol}`} className="p-2 hover:bg-blue-500/10 text-slate-400 hover:text-blue-500 rounded-lg">
                                   <Pencil className="w-4 h-4" />
                                 </button>
-                                <button onClick={() => handleDelete(asset.symbol)} className="p-2 hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 rounded-lg">
+                                <button onClick={() => handleDelete(asset.symbol)} aria-label={`Delete ${asset.symbol}`} className="p-2 hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 rounded-lg">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
@@ -441,6 +457,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                         key={t}
                         type="button"
                         onClick={() => setFormData({...formData, type: t})}
+                        aria-label={`Select ${t} asset type`}
                         className={`py-3 text-[10px] font-black uppercase rounded-xl border transition-all ${formData.type === t ? 'bg-[#00e5ff]/10 border-[#00e5ff] text-[#00e5ff]' : 'border-slate-200 dark:border-white/10 text-slate-500'}`}
                       >
                         {t}
@@ -457,8 +474,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                 </div>
                 
                 <div className="pt-6 flex gap-4">
-                   <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 py-4 text-slate-500 font-black uppercase text-xs hover:bg-slate-100 dark:hover:bg-white/5 rounded-2xl transition-all">Cancel</button>
-                   <button type="submit" className="flex-[2] py-5 bg-[#00e5ff] text-[#0b0e14] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20">{editingAsset ? 'Update Node' : 'Capture'}</button>
+                   <button type="button" onClick={() => setIsAddModalOpen(false)} aria-label="Cancel and close modal" className="flex-1 py-4 text-slate-500 font-black uppercase text-xs hover:bg-slate-100 dark:hover:bg-white/5 rounded-2xl transition-all">Cancel</button>
+                   <button type="submit" aria-label={editingAsset ? 'Update asset' : 'Add new asset'} className="flex-[2] py-5 bg-[#00e5ff] text-[#0b0e14] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20">{editingAsset ? 'Update Node' : 'Capture'}</button>
                 </div>
              </form>
            </div>

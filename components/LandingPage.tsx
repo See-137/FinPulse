@@ -144,6 +144,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                     <button 
                         type="button"
                         onClick={handleKeySelection}
+                        aria-label="Authorize AI Engine with API key"
                         className="w-full py-3 bg-[#00e5ff] text-[#0b0e14] font-black text-[10px] uppercase tracking-widest rounded-lg sm:rounded-xl hover:opacity-90 transition-all shadow-lg"
                     >
                         Authorize AI Engine
@@ -153,6 +154,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                     <button 
                     type="submit"
                     disabled={isLoading}
+                    aria-label={isSignUp ? 'Establish mirror account' : 'Connect to existing session'}
                     className="w-full py-3.5 sm:py-4 bg-white text-[#0b0e14] font-black uppercase tracking-widest rounded-xl sm:rounded-2xl hover:bg-[#00e5ff] transition-all flex items-center justify-center shadow-lg gap-2 mt-4 text-[11px] sm:text-xs"
                     >
                     {isLoading ? (
@@ -172,6 +174,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                     {isSignUp ? 'Already have a mirror?' : "First time here?"}{' '}
                     <button 
                     onClick={() => setIsSignUp(!isSignUp)}
+                    aria-label={isSignUp ? 'Switch to sign in' : 'Switch to sign up'}
                     className="text-[#00e5ff] font-black uppercase tracking-widest hover:underline transition-all"
                     >
                     {isSignUp ? 'Sign In' : 'Sign Up'}
@@ -251,7 +254,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style>{`
         .perspective-container { perspective: 2000px; }
         .tilted-preview {
           transform: rotateY(-12deg) rotateX(8deg) rotateZ(-1deg) scale(0.85);
@@ -276,7 +279,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
            background: #374151; 
         }
-      `}} />
+      `}</style>
     </div>
   );
 };

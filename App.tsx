@@ -67,8 +67,22 @@ const App: React.FC = () => {
     root.classList.remove('light', 'dark');
 
     if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const systemTheme = mediaQuery.matches ? 'dark' : 'light';
       root.classList.add(systemTheme);
+      
+      // Add listener for system theme changes
+      const handleChange = (e: MediaQueryListEvent) => {
+        root.classList.remove('light', 'dark');
+        root.classList.add(e.matches ? 'dark' : 'light');
+      };
+      
+      mediaQuery.addEventListener('change', handleChange);
+      
+      // Cleanup listener on unmount or theme change
+      return () => {
+        mediaQuery.removeEventListener('change', handleChange);
+      };
     } else {
       root.classList.add(theme);
     }
@@ -136,31 +150,31 @@ const App: React.FC = () => {
             <Logo className="h-6 sm:h-8 shrink-0" />
             
             <div className="hidden md:flex items-center bg-slate-100 dark:bg-[#151921] p-1 rounded-2xl border border-slate-200 dark:border-white/5 shrink-0 transition-colors">
-               <button onClick={() => setActiveTab('portfolio')} className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'portfolio' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
-                 <LayoutGrid className="w-3.5 h-3.5" /> Mirror
+               <button onClick={() => setActiveTab('portfolio')} aria-label="View portfolio" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'portfolio' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
+                 <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> Mirror
                </button>
-               <button onClick={() => setActiveTab('community')} className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'community' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
-                 <Users className="w-3.5 h-3.5" /> Community
+               <button onClick={() => setActiveTab('community')} aria-label="View community" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'community' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
+                 <Users className="w-3.5 h-3.5" aria-hidden="true" /> Community
                </button>
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
             <div className="hidden sm:flex bg-slate-100 dark:bg-[#151921] rounded-lg p-0.5 border border-slate-200 dark:border-white/5">
-               <button onClick={() => setCurrency('USD')} className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${currency === 'USD' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>USD</button>
-               <button onClick={() => setCurrency('ILS')} className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${currency === 'ILS' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>ILS</button>
+               <button onClick={() => setCurrency('USD')} aria-label="Switch to USD currency" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${currency === 'USD' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>USD</button>
+               <button onClick={() => setCurrency('ILS')} aria-label="Switch to ILS currency" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${currency === 'ILS' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>ILS</button>
             </div>
 
-            <button onClick={() => setIsAdminOpen(true)} className="p-2 text-slate-500 hover:text-[#00e5ff] transition-all">
-              <Terminal className="w-5 h-5" />
+            <button onClick={() => setIsAdminOpen(true)} aria-label="Open admin portal" className="p-2 text-slate-500 hover:text-[#00e5ff] transition-all">
+              <Terminal className="w-5 h-5" aria-hidden="true" />
             </button>
-            <button className={`px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${user?.plan === 'PRO' ? 'border-cyan-500/50 text-cyan-400' : 'border-slate-200 dark:border-white/10 text-slate-500'}`}>
+            <button aria-label={`Current plan: ${user?.plan} Node`} className={`px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${user?.plan === 'PRO' ? 'border-cyan-500/50 text-cyan-400' : 'border-slate-200 dark:border-white/10 text-slate-500'}`}>
               {user?.plan} Node
             </button>
-            <button onClick={() => setIsNewsSidebarOpen(!isNewsSidebarOpen)} className={`p-2 rounded-xl lg:hidden ${isNewsSidebarOpen ? 'text-[#00e5ff] bg-[#00e5ff]/10' : 'text-slate-400'}`}>
-              <Menu className="w-5 h-5" />
+            <button onClick={() => setIsNewsSidebarOpen(!isNewsSidebarOpen)} aria-label={isNewsSidebarOpen ? 'Close news sidebar' : 'Open news sidebar'} className={`p-2 rounded-xl lg:hidden ${isNewsSidebarOpen ? 'text-[#00e5ff] bg-[#00e5ff]/10' : 'text-slate-400'}`}>
+              <Menu className="w-5 h-5" aria-hidden="true" />
             </button>
-            <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-3 group shrink-0">
+            <button onClick={() => setIsSettingsOpen(true)} aria-label="Open settings" className="flex items-center gap-3 group shrink-0">
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-slate-200 dark:border-white/10 flex items-center justify-center font-black text-[#00e5ff] text-xs">
                 {user?.name.substring(0, 2).toUpperCase() || 'JD'}
               </div>
@@ -187,8 +201,8 @@ const App: React.FC = () => {
       <div className={`fixed inset-y-0 right-0 z-50 lg:relative lg:block transition-transform duration-500 transform ${isNewsSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
         <div className="h-full relative w-[85vw] sm:w-[380px] lg:w-[380px]">
            <NewsSidebar userPlan={user?.plan || 'FREE'} />
-           <button onClick={() => setIsNewsSidebarOpen(false)} className="absolute top-6 left-[-3rem] lg:hidden p-3 text-white bg-[#00e5ff] rounded-full">
-             <X className="w-5 h-5 text-[#0b0e14]" />
+           <button onClick={() => setIsNewsSidebarOpen(false)} aria-label="Close news sidebar" className="absolute top-6 left-[-3rem] lg:hidden p-3 text-white bg-[#00e5ff] rounded-full">
+             <X className="w-5 h-5 text-[#0b0e14]" aria-hidden="true" />
            </button>
         </div>
       </div>
