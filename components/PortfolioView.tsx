@@ -56,10 +56,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   const userRef = useRef(user);
   const onUpdateUserRef = useRef(onUpdateUser);
   
+  // Update refs on every render to avoid stale closures
   useEffect(() => {
     userRef.current = user;
     onUpdateUserRef.current = onUpdateUser;
-  });
+  }, [user, onUpdateUser]);
 
   const rate = CURRENCY_RATES[currency];
   const currencySymbol = currency === 'USD' ? '$' : '₪';
@@ -146,11 +147,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        // Clean up the URL object after a delay to ensure download completes
-        setTimeout(() => URL.revokeObjectURL(url), 100);
+        // Clean up the URL object after sufficient delay to ensure download initiates
+        // Using 1 second to be safe across different browsers
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
     } catch (error) {
       console.error('Failed to export CSV:', error);
+      // Using alert for error notification to maintain consistency with existing codebase patterns
+      // TODO: Replace with toast notification system for better UX
       alert('Export failed. Please check your browser permissions and try again.');
     }
   };
