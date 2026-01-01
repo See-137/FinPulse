@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { 
   Plus, Download, Lock, Search, Trash2, Pencil, ShieldCheck, 
@@ -52,6 +52,15 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     avgCost: ''
   });
 
+  // Use refs to avoid stale closures while preventing unnecessary re-renders
+  const userRef = useRef(user);
+  const onUpdateUserRef = useRef(onUpdateUser);
+  
+  useEffect(() => {
+    userRef.current = user;
+    onUpdateUserRef.current = onUpdateUser;
+  });
+
   const rate = CURRENCY_RATES[currency];
   const currencySymbol = currency === 'USD' ? '$' : '₪';
 
@@ -61,8 +70,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
 
   useEffect(() => {
     // Only update user credits when holdings count changes
-    if (user.credits.assets !== holdings.length) {
-      onUpdateUser({ ...user, credits: { ...user.credits, assets: holdings.length } });
+    const currentUser = userRef.current;
+    const updateUser = onUpdateUserRef.current;
+    if (currentUser.credits.assets !== holdings.length) {
+      updateUser({ ...currentUser, credits: { ...currentUser.credits, assets: holdings.length } });
     }
   }, [holdings.length]);
 
@@ -135,7 +146,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url); // Clean up the URL object
+        // Clean up the URL object after a delay to ensure download completes
+        setTimeout(() => URL.revokeObjectURL(url), 100);
       }
     } catch (error) {
       console.error('Failed to export CSV:', error);
