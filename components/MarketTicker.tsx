@@ -1,11 +1,18 @@
 
 import React from 'react';
-import { MOCK_STOCKS } from '../constants';
+import { MOCK_STOCKS, CURRENCY_RATES } from '../constants';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { Currency } from '../types';
 
-export const MarketTicker: React.FC = () => {
+interface MarketTickerProps {
+  currency: Currency;
+}
+
+export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
   // Triple the data to ensure zero gaps on ultra-wide screens
   const stocks = [...MOCK_STOCKS, ...MOCK_STOCKS, ...MOCK_STOCKS];
+  const rate = CURRENCY_RATES[currency];
+  const symbol = currency === 'USD' ? '$' : '₪';
 
   return (
     <div className="bg-[#0b0e14] text-white py-3 overflow-hidden border-b border-white/5 relative z-30">
@@ -21,7 +28,7 @@ export const MarketTicker: React.FC = () => {
               </span>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-white">
-                  ${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {symbol}{(stock.price * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <div className={`flex items-center gap-0.5 text-[10px] font-bold ${stock.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {stock.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}

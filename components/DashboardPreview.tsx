@@ -72,7 +72,7 @@ export const DashboardPreview: React.FC = () => {
         <div className="space-y-3">
           {[
             { symbol: 'BTC', name: 'Bitcoin', val: '$94,231', change: '+2.4%', color: 'bg-orange-500/10 text-orange-400' },
-            { symbol: 'GOLD', name: 'Physical Gold', val: '$2,685', change: '+0.4%', color: 'bg-amber-400/10 text-amber-400' },
+            { symbol: 'ETH', name: 'Ethereum', val: '$2,923', change: '-0.4%', color: 'bg-indigo-400/10 text-indigo-400' },
             { symbol: 'NVDA', name: 'Nvidia Corp', val: '$145.20', change: '+1.2%', color: 'bg-emerald-400/10 text-emerald-400' }
           ].map(asset => (
             <div key={asset.symbol} className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-2xl">

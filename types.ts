@@ -1,5 +1,7 @@
 
 export type PlanType = 'FREE' | 'PRO' | 'TEAM';
+export type Theme = 'light' | 'dark' | 'system';
+export type Currency = 'USD' | 'ILS';
 
 export interface User {
   id: string;

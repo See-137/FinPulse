@@ -6,9 +6,13 @@ const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 const handleApiError = async (error: any) => {
   console.error("Gemini API Error:", error);
   if (error?.message?.includes("Requested entity was not found")) {
-    // If the key is invalid or from a non-paid project, prompt re-selection
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
+    // Safely check for window.aistudio to avoid runtime crashes
+    if (typeof window !== 'undefined' && (window as any).aistudio) {
+      try {
+        await (window as any).aistudio.openSelectKey();
+      } catch (e) {
+        console.error("Failed to open key selector:", e);
+      }
     }
     return "API Key Error: Please ensure you have selected a valid API key from a paid GCP project.";
   }
@@ -20,16 +24,21 @@ export const getMarketInsightStream = async (query: string, callback: (text: str
     const ai = getAI();
     const responseStream = await ai.models.generateContentStream({
       model: 'gemini-3-pro-preview',
-      contents: `Context: You are FinPulse Copilot, an elite AI financial strategist. 
-      The user is using a real-time Portfolio Mirror to track their global assets (Stocks, Crypto, Commodities). 
+      contents: `Context: You are FinPulse Copilot, an elite AI financial analyst.
+      
+      STRICT GUARDRAILS:
+      1. OBSERVATION ONLY: Describe what is happening in the market based on data.
+      2. NO PREDICTIONS: Do NOT use terms like "bullish", "bearish", "buy", "sell", "likely to rise", "accumulation zone", or "distribution".
+      3. NO ADVICE: Never give financial advice.
+      4. TONE: Institutional, objective, concise.
+      
       The user is asking: ${query}. 
-      Provide a highly sophisticated, concise analysis. Use real-time data from search if needed. 
-      Maintain a professional, institutional tone. Be direct and avoid fluff.`,
+      Use real-time data from search to provide context.`,
       config: {
         tools: [{ googleSearch: {} }],
-        temperature: 0.7,
-        topP: 0.9,
-        thinkingConfig: { thinkingBudget: 2000 },
+        temperature: 0.3,
+        topP: 0.8,
+        thinkingConfig: { thinkingBudget: 1000 },
       }
     });
 
@@ -45,6 +54,7 @@ export const getMarketInsightStream = async (query: string, callback: (text: str
   } catch (error) {
     const errorMsg = await handleApiError(error);
     callback(errorMsg);
+    return errorMsg; // Return error string so awaited promises resolve
   }
 };
 
@@ -53,8 +63,8 @@ export const summarizeNews = async (headline: string) => {
     const ai = getAI();
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Provide a 2-sentence institutional-grade impact summary for: "${headline}". 
-      Focus on capital rotation and market sentiment implications.`,
+      contents: `Provide a 2-sentence institutional-grade factual summary for: "${headline}". 
+      Focus on market movements and factual events. Avoid predictive language.`,
       config: { 
         thinkingConfig: { thinkingBudget: 500 },
       }
@@ -72,7 +82,7 @@ export const fetchRealtimeNews = async () => {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Retrieve the 6 most critical global financial news events from the last 12 hours. 
-      Focus on Bitcoin dominance, Gold spot prices, and AI-sector stock volatility.
+      Focus on Bitcoin, Major Tech Equities, and Macro Economic events.
       Format: Source | Headline | Summary | Tags`,
       config: {
         tools: [{ googleSearch: {} }],

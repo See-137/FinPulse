@@ -12,14 +12,41 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ userName, onContinue }
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchPulse = async () => {
-      await getMarketInsightStream(
-        "Summarize the current global financial state in 3 punchy sentences for a high-net-worth investor starting their day.", 
-        (text) => setPulse(text)
-      );
-      setIsReady(true);
+      // 1. Safety Timeout: Force ready state after 8 seconds no matter what
+      const safetyTimer = setTimeout(() => {
+        if (isMounted && !isReady) {
+          setIsReady(true);
+        }
+      }, 8000);
+
+      try {
+        await getMarketInsightStream(
+          "Summarize the current global financial state in 3 punchy sentences for a high-net-worth investor starting their day.", 
+          (text) => {
+            if (isMounted) {
+              setPulse(text);
+              // 2. Optimistic Readiness: If we have enough text, let the user in immediately
+              // This prevents waiting for the stream "end" event which might hang.
+              if (text.length > 50) {
+                setIsReady(true);
+              }
+            }
+          }
+        );
+      } catch (error) {
+        console.error("Pulse stream failed:", error);
+      } finally {
+        clearTimeout(safetyTimer);
+        if (isMounted) setIsReady(true);
+      }
     };
+
     fetchPulse();
+    
+    return () => { isMounted = false; };
   }, []);
 
   return (
@@ -42,7 +69,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ userName, onContinue }
         </div>
         <div className="min-h-[80px]">
           {pulse ? (
-            <p className="text-slate-200 text-lg leading-relaxed font-medium animate-in slide-in-from-bottom-2">
+            <p className="text-slate-200 text-lg leading-relaxed font-medium animate-in slide-in-from-bottom-2 whitespace-pre-line">
               {pulse}
             </p>
           ) : (
@@ -58,10 +85,11 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ userName, onContinue }
       <div className="mt-12">
         <button 
           onClick={onContinue}
-          disabled={!isReady}
-          className={`px-12 py-4 bg-white text-[#0b0e14] font-black uppercase tracking-widest rounded-xl transition-all ${isReady ? 'hover:scale-105 opacity-100' : 'opacity-20 cursor-wait'}`}
+          // Enable button if isReady OR if we have data shown (pulse exists)
+          disabled={!isReady && !pulse}
+          className={`px-12 py-4 bg-white text-[#0b0e14] font-black uppercase tracking-widest rounded-xl transition-all ${isReady || pulse ? 'hover:scale-105 opacity-100 cursor-pointer' : 'opacity-20 cursor-wait'}`}
         >
-          {isReady ? 'Enter Dashboard' : 'Processing...'}
+          {isReady || pulse ? 'Enter Dashboard' : 'Processing...'}
         </button>
       </div>
     </div>

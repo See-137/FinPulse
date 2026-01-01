@@ -1,23 +1,56 @@
 
 import React, { useState, useEffect } from 'react';
 import { Logo } from '../constants';
-import { Shield, ArrowRight, Lock, TrendingUp, User as UserIcon, Key, Zap, Globe, Cpu, CheckCircle } from 'lucide-react';
-import { DashboardPreview } from './DashboardPreview';
+import { Shield, ArrowRight, Lock, User as UserIcon, Key, LayoutGrid, Wallet, Zap, MessageSquareText } from 'lucide-react';
 
-interface LandingPageProps {
+interface LandingPageShowcaseProps {
   onLogin: (name: string, isNewUser: boolean) => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
+const SHOWCASE_ITEMS = [
+  {
+    id: 'dashboard',
+    title: 'Global Dashboard',
+    desc: 'Real-time net worth tracking and global market pulse.',
+    icon: LayoutGrid,
+    image: '/assets/landing/dashboard.png'
+  },
+  {
+    id: 'holdings',
+    title: 'Holdings Mirror',
+    desc: 'Precision asset tracking with multi-currency support.',
+    icon: Wallet,
+    image: '/assets/landing/holdings.png'
+  },
+  {
+    id: 'intelligence',
+    title: 'Market Intelligence',
+    desc: 'AI-curated news and sentiment analysis.',
+    icon: Zap,
+    image: '/assets/landing/intelligence.png'
+  },
+  {
+    id: 'copilot',
+    title: 'Institutional Copilot',
+    desc: 'Context-aware AI chat for deep market queries.',
+    icon: MessageSquareText,
+    image: '/assets/landing/copilot.png'
+  }
+];
+
+export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogin }) => {
   const [isSignUp, setIsSignUp] = useState(true);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [requiresKey, setRequiresKey] = useState(false);
+  
+  // Showcase State
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
 
   useEffect(() => {
     const checkKey = async () => {
-      // Use type assertion to access aistudio safely if it's not perfectly typed in the environment
       const aiStudio = (window as any).aistudio;
       if (aiStudio) {
         const hasKey = await aiStudio.hasSelectedApiKey();
@@ -27,11 +60,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
     checkKey();
   }, []);
 
+  // Auto-rotate showcase
+  useEffect(() => {
+    if (isHovering) return;
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % SHOWCASE_ITEMS.length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [isHovering]);
+
   const handleKeySelection = async () => {
     const aiStudio = (window as any).aistudio;
     if (aiStudio) {
       await aiStudio.openSelectKey();
-      // Assume success as per guidelines to avoid race conditions
       setRequiresKey(false);
     }
   };
@@ -52,11 +93,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
 
   return (
     <div className="h-screen h-[100dvh] bg-[#0b0e14] flex flex-col lg:flex-row overflow-hidden selection:bg-[#00e5ff] selection:text-[#0b0e14]">
-      {/* Left Side: Value & Auth - Scrollable */}
+      {/* Left Side: Auth & Selector */}
       <div className="w-full lg:w-[45%] h-full flex flex-col relative z-10 bg-[#0b0e14] overflow-y-auto custom-scrollbar">
         <div className="p-6 sm:p-8 lg:p-16 flex flex-col min-h-min">
-            <div className="mb-8 lg:mb-12">
-            <Logo />
+            <div className="mb-8 lg:mb-10">
+              <Logo />
             </div>
 
             <div className="flex-1 flex flex-col justify-center max-w-md mx-auto lg:mx-0">
@@ -72,16 +113,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 </span>
             </h1>
 
-            <p className="text-slate-400 text-base sm:text-lg mb-8 lg:mb-10 leading-relaxed font-medium">
-                Mirror your global assets in a precision, read-only environment. No custody risks. No brokerage links. Just the bottom line.
-            </p>
-
             <div className="card-surface p-6 sm:p-8 rounded-[24px] sm:rounded-[32px] border-white/5 shadow-2xl bg-[#151921]/50 backdrop-blur-xl mb-12">
                 <div className="flex items-center justify-between mb-6 sm:mb-8">
-                <div>
-                    <h3 className="text-white font-black text-lg sm:text-xl mb-1">{isSignUp ? 'Establish Mirror Node' : 'Connect Session'}</h3>
-                    <p className="text-slate-500 text-[10px] sm:text-xs">{isSignUp ? 'Start your high-fidelity tracking' : 'Resume institutional monitoring'}</p>
-                </div>
+                  <div>
+                      <h3 className="text-white font-black text-lg sm:text-xl mb-1">{isSignUp ? 'Establish Mirror Node' : 'Connect Session'}</h3>
+                      <p className="text-slate-500 text-[10px] sm:text-xs">{isSignUp ? 'Start your high-fidelity tracking' : 'Resume institutional monitoring'}</p>
+                  </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -166,36 +203,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                     </button>
                 )}
                 </form>
-
-                <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/5 text-center">
-                <p className="text-slate-500 text-[10px] sm:text-xs font-medium">
-                    {isSignUp ? 'Already have a mirror?' : "First time here?"}{' '}
-                    <button 
-                    onClick={() => setIsSignUp(!isSignUp)}
-                    className="text-[#00e5ff] font-black uppercase tracking-widest hover:underline transition-all"
-                    >
-                    {isSignUp ? 'Sign In' : 'Sign Up'}
-                    </button>
-                </p>
+                
+                <div className="mt-4 text-center">
+                   <button onClick={() => setIsSignUp(!isSignUp)} className="text-[#00e5ff] text-[10px] font-black uppercase tracking-widest hover:underline">
+                      {isSignUp ? 'Already have an account? Sign In' : 'New User? Create Account'}
+                   </button>
                 </div>
             </div>
 
-            {/* Value Propositions */}
-            <div className="grid grid-cols-2 gap-6 pb-12">
-                <div className="space-y-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
-                    <Globe className="w-4 h-4" />
-                </div>
-                <h4 className="text-xs font-black text-white uppercase tracking-wider">Multi-Asset</h4>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Unified view of Crypto, Stocks, and Commodities.</p>
-                </div>
-                <div className="space-y-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                    <Cpu className="w-4 h-4" />
-                </div>
-                <h4 className="text-xs font-black text-white uppercase tracking-wider">AI Copilot</h4>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Institutional-grade trend analysis on demand.</p>
-                </div>
+            {/* Interactive Feature List */}
+            <div className="space-y-3 pb-12" onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
+              {SHOWCASE_ITEMS.map((item, index) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveIndex(index)}
+                  className={`w-full text-left p-4 rounded-xl border-l-4 transition-all duration-300 group ${
+                    activeIndex === index 
+                      ? 'bg-white/5 border-[#00e5ff]' 
+                      : 'border-transparent hover:bg-white/[0.02] hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                     <div className={`p-2 rounded-lg transition-colors ${activeIndex === index ? 'bg-[#00e5ff]/10 text-[#00e5ff]' : 'bg-slate-800 text-slate-500 group-hover:text-slate-300'}`}>
+                        <item.icon className="w-5 h-5" />
+                     </div>
+                     <div>
+                        <h4 className={`text-sm font-black uppercase tracking-wide mb-1 transition-colors ${activeIndex === index ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`}>{item.title}</h4>
+                        <p className={`text-[11px] leading-relaxed transition-colors ${activeIndex === index ? 'text-slate-400' : 'text-slate-600'}`}>{item.desc}</p>
+                     </div>
+                  </div>
+                </button>
+              ))}
             </div>
             </div>
 
@@ -211,72 +249,47 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
         </div>
       </div>
 
-      {/* Right Side: Product Showcase - Fixed */}
+      {/* Right Side: Screenshot Showcase */}
       <div className="hidden lg:flex flex-1 relative items-center justify-center bg-[#0b0e14] overflow-hidden h-full">
         {/* Ambient Glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(0,229,255,0.08),transparent_70%)] pointer-events-none"></div>
-        
-        {/* Grid Pattern */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
 
-        <div className="relative w-full max-w-4xl px-12 perspective-container">
-          <div className="tilted-preview transition-transform duration-700 hover:scale-[1.02] hover:rotate-y-[-8deg]">
-            <DashboardPreview />
-          </div>
-          
-          {/* Floating Accents */}
-          <div className="absolute -top-10 -right-4 card-surface p-4 rounded-2xl border-cyan-500/20 shadow-2xl animate-bounce [animation-duration:4s]">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase text-slate-500 leading-none mb-1">Mirror Gain</p>
-                <p className="text-sm font-black text-emerald-400 leading-none">+$28,450.00</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="absolute -bottom-10 -left-4 card-surface p-4 rounded-2xl border-blue-500/20 shadow-2xl animate-pulse [animation-duration:6s]">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
-                <Zap className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase text-slate-500 leading-none mb-1">Mirror Health</p>
-                <p className="text-sm font-black text-blue-400 leading-none">99.9% Latency</p>
-              </div>
-            </div>
-          </div>
+        <div className="relative w-full max-w-5xl px-12 perspective-container">
+           {SHOWCASE_ITEMS.map((item, index) => (
+             <div 
+                key={item.id}
+                className={`absolute inset-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out flex items-center justify-center ${
+                  activeIndex === index 
+                    ? 'opacity-100 scale-100 rotate-0 z-20' 
+                    : 'opacity-0 scale-95 rotate-2 z-10 pointer-events-none'
+                }`}
+             >
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-[#00e5ff]/10 border border-white/10 bg-[#151921] max-h-[80vh] aspect-auto">
+                   <div className="absolute top-0 left-0 right-0 h-6 bg-[#0b0e14] border-b border-white/5 flex items-center px-4 gap-2">
+                      <div className="w-2 h-2 rounded-full bg-rose-500/50"></div>
+                      <div className="w-2 h-2 rounded-full bg-amber-500/50"></div>
+                      <div className="w-2 h-2 rounded-full bg-emerald-500/50"></div>
+                   </div>
+                   <div className="mt-6">
+                      <img 
+                        src={item.image} 
+                        alt={item.title} 
+                        className="w-full h-auto object-cover"
+                        onError={(e) => {
+                          // Fallback if image not found
+                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/1200x800/151921/00e5ff?text=FinPulse+Showcase';
+                        }}
+                      />
+                   </div>
+                   
+                   {/* Overlay Gradient for polish */}
+                   <div className="absolute inset-0 bg-gradient-to-tr from-[#00e5ff]/5 to-transparent pointer-events-none"></div>
+                </div>
+             </div>
+           ))}
         </div>
       </div>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .perspective-container { perspective: 2000px; }
-        .tilted-preview {
-          transform: rotateY(-12deg) rotateX(8deg) rotateZ(-1deg) scale(0.85);
-          box-shadow: -40px 60px 100px -20px rgba(0,0,0,0.8);
-          border-radius: 32px;
-          overflow: hidden;
-          background: #0b0e14;
-        }
-        @media (min-width: 1440px) {
-          .tilted-preview {
-             transform: rotateY(-18deg) rotateX(10deg) rotateZ(-2deg) scale(0.9);
-          }
-        }
-        /* Custom scrollbar matching dark mode for landing page */
-        .custom-scrollbar::-webkit-scrollbar-track {
-           background: transparent; 
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-           background: #1f2937; 
-           border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-           background: #374151; 
-        }
-      `}} />
     </div>
   );
 };

@@ -61,8 +61,8 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
                <Crown className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-black text-sm text-white">Institutional Copilot</h2>
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{user.plan} Active • {user.credits.maxAi - user.credits.ai} Credits Left</p>
+              <h2 className="font-black text-sm text-white">Market Intelligence</h2>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Market observations based on available data. No predictions.</p>
             </div>
           </div>
         </div>

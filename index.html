@@ -6,38 +6,80 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FinPulse | Precision Financial Mirror</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              background: "var(--bg-body)",
+              surface: "var(--bg-card)",
+            }
+          }
+        }
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-body: #f8fafc;
+            --text-body: #0f172a;
+            --bg-card: #ffffff;
+            --border-card: #e2e8f0;
+        }
+        .dark {
+            --bg-body: #0b0e14;
+            --text-body: #ffffff;
+            --bg-card: #151921;
+            --border-card: #1f242d;
+        }
+
+        html, body, #root {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Critical for fixed layout apps */
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0b0e14;
-            color: #ffffff;
+            background-color: var(--bg-body);
+            color: var(--text-body);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         .mono {
             font-family: 'JetBrains+Mono', monospace;
         }
         .glass-sidebar {
-            background: rgba(21, 25, 33, 0.8);
+            background: rgba(21, 25, 33, 0.85);
             backdrop-filter: blur(16px);
             border-left: 1px solid rgba(255, 255, 255, 0.05);
         }
+        
         .card-surface {
-            background-color: #151921;
-            border: 1px solid #1f242d;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-card);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
-        ::-webkit-scrollbar {
+
+        /* Refined Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
         }
-        ::-webkit-scrollbar-track {
-            background: #0b0e14;
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
         }
-        ::-webkit-scrollbar-thumb {
-            background: #1f242d;
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.5);
             border-radius: 10px;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #2d343f;
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(31, 41, 55, 0.5);
         }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.8);
+        }
+
         @keyframes ticker {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }

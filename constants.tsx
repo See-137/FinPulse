@@ -2,6 +2,11 @@
 import React from 'react';
 import { PlanType } from './types';
 
+export const CURRENCY_RATES = {
+  USD: 1,
+  ILS: 3.62
+};
+
 export const Logo: React.FC<{ className?: string }> = ({ className = "h-8" }) => (
   <div className={`flex items-center gap-3 ${className}`}>
     <svg viewBox="0 0 120 120" className="h-full aspect-square filter drop-shadow-sm">
@@ -53,12 +58,14 @@ export const SaaS_PLANS = {
   }
 };
 
+// Fixed MVP Asset Universe
 export const MOCK_STOCKS = [
   { symbol: 'BTC', price: 94231.50, change: 1240.20, changePercent: 1.35 },
-  { symbol: 'GOLD', price: 2685.40, change: 12.45, changePercent: 0.46 },
   { symbol: 'ETH', price: 2923.58, change: -11.40, changePercent: -0.39 },
   { symbol: 'SOL', price: 123.16, change: -0.18, changePercent: -0.15 },
-  { symbol: 'NVDA', price: 190.53, change: 0.19, changePercent: 0.10 },
+  { symbol: 'BNB', price: 598.20, change: 4.50, changePercent: 0.76 },
   { symbol: 'AAPL', price: 224.53, change: 1.45, changePercent: 0.65 },
-  { symbol: 'TSLA', price: 248.12, change: -3.42, changePercent: -1.36 },
+  { symbol: 'MSFT', price: 417.32, change: 2.10, changePercent: 0.51 },
+  { symbol: 'NVDA', price: 145.20, change: 0.19, changePercent: 0.13 },
+  { symbol: 'AMZN', price: 178.22, change: -1.12, changePercent: -0.62 },
 ];

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { fetchRealtimeNews } from '../services/geminiService';
+import { PlanType } from '../types';
 
 interface NewsArticle {
   source: string;
@@ -10,7 +11,11 @@ interface NewsArticle {
   url?: string;
 }
 
-export const NewsSidebar: React.FC = () => {
+interface NewsSidebarProps {
+  userPlan: PlanType;
+}
+
+export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan }) => {
   const [activeFilter, setActiveFilter] = useState('All');
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +26,6 @@ export const NewsSidebar: React.FC = () => {
     const result = await fetchRealtimeNews();
     
     if (result) {
-      // Extract sources from grounding chunks
       const extractedSources = result.chunks
         .filter(chunk => chunk.web)
         .map(chunk => ({
@@ -30,11 +34,8 @@ export const NewsSidebar: React.FC = () => {
         }));
       setSources(extractedSources);
 
-      // Simple parsing of the model's text response into structured items
-      // We expect lines like: Source | Headline | Summary | Tags
       const lines = result.text.split('\n').filter(l => l.trim().length > 10);
       const parsedArticles: NewsArticle[] = lines.slice(0, 5).map((line, idx) => {
-        // Robust splitting logic for potential bullet points or separators
         const cleaned = line.replace(/^\d+\.\s*/, '').replace(/^[-*]\s*/, '');
         const parts = cleaned.split(/[|:]/);
         
@@ -57,8 +58,8 @@ export const NewsSidebar: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-[380px] h-screen glass-sidebar flex flex-col shadow-2xl shadow-black/50">
-      <div className="p-6 border-b border-white/5">
+    <div className="w-full h-full glass-sidebar flex flex-col shadow-2xl shadow-black/50 border-l border-white/5">
+      <div className="p-6 border-b border-white/5 flex-shrink-0">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-400">
@@ -66,7 +67,7 @@ export const NewsSidebar: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path>
               </svg>
             </div>
-            <h2 className="font-black text-lg tracking-tight">Market News</h2>
+            <h2 className="font-black text-lg tracking-tight text-white">Market News</h2>
           </div>
           <button 
             onClick={loadNews}
@@ -103,10 +104,6 @@ export const NewsSidebar: React.FC = () => {
               </div>
               <div className="h-3 w-full bg-slate-800 rounded mb-2"></div>
               <div className="h-3 w-2/3 bg-slate-800 rounded mb-4"></div>
-              <div className="flex gap-2">
-                <div className="h-4 w-12 bg-slate-800 rounded"></div>
-                <div className="h-4 w-12 bg-slate-800 rounded"></div>
-              </div>
             </div>
           ))
         ) : (
@@ -123,7 +120,7 @@ export const NewsSidebar: React.FC = () => {
                   <span className="text-[10px] font-black uppercase text-blue-400/80">{item.source}</span>
                   <span className="text-[10px] font-bold text-slate-500">Just Now</span>
                 </div>
-                <h3 className="text-sm font-bold leading-snug mb-2 group-hover:text-[#00e5ff] transition-colors">{item.title}</h3>
+                <h3 className="text-sm font-bold leading-snug mb-2 group-hover:text-[#00e5ff] transition-colors text-slate-200">{item.title}</h3>
                 {item.summary && <p className="text-xs text-slate-400 mb-3 line-clamp-2 leading-relaxed">{item.summary}</p>}
                 <div className="flex flex-wrap gap-2 items-center">
                   {item.tags.filter(t => t.length > 0).map(tag => (
@@ -132,26 +129,6 @@ export const NewsSidebar: React.FC = () => {
                 </div>
               </a>
             ))}
-
-            {sources.length > 0 && (
-              <div className="pt-4 border-t border-white/5">
-                <h4 className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-3 px-2">Grounding Sources</h4>
-                <div className="space-y-2 px-2">
-                  {sources.map((source, i) => (
-                    <a 
-                      key={i} 
-                      href={source.uri} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-[10px] text-slate-500 hover:text-blue-400 transition-colors truncate"
-                    >
-                      <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"></path></svg>
-                      {source.title}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
