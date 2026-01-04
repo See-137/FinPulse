@@ -247,6 +247,12 @@ class AuthService {
   }
 
   getCurrentUser(): CognitoUser | null {
+    // Also verify token exists - if not, user is effectively logged out
+    const idToken = localStorage.getItem('finpulse_id_token');
+    if (!idToken) {
+      this.currentUser = null;
+      return null;
+    }
     return this.currentUser;
   }
 
@@ -278,8 +284,10 @@ class AuthService {
     try {
       const tokensJson = localStorage.getItem('finpulse_auth_tokens');
       const userJson = localStorage.getItem('finpulse_user');
+      const idToken = localStorage.getItem('finpulse_id_token');
       
-      if (tokensJson && userJson) {
+      // Require all three to be present for valid session
+      if (tokensJson && userJson && idToken) {
         const tokens: AuthTokens = JSON.parse(tokensJson);
         const user: CognitoUser = JSON.parse(userJson);
         
