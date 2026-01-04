@@ -154,6 +154,24 @@ export const translations = {
       pro: 'Pro',
       enterprise: 'Enterprise',
     },
+    
+    // Pricing Modal
+    pricing: {
+      title: 'Choose Your Plan',
+      subtitle: 'Unlock powerful features to maximize your mirror',
+      popular: 'Most Popular',
+      currentPlan: 'Current Plan',
+      month: 'month',
+      assets: 'Assets',
+      aiQueries: 'AI Queries',
+      day: 'day',
+      upgrade: 'Upgrade Now',
+      downgrade: 'Manage Plan',
+      manageBilling: 'Manage Billing',
+      freeForever: 'Free Forever',
+      securePayment: 'Secure payment powered by',
+      cancelAnytime: 'Cancel anytime. No hidden fees.',
+    },
   },
   
   he: {
@@ -303,6 +321,24 @@ export const translations = {
       free: 'חינם',
       pro: 'פרו',
       enterprise: 'ארגוני',
+    },
+    
+    // Pricing Modal
+    pricing: {
+      title: 'בחר את התוכנית שלך',
+      subtitle: 'פתח תכונות חזקות כדי למקסם את המראה שלך',
+      popular: 'הכי פופולרי',
+      currentPlan: 'תוכנית נוכחית',
+      month: 'חודש',
+      assets: 'נכסים',
+      aiQueries: 'שאילתות AI',
+      day: 'יום',
+      upgrade: 'שדרג עכשיו',
+      downgrade: 'נהל תוכנית',
+      manageBilling: 'נהל חיוב',
+      freeForever: 'חינם לנצח',
+      securePayment: 'תשלום מאובטח באמצעות',
+      cancelAnytime: 'בטל בכל עת. ללא עמלות נסתרות.',
     },
   },
 } as const;

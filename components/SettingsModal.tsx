@@ -4,12 +4,14 @@ import { X, CreditCard, Sparkles, Check, ChevronRight, Moon, Sun, Monitor, Palet
 import { User, PlanType, Theme } from '../types';
 import { SaaS_PLANS } from '../constants';
 import { auth } from '../services/authService';
+import { redirectToCustomerPortal } from '../services/stripeService';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: User;
   onUpgrade: (plan: PlanType) => void;
+  onOpenPricing: () => void;
   currentTheme: Theme;
   onThemeChange: (theme: Theme) => void;
   onLogout: () => void;
@@ -20,6 +22,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose, 
   user, 
   onUpgrade,
+  onOpenPricing,
   currentTheme,
   onThemeChange,
   onLogout
@@ -29,6 +32,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onLogout();
     onClose();
   };
+
+  const handleBillingPortal = async () => {
+    try {
+      await redirectToCustomerPortal(user.id);
+    } catch (error) {
+      console.error('Failed to open billing portal:', error);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -102,7 +114,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {(['PRO', 'TEAM'] as PlanType[]).map(p => (
                   <button 
                     key={p}
-                    onClick={() => { onUpgrade(p); onClose(); }}
+                    onClick={onOpenPricing}
                     className="w-full p-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-2xl flex items-center justify-between hover:border-cyan-500/50 group transition-all shadow-sm dark:shadow-none"
                   >
                     <div className="flex items-center gap-4">
@@ -117,7 +129,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 ))}
              </div>
              <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 space-y-4">
-                <button className="flex items-center gap-3 text-slate-500 hover:text-[#00e5ff] text-xs font-black uppercase tracking-widest">
+                <button 
+                  onClick={handleBillingPortal}
+                  className="flex items-center gap-3 text-slate-500 hover:text-[#00e5ff] text-xs font-black uppercase tracking-widest"
+                >
                    <CreditCard className="w-4 h-4" /> Billing Portal
                 </button>
                 <button 

@@ -28,6 +28,7 @@ export const config = {
     news: '/news',
     community: '/community',
     admin: '/admin',
+    payments: '/payments',
   }
 };
 
