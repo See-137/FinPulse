@@ -11,6 +11,7 @@ import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { useMarketData } from '../hooks/useMarketData';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
+import { AssetSelector } from './AssetSelector';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
 
@@ -65,6 +66,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     quantity: '',
     avgCost: ''
   });
+  
+  const [selectedAsset, setSelectedAsset] = useState<{ symbol: string; name: string; type: AssetType }>(
+    { symbol: '', name: '', type: 'STOCK' }
+  );
 
   // Use refs to avoid stale closures while preventing unnecessary re-renders
   const userRef = useRef(user);
@@ -123,6 +128,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     setIsAddModalOpen(false);
     setEditingAsset(null);
     setFormData({ symbol: '', name: '', type: 'STOCK', quantity: '', avgCost: '' });
+    setSelectedAsset({ symbol: '', name: '', type: 'STOCK' });
   };
 
   const handleDelete = (symbol: string) => {
@@ -498,7 +504,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                             </td>
                             <td className="px-3 py-3">
                               <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => { setEditingAsset(asset); setFormData({...asset, type: asset.type, quantity: asset.quantity.toString(), avgCost: asset.avgCost.toString()}); setIsAddModalOpen(true); }} aria-label={`Edit ${asset.symbol}`} className="p-1.5 hover:bg-blue-500/10 text-slate-400 hover:text-blue-500 rounded-lg">
+                                <button onClick={() => { 
+                                  setEditingAsset(asset); 
+                                  setFormData({...asset, type: asset.type, quantity: asset.quantity.toString(), avgCost: asset.avgCost.toString()}); 
+                                  setSelectedAsset({ symbol: asset.symbol, name: asset.name, type: asset.type });
+                                  setIsAddModalOpen(true); 
+                                }} aria-label={`Edit ${asset.symbol}`} className="p-1.5 hover:bg-blue-500/10 text-slate-400 hover:text-blue-500 rounded-lg">
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
                                 <button onClick={() => handleDelete(asset.symbol)} aria-label={`Delete ${asset.symbol}`} className="p-1.5 hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 rounded-lg">
@@ -595,8 +606,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                    ))}
                 </div>
                 <div className="space-y-4">
-                  <input required placeholder="Symbol (e.g. BTC)" value={formData.symbol} onChange={e => setFormData({...formData, symbol: e.target.value})} className="w-full bg-slate-50 dark:bg-[#0b0e14] border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-4 dark:text-white font-bold outline-none focus:border-[#00e5ff]" />
-                  <input required placeholder="Asset Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-slate-50 dark:bg-[#0b0e14] border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-4 dark:text-white font-bold outline-none focus:border-[#00e5ff]" />
+                  <AssetSelector
+                    value={selectedAsset}
+                    onChange={(asset) => {
+                      setSelectedAsset(asset);
+                      setFormData({...formData, symbol: asset.symbol, name: asset.name, type: asset.type});
+                    }}
+                    disabled={!!editingAsset}
+                    filterTypes={formData.type ? [formData.type] : undefined}
+                    excludeSymbols={holdings.map(h => h.symbol)}
+                  />
                   <div className="grid grid-cols-2 gap-4">
                      <input required type="number" step="any" placeholder="Quantity" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full bg-slate-50 dark:bg-[#0b0e14] border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-4 dark:text-white font-bold outline-none focus:border-[#00e5ff]" />
                      <input required type="number" step="any" placeholder="Avg Cost" value={formData.avgCost} onChange={e => setFormData({...formData, avgCost: e.target.value})} className="w-full bg-slate-50 dark:bg-[#0b0e14] border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-4 dark:text-white font-bold outline-none focus:border-[#00e5ff]" />
