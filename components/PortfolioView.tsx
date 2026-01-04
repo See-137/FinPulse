@@ -641,6 +641,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
 
            {/* Portfolio Insights - Available to all users including FREE tier */}
            {holdings.length > 0 && (() => {
+             // Constants for diversity scoring
+             const MAX_ASSET_TYPES = 3; // CRYPTO, STOCK, COMMODITY
+             const ASSET_COUNT_WEIGHT = 40; // Weight for number of assets
+             const TYPE_DIVERSITY_WEIGHT = 30; // Weight for asset type diversity
+             const BALANCE_WEIGHT = 30; // Weight for allocation balance
+             
              // Calculate top performer and worst performer
              const performanceData = holdings.map(h => {
                const currentPrice = getMarketPrice(h.symbol, h.currentPrice);
@@ -658,17 +664,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
 
              // Calculate diversity score (0-100)
              // Based on: 1) Number of assets, 2) Type diversity, 3) Allocation balance
-             const maxAssets = 8; // Normalize to 8 for free tier
-             const assetCountScore = Math.min(holdings.length / maxAssets, 1) * 40;
+             const assetCountScore = Math.min(holdings.length / user.credits.maxAssets, 1) * ASSET_COUNT_WEIGHT;
              
              const typeSet = new Set(holdings.map(h => h.type));
-             const typeScore = (typeSet.size / 3) * 30; // Max 3 types
+             const typeScore = (typeSet.size / MAX_ASSET_TYPES) * TYPE_DIVERSITY_WEIGHT;
              
              // Calculate Herfindahl index for concentration (lower is more diverse)
              const assetValues = holdings.map(h => h.quantity * getMarketPrice(h.symbol, h.currentPrice));
              const totalVal = assetValues.reduce((sum, v) => sum + v, 0);
              const herfindahl = assetValues.reduce((sum, v) => sum + Math.pow(v / totalVal, 2), 0);
-             const balanceScore = (1 - herfindahl) * 30; // Invert so higher is better
+             const balanceScore = (1 - herfindahl) * BALANCE_WEIGHT; // Invert so higher is better
              
              const diversityScore = Math.round(assetCountScore + typeScore + balanceScore);
 
@@ -708,7 +713,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                    </div>
 
                    {/* Worst Performer */}
-                   {worstPerformer.symbol !== topPerformer.symbol && (
+                   {(worstPerformer.symbol !== topPerformer.symbol || worstPerformer.type !== topPerformer.type) && (
                      <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/20">
                        <div className="flex items-center justify-between mb-2">
                          <span className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400">Needs Attention</span>
