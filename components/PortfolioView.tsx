@@ -255,6 +255,30 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     const price = getMarketPrice(h.symbol, h.currentPrice);
     return sum + h.quantity * price;
   }, 0);
+
+  // Calculate 24h portfolio change (weighted by asset value)
+  const portfolio24hChange = useMemo(() => {
+    let totalCurrentValue = 0;
+    let totalPreviousValue = 0;
+    
+    holdings.forEach(h => {
+      const currentPrice = getMarketPrice(h.symbol, h.currentPrice);
+      const change24hPercent = getMarketChange(h.symbol, h.dayPL);
+      const assetCurrentValue = h.quantity * currentPrice;
+      // Calculate previous value: currentValue / (1 + change%)
+      const assetPreviousValue = assetCurrentValue / (1 + change24hPercent / 100);
+      
+      totalCurrentValue += assetCurrentValue;
+      totalPreviousValue += assetPreviousValue;
+    });
+    
+    const dollarChange = totalCurrentValue - totalPreviousValue;
+    const percentChange = totalPreviousValue > 0 
+      ? ((totalCurrentValue - totalPreviousValue) / totalPreviousValue) * 100 
+      : 0;
+    
+    return { dollarChange, percentChange };
+  }, [holdings, marketPrices, wsPrices]);
   
   const data = [
     { name: 'Crypto', type: 'CRYPTO', value: holdings.filter(h => h.type === 'CRYPTO').reduce((sum, h) => sum + h.quantity * getMarketPrice(h.symbol, h.currentPrice), 0), color: '#00e5ff' },
@@ -529,6 +553,38 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
 
         {/* Analytics Side */}
         <div className="space-y-6">
+           {/* 24h Portfolio Performance Hero Card */}
+           <div className="card-surface p-8 rounded-[40px] bg-gradient-to-br from-slate-50 to-white dark:from-[#151921] dark:to-[#0b0e14]">
+              <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-4">Portfolio Value</h3>
+              <div className="text-center">
+                 <p className="text-4xl font-black dark:text-white mb-3">
+                   {isPrivate ? '••••••' : `${currencySymbol}${(totalValue * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                 </p>
+                 <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl ${
+                   portfolio24hChange.percentChange >= 0 
+                     ? 'bg-green-500/10 text-green-500' 
+                     : 'bg-red-500/10 text-red-500'
+                 }`}>
+                   {portfolio24hChange.percentChange >= 0 ? (
+                     <TrendingUp className="w-5 h-5" />
+                   ) : (
+                     <TrendingDown className="w-5 h-5" />
+                   )}
+                   <span className="text-lg font-black">
+                     {isPrivate ? '••••' : (
+                       <>
+                         {portfolio24hChange.percentChange >= 0 ? '+' : ''}
+                         {currencySymbol}{(Math.abs(portfolio24hChange.dollarChange) * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                         {' '}
+                         ({portfolio24hChange.percentChange >= 0 ? '+' : ''}{portfolio24hChange.percentChange.toFixed(2)}%)
+                       </>
+                     )}
+                   </span>
+                   <span className="text-xs opacity-70">24h</span>
+                 </div>
+              </div>
+           </div>
+
            <div className="card-surface p-8 rounded-[40px] bg-gradient-to-br from-slate-50 to-white dark:from-[#151921] dark:to-[#0b0e14]">
               <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-8">Allocation</h3>
               <div className="h-[200px] w-full relative">
