@@ -141,8 +141,8 @@ class AuthService {
       // Store session
       this.storeSession(tokens, user);
       
-      // Set token for API calls
-      api.setAccessToken(tokens.accessToken);
+      // Set ID token for API calls (NOT accessToken - idToken has email claim)
+      api.setIdToken(tokens.idToken);
 
       // Schedule token refresh
       this.scheduleRefresh(tokens.expiresIn, tokens.refreshToken);
