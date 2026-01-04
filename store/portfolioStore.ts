@@ -18,104 +18,213 @@ interface WatchlistItem {
   name: string;
   type: AssetType;
   addedAt: string;
-  alertPrice?: number; // Optional price alert
+  alertPrice?: number;
   alertType?: 'above' | 'below';
 }
 
 interface PortfolioState {
+  // Current user ID for data isolation
+  currentUserId: string | null;
+  
+  // User-scoped data maps
+  userHoldings: Record<string, Holding[]>;
+  userWatchlists: Record<string, WatchlistItem[]>;
+  
+  // UI state (not user-scoped)
   isPrivate: boolean;
   search: string;
   filterType: string | null;
-  holdings: Holding[];
-  watchlist: WatchlistItem[];
+  
+  // User management
+  setCurrentUser: (userId: string) => void;
+  clearCurrentUser: () => void;
+  
+  // UI actions
   setIsPrivate: (value: boolean) => void;
   setSearch: (value: string) => void;
   setFilterType: (value: string | null) => void;
+  
+  // Holdings actions (user-scoped)
   setHoldings: (holdings: Holding[]) => void;
   addHolding: (holding: Holding) => void;
   updateHolding: (symbol: string, holding: Holding) => void;
   removeHolding: (symbol: string) => void;
-  // Watchlist actions
+  
+  // Watchlist actions (user-scoped)
   addToWatchlist: (item: Omit<WatchlistItem, 'addedAt'>) => void;
   removeFromWatchlist: (symbol: string) => void;
   isInWatchlist: (symbol: string) => boolean;
   setWatchlistAlert: (symbol: string, alertPrice: number | undefined, alertType?: 'above' | 'below') => void;
+  
+  // Computed getters
+  getHoldings: () => Holding[];
+  getWatchlist: () => WatchlistItem[];
 }
-
-const STORAGE_KEY = 'finpulse_mirror_holdings';
-const WATCHLIST_STORAGE_KEY = 'finpulse_watchlist';
-
-// Load initial holdings from localStorage
-const loadInitialHoldings = (): Holding[] => {
-  if (typeof window === 'undefined') return [];
-  const saved = localStorage.getItem(STORAGE_KEY);
-  return saved ? JSON.parse(saved) : [];
-};
-
-// Load initial watchlist from localStorage
-const loadInitialWatchlist = (): WatchlistItem[] => {
-  if (typeof window === 'undefined') return [];
-  const saved = localStorage.getItem(WATCHLIST_STORAGE_KEY);
-  return saved ? JSON.parse(saved) : [];
-};
 
 export const usePortfolioStore = create<PortfolioState>()(
   persist(
     (set, get) => ({
+      // Initial state
+      currentUserId: null,
+      userHoldings: {},
+      userWatchlists: {},
       isPrivate: false,
       search: '',
       filterType: null,
-      holdings: loadInitialHoldings(),
-      watchlist: loadInitialWatchlist(),
+      
+      // Computed holdings for current user
+      getHoldings: () => {
+        const { currentUserId, userHoldings } = get();
+        if (!currentUserId) return [];
+        return userHoldings[currentUserId] || [];
+      },
+      
+      // Computed watchlist for current user
+      getWatchlist: () => {
+        const { currentUserId, userWatchlists } = get();
+        if (!currentUserId) return [];
+        return userWatchlists[currentUserId] || [];
+      },
+      
+      // Set current user on login/restore
+      setCurrentUser: (userId: string) => {
+        set((state) => {
+          const userHoldings = { ...state.userHoldings };
+          const userWatchlists = { ...state.userWatchlists };
+          
+          if (!userHoldings[userId]) {
+            userHoldings[userId] = [];
+          }
+          if (!userWatchlists[userId]) {
+            userWatchlists[userId] = [];
+          }
+          
+          return { currentUserId: userId, userHoldings, userWatchlists };
+        });
+      },
+      
+      // Clear current user on logout
+      clearCurrentUser: () => {
+        set({ currentUserId: null });
+      },
+      
+      // UI actions
       setIsPrivate: (value) => set({ isPrivate: value }),
       setSearch: (value) => set({ search: value }),
       setFilterType: (value) => set({ filterType: value }),
+      
+      // Holdings actions - user-scoped
       setHoldings: (holdings) => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(holdings));
-        set({ holdings });
+        const { currentUserId } = get();
+        if (!currentUserId) return;
+        
+        set((state) => ({
+          userHoldings: {
+            ...state.userHoldings,
+            [currentUserId]: holdings
+          }
+        }));
       },
+      
       addHolding: (holding) => {
-        const holdings = [...get().holdings, holding];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(holdings));
-        set({ holdings });
+        const { currentUserId, userHoldings } = get();
+        if (!currentUserId) return;
+        
+        const currentHoldings = userHoldings[currentUserId] || [];
+        set((state) => ({
+          userHoldings: {
+            ...state.userHoldings,
+            [currentUserId]: [...currentHoldings, holding]
+          }
+        }));
       },
+      
       updateHolding: (symbol, holding) => {
-        const holdings = get().holdings.map(h => h.symbol === symbol ? holding : h);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(holdings));
-        set({ holdings });
+        const { currentUserId, userHoldings } = get();
+        if (!currentUserId) return;
+        
+        const currentHoldings = userHoldings[currentUserId] || [];
+        set((state) => ({
+          userHoldings: {
+            ...state.userHoldings,
+            [currentUserId]: currentHoldings.map(h => h.symbol === symbol ? holding : h)
+          }
+        }));
       },
+      
       removeHolding: (symbol) => {
-        const holdings = get().holdings.filter(h => h.symbol !== symbol);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(holdings));
-        set({ holdings });
+        const { currentUserId, userHoldings } = get();
+        if (!currentUserId) return;
+        
+        const currentHoldings = userHoldings[currentUserId] || [];
+        set((state) => ({
+          userHoldings: {
+            ...state.userHoldings,
+            [currentUserId]: currentHoldings.filter(h => h.symbol !== symbol)
+          }
+        }));
       },
-      // Watchlist actions
+      
+      // Watchlist actions - user-scoped
       addToWatchlist: (item) => {
-        const watchlist = [...get().watchlist, { ...item, addedAt: new Date().toISOString() }];
-        localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchlist));
-        set({ watchlist });
+        const { currentUserId, userWatchlists } = get();
+        if (!currentUserId) return;
+        
+        const currentWatchlist = userWatchlists[currentUserId] || [];
+        const newItem: WatchlistItem = { ...item, addedAt: new Date().toISOString() };
+        
+        set((state) => ({
+          userWatchlists: {
+            ...state.userWatchlists,
+            [currentUserId]: [...currentWatchlist, newItem]
+          }
+        }));
       },
+      
       removeFromWatchlist: (symbol) => {
-        const watchlist = get().watchlist.filter(w => w.symbol !== symbol);
-        localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchlist));
-        set({ watchlist });
+        const { currentUserId, userWatchlists } = get();
+        if (!currentUserId) return;
+        
+        const currentWatchlist = userWatchlists[currentUserId] || [];
+        set((state) => ({
+          userWatchlists: {
+            ...state.userWatchlists,
+            [currentUserId]: currentWatchlist.filter(w => w.symbol !== symbol)
+          }
+        }));
       },
+      
       isInWatchlist: (symbol) => {
-        return get().watchlist.some(w => w.symbol.toUpperCase() === symbol.toUpperCase());
+        const { currentUserId, userWatchlists } = get();
+        if (!currentUserId) return false;
+        
+        const currentWatchlist = userWatchlists[currentUserId] || [];
+        return currentWatchlist.some(w => w.symbol.toUpperCase() === symbol.toUpperCase());
       },
+      
       setWatchlistAlert: (symbol, alertPrice, alertType) => {
-        const watchlist = get().watchlist.map(w => 
-          w.symbol === symbol ? { ...w, alertPrice, alertType } : w
-        );
-        localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchlist));
-        set({ watchlist });
+        const { currentUserId, userWatchlists } = get();
+        if (!currentUserId) return;
+        
+        const currentWatchlist = userWatchlists[currentUserId] || [];
+        set((state) => ({
+          userWatchlists: {
+            ...state.userWatchlists,
+            [currentUserId]: currentWatchlist.map(w => 
+              w.symbol === symbol ? { ...w, alertPrice, alertType } : w
+            )
+          }
+        }));
       },
     }),
     {
-      name: 'finpulse-portfolio-preferences',
-      partialize: (state) => ({ 
+      name: 'finpulse-portfolio-v2',
+      version: 2,
+      partialize: (state) => ({
+        currentUserId: state.currentUserId,
+        userHoldings: state.userHoldings,
+        userWatchlists: state.userWatchlists,
         isPrivate: state.isPrivate,
-        // Don't persist holdings/watchlist here - we use separate localStorage keys
       }),
     }
   )

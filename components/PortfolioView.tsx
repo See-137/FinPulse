@@ -34,9 +34,12 @@ interface PortfolioViewProps {
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser, currency, onCurrencyChange }) => {
   // Use Zustand store for shared state (including holdings for news filtering)
   const { 
-    isPrivate, search, filterType, holdings,
+    isPrivate, search, filterType, getHoldings, getWatchlist,
     setIsPrivate, setSearch, setFilterType, setHoldings, addHolding, updateHolding, removeHolding 
   } = usePortfolioStore();
+  
+  // Get user-scoped holdings
+  const holdings = getHoldings();
 
   // Fetch real-time market prices (REST API as fallback)
   const { prices: marketPrices, loading: pricesLoading } = useMarketData(30000);

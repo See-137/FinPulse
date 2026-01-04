@@ -6,11 +6,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { usePortfolioStore } from '../../store/portfolioStore';
 
+const TEST_USER_ID = 'test-user-123';
+
 describe('portfolioStore', () => {
   beforeEach(() => {
     // Reset store state before each test
     usePortfolioStore.setState({
-      holdings: [],
+      currentUserId: TEST_USER_ID,
+      userHoldings: { [TEST_USER_ID]: [] },
+      userWatchlists: { [TEST_USER_ID]: [] },
       isPrivate: false,
       search: '',
       filterType: null,
@@ -32,8 +36,9 @@ describe('portfolioStore', () => {
       });
 
       const state = usePortfolioStore.getState();
-      expect(state.holdings).toHaveLength(1);
-      expect(state.holdings[0].symbol).toBe('BTC');
+      const holdings = state.getHoldings();
+      expect(holdings).toHaveLength(1);
+      expect(holdings[0].symbol).toBe('BTC');
     });
 
     it('should add multiple different holdings', () => {
@@ -60,7 +65,8 @@ describe('portfolioStore', () => {
       });
 
       const state = usePortfolioStore.getState();
-      expect(state.holdings).toHaveLength(2);
+      const holdings = state.getHoldings();
+      expect(holdings).toHaveLength(2);
     });
   });
 
@@ -81,7 +87,8 @@ describe('portfolioStore', () => {
       store.removeHolding('BTC');
 
       const state = usePortfolioStore.getState();
-      expect(state.holdings).toHaveLength(0);
+      const holdings = state.getHoldings();
+      expect(holdings).toHaveLength(0);
     });
   });
 
@@ -110,9 +117,10 @@ describe('portfolioStore', () => {
       });
 
       const state = usePortfolioStore.getState();
-      expect(state.holdings).toHaveLength(1);
-      expect(state.holdings[0].quantity).toBe(2);
-      expect(state.holdings[0].avgCost).toBe(46000);
+      const holdings = state.getHoldings();
+      expect(holdings).toHaveLength(1);
+      expect(holdings[0].quantity).toBe(2);
+      expect(holdings[0].avgCost).toBe(46000);
     });
   });
 

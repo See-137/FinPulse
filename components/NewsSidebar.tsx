@@ -38,7 +38,8 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan }) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
-  const { holdings } = usePortfolioStore();
+  const { getHoldings } = usePortfolioStore();
+  const holdings = getHoldings();
 
   // Get user's holding symbols
   const userSymbols = holdings.map(h => h.symbol.toUpperCase());
