@@ -638,6 +638,210 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                  <p className="text-[9px] font-bold text-slate-500 text-center">FX as of {timeString} UTC</p>
               </div>
            </div>
+
+           {/* Portfolio Insights - Available to all users including FREE tier */}
+           {holdings.length > 0 && (() => {
+             // Calculate top performer and worst performer
+             const performanceData = holdings.map(h => {
+               const currentPrice = getMarketPrice(h.symbol, h.currentPrice);
+               const profitLossPercent = h.avgCost > 0 ? ((currentPrice - h.avgCost) / h.avgCost) * 100 : 0;
+               return { ...h, profitLossPercent, currentPrice };
+             });
+             
+             const topPerformer = performanceData.reduce((max, h) => 
+               h.profitLossPercent > max.profitLossPercent ? h : max, performanceData[0]
+             );
+             
+             const worstPerformer = performanceData.reduce((min, h) => 
+               h.profitLossPercent < min.profitLossPercent ? h : min, performanceData[0]
+             );
+
+             // Calculate diversity score (0-100)
+             // Based on: 1) Number of assets, 2) Type diversity, 3) Allocation balance
+             const maxAssets = 8; // Normalize to 8 for free tier
+             const assetCountScore = Math.min(holdings.length / maxAssets, 1) * 40;
+             
+             const typeSet = new Set(holdings.map(h => h.type));
+             const typeScore = (typeSet.size / 3) * 30; // Max 3 types
+             
+             // Calculate Herfindahl index for concentration (lower is more diverse)
+             const assetValues = holdings.map(h => h.quantity * getMarketPrice(h.symbol, h.currentPrice));
+             const totalVal = assetValues.reduce((sum, v) => sum + v, 0);
+             const herfindahl = assetValues.reduce((sum, v) => sum + Math.pow(v / totalVal, 2), 0);
+             const balanceScore = (1 - herfindahl) * 30; // Invert so higher is better
+             
+             const diversityScore = Math.round(assetCountScore + typeScore + balanceScore);
+
+             return (
+               <>
+                 {/* Top & Worst Performers */}
+                 <div className="card-surface p-6 rounded-[32px] bg-gradient-to-br from-slate-50 to-white dark:from-[#151921] dark:to-[#0b0e14]">
+                   <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-4">Performance</h3>
+                   
+                   {/* Top Performer */}
+                   <div className="mb-4 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
+                     <div className="flex items-center justify-between mb-2">
+                       <span className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400">Top Performer</span>
+                       <TrendingUp className="w-4 h-4 text-emerald-500" />
+                     </div>
+                     <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-2">
+                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${topPerformer.type === 'CRYPTO' ? 'bg-orange-500/10 text-orange-500' : topPerformer.type === 'STOCK' ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                           {topPerformer.type === 'CRYPTO' ? <Bitcoin className="w-3.5 h-3.5" /> : topPerformer.type === 'STOCK' ? <Activity className="w-3.5 h-3.5" /> : <Gem className="w-3.5 h-3.5" />}
+                         </div>
+                         <div>
+                           <p className="font-black text-sm dark:text-white">{topPerformer.symbol}</p>
+                           <p className="text-[9px] text-slate-500">{topPerformer.name}</p>
+                         </div>
+                       </div>
+                       <div className="text-right">
+                         <p className="font-black text-emerald-500 text-sm">
+                           +{topPerformer.profitLossPercent.toFixed(1)}%
+                         </p>
+                         {!isPrivate && (
+                           <p className="text-[9px] text-slate-500">
+                             +{currencySymbol}{((topPerformer.currentPrice - topPerformer.avgCost) * topPerformer.quantity * rate).toFixed(2)}
+                           </p>
+                         )}
+                       </div>
+                     </div>
+                   </div>
+
+                   {/* Worst Performer */}
+                   {worstPerformer.symbol !== topPerformer.symbol && (
+                     <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/20">
+                       <div className="flex items-center justify-between mb-2">
+                         <span className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400">Needs Attention</span>
+                         <TrendingDown className="w-4 h-4 text-rose-500" />
+                       </div>
+                       <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${worstPerformer.type === 'CRYPTO' ? 'bg-orange-500/10 text-orange-500' : worstPerformer.type === 'STOCK' ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                             {worstPerformer.type === 'CRYPTO' ? <Bitcoin className="w-3.5 h-3.5" /> : worstPerformer.type === 'STOCK' ? <Activity className="w-3.5 h-3.5" /> : <Gem className="w-3.5 h-3.5" />}
+                           </div>
+                           <div>
+                             <p className="font-black text-sm dark:text-white">{worstPerformer.symbol}</p>
+                             <p className="text-[9px] text-slate-500">{worstPerformer.name}</p>
+                           </div>
+                         </div>
+                         <div className="text-right">
+                           <p className={`font-black text-sm ${worstPerformer.profitLossPercent >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                             {worstPerformer.profitLossPercent >= 0 ? '+' : ''}{worstPerformer.profitLossPercent.toFixed(1)}%
+                           </p>
+                           {!isPrivate && worstPerformer.avgCost > 0 && (
+                             <p className="text-[9px] text-slate-500">
+                               {worstPerformer.profitLossPercent >= 0 ? '+' : ''}{currencySymbol}{((worstPerformer.currentPrice - worstPerformer.avgCost) * worstPerformer.quantity * rate).toFixed(2)}
+                             </p>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+                   )}
+                 </div>
+
+                 {/* Diversity Score */}
+                 <div className="card-surface p-6 rounded-[32px] bg-gradient-to-br from-slate-50 to-white dark:from-[#151921] dark:to-[#0b0e14]">
+                   <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-4">Diversity Score</h3>
+                   <div className="text-center mb-4">
+                     <div className="relative inline-flex items-center justify-center">
+                       <svg className="w-32 h-32 transform -rotate-90">
+                         <circle
+                           cx="64"
+                           cy="64"
+                           r="56"
+                           stroke="currentColor"
+                           strokeWidth="8"
+                           fill="none"
+                           className="text-slate-200 dark:text-white/5"
+                         />
+                         <circle
+                           cx="64"
+                           cy="64"
+                           r="56"
+                           stroke="currentColor"
+                           strokeWidth="8"
+                           fill="none"
+                           strokeDasharray={`${2 * Math.PI * 56}`}
+                           strokeDashoffset={`${2 * Math.PI * 56 * (1 - diversityScore / 100)}`}
+                           className={`${
+                             diversityScore >= 70 ? 'text-emerald-500' : 
+                             diversityScore >= 40 ? 'text-cyan-500' : 
+                             'text-amber-500'
+                           } transition-all duration-1000`}
+                           strokeLinecap="round"
+                         />
+                       </svg>
+                       <div className="absolute inset-0 flex flex-col items-center justify-center">
+                         <span className="text-3xl font-black dark:text-white">{diversityScore}</span>
+                         <span className="text-[9px] font-bold text-slate-500">/ 100</span>
+                       </div>
+                     </div>
+                   </div>
+                   <div className="space-y-2">
+                     <div className="flex justify-between items-center text-xs">
+                       <span className="text-slate-500">Asset Count</span>
+                       <span className="font-bold dark:text-white">{holdings.length} assets</span>
+                     </div>
+                     <div className="flex justify-between items-center text-xs">
+                       <span className="text-slate-500">Asset Types</span>
+                       <span className="font-bold dark:text-white">{typeSet.size} types</span>
+                     </div>
+                     <div className="flex justify-between items-center text-xs">
+                       <span className="text-slate-500">Balance</span>
+                       <span className="font-bold dark:text-white">
+                         {herfindahl < 0.3 ? 'Well Balanced' : herfindahl < 0.5 ? 'Moderate' : 'Concentrated'}
+                       </span>
+                     </div>
+                   </div>
+                   <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
+                     <p className="text-[10px] text-slate-500 text-center leading-relaxed">
+                       {diversityScore >= 70 ? '✓ Excellent diversification across assets and types' :
+                        diversityScore >= 40 ? '→ Good start! Consider adding more asset types' :
+                        '⚠ Limited diversity. Adding more assets can reduce risk'}
+                     </p>
+                   </div>
+                 </div>
+
+                 {/* Quick Stats */}
+                 <div className="card-surface p-6 rounded-[32px] bg-gradient-to-br from-slate-50 to-white dark:from-[#151921] dark:to-[#0b0e14]">
+                   <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-4">Quick Stats</h3>
+                   <div className="space-y-3">
+                     <div className="flex justify-between items-center p-3 rounded-xl bg-white/50 dark:bg-white/[0.02]">
+                       <span className="text-xs text-slate-500">Total Assets</span>
+                       <span className="font-black text-sm dark:text-white">{holdings.length}</span>
+                     </div>
+                     <div className="flex justify-between items-center p-3 rounded-xl bg-white/50 dark:bg-white/[0.02]">
+                       <span className="text-xs text-slate-500">Avg Position</span>
+                       <span className="font-black text-sm dark:text-white">
+                         {isPrivate ? '••••' : `${currencySymbol}${((totalValue / holdings.length) * rate).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                       </span>
+                     </div>
+                     <div className="flex justify-between items-center p-3 rounded-xl bg-white/50 dark:bg-white/[0.02]">
+                       <span className="text-xs text-slate-500">Largest Position</span>
+                       <span className="font-black text-sm dark:text-white">
+                         {(() => {
+                           const largest = holdings.reduce((max, h) => {
+                             const val = h.quantity * getMarketPrice(h.symbol, h.currentPrice);
+                             const maxVal = max.quantity * getMarketPrice(max.symbol, max.currentPrice);
+                             return val > maxVal ? h : max;
+                           }, holdings[0]);
+                           const largestValue = largest.quantity * getMarketPrice(largest.symbol, largest.currentPrice);
+                           const pct = (largestValue / totalValue) * 100;
+                           return isPrivate ? '••••' : `${largest.symbol} (${pct.toFixed(0)}%)`;
+                         })()}
+                       </span>
+                     </div>
+                     <div className="flex justify-between items-center p-3 rounded-xl bg-white/50 dark:bg-white/[0.02]">
+                       <span className="text-xs text-slate-500">Winning Positions</span>
+                       <span className="font-black text-sm text-emerald-500">
+                         {performanceData.filter(h => h.profitLossPercent > 0).length} / {holdings.length}
+                       </span>
+                     </div>
+                   </div>
+                 </div>
+               </>
+             );
+           })()}
         </div>
       </div>
 
