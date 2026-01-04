@@ -1,28 +1,36 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Logo, SaaS_PLANS } from './constants';
-import { NewsSidebar } from './components/NewsSidebar';
-import { PortfolioView } from './components/PortfolioView';
-import { Community } from './components/Community';
-import { Watchlist } from './components/Watchlist';
-import { SettingsModal } from './components/SettingsModal';
+// Critical components - loaded immediately
 import { MarketTicker } from './components/MarketTicker';
-import { AIAssistant } from './components/AIAssistant';
 import { LandingPage } from './components/LandingPage';
-import { LandingPageShowcase } from './components/LandingPageShowcase';
-import { WelcomePage } from './components/WelcomePage';
-import { AdminPortal } from './components/AdminPortal';
-import { PricingModal } from './components/PricingModal';
-import { TermsOfService, PrivacyPolicy, PricingPage } from './components/LegalPages';
-import { AccessibilityStatement } from './components/AccessibilityStatement';
 import { Footer } from './components/Footer';
-import { DebugPanel } from './components/DebugPanel';
-// Notification & Onboarding Components
-import { ChangelogModal, useChangelog } from './components/ChangelogModal';
 import { NotificationBell } from './components/NotificationBell';
 import { TopBanner } from './components/TopBanner';
-import { OnboardingFlow, useOnboarding } from './components/OnboardingFlow';
-import { MilestoneModal } from './components/MilestoneModal';
+
+// Lazy-loaded components (code splitting)
+const NewsSidebar = lazy(() => import('./components/NewsSidebar').then(m => ({ default: m.NewsSidebar })));
+const PortfolioView = lazy(() => import('./components/PortfolioView').then(m => ({ default: m.PortfolioView })));
+const Community = lazy(() => import('./components/Community').then(m => ({ default: m.Community })));
+const Watchlist = lazy(() => import('./components/Watchlist').then(m => ({ default: m.Watchlist })));
+const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const AIAssistant = lazy(() => import('./components/AIAssistant').then(m => ({ default: m.AIAssistant })));
+const LandingPageShowcase = lazy(() => import('./components/LandingPageShowcase').then(m => ({ default: m.LandingPageShowcase })));
+const WelcomePage = lazy(() => import('./components/WelcomePage').then(m => ({ default: m.WelcomePage })));
+const AdminPortal = lazy(() => import('./components/AdminPortal').then(m => ({ default: m.AdminPortal })));
+const PricingModal = lazy(() => import('./components/PricingModal').then(m => ({ default: m.PricingModal })));
+const DebugPanel = lazy(() => import('./components/DebugPanel').then(m => ({ default: m.DebugPanel })));
+const ChangelogModal = lazy(() => import('./components/ChangelogModal').then(m => ({ default: m.ChangelogModal })));
+const OnboardingFlow = lazy(() => import('./components/OnboardingFlow').then(m => ({ default: m.OnboardingFlow })));
+const MilestoneModal = lazy(() => import('./components/MilestoneModal').then(m => ({ default: m.MilestoneModal })));
+
+// Legal pages - very rarely accessed
+const LegalPages = lazy(() => import('./components/LegalPages'));
+const AccessibilityStatement = lazy(() => import('./components/AccessibilityStatement').then(m => ({ default: m.AccessibilityStatement })));
+
+// Hooks for changelog and onboarding (small, non-lazy)
+import { useChangelog } from './components/ChangelogModal';
+import { useOnboarding } from './components/OnboardingFlow';
 import { milestoneService } from './services/milestoneService';
 import { Milestone } from './types/notifications';
 import { Shield, LayoutGrid, Users, Menu, X, Terminal, Star, Globe, Check, Database } from 'lucide-react';
@@ -31,6 +39,16 @@ import { auth, type CognitoUser } from './services/authService';
 import { LanguageProvider, useLanguage, type Language } from './i18n';
 import { usePortfolioStore } from './store/portfolioStore';
 import { api } from './services/apiService';
+
+// Loading fallback component
+const LoadingSpinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
+  const sizeClasses = { sm: 'w-4 h-4', md: 'w-8 h-8', lg: 'w-12 h-12' };
+  return (
+    <div className="flex items-center justify-center p-4">
+      <div className={`${sizeClasses[size]} border-2 border-[#00e5ff]/20 border-t-[#00e5ff] rounded-full animate-spin`} />
+    </div>
+  );
+};
 
 const USER_STORAGE_KEY = 'finpulse_user_session';
 
@@ -346,21 +364,41 @@ const AppContent: React.FC = () => {
   const handleContinue = () => setView('dashboard');
 
   // Legal pages (accessible via URL hash: #terms, #privacy, #pricing, #accessibility)
-  if (view === 'terms') return <TermsOfService onBack={() => { window.location.hash = ''; setView('landing'); }} />;
-  if (view === 'privacy') return <PrivacyPolicy onBack={() => { window.location.hash = ''; setView('landing'); }} />;
-  if (view === 'pricing') return <PricingPage onBack={() => { window.location.hash = ''; setView('landing'); }} />;
-  if (view === 'accessibility') return <AccessibilityStatement onBack={() => { window.location.hash = ''; setView('landing'); }} />;
+  if (view === 'terms') return (
+    <Suspense fallback={<LoadingSpinner size="lg" />}>
+      <LegalPages.TermsOfService onBack={() => { window.location.hash = ''; setView('landing'); }} />
+    </Suspense>
+  );
+  if (view === 'privacy') return (
+    <Suspense fallback={<LoadingSpinner size="lg" />}>
+      <LegalPages.PrivacyPolicy onBack={() => { window.location.hash = ''; setView('landing'); }} />
+    </Suspense>
+  );
+  if (view === 'pricing') return (
+    <Suspense fallback={<LoadingSpinner size="lg" />}>
+      <LegalPages.PricingPage onBack={() => { window.location.hash = ''; setView('landing'); }} />
+    </Suspense>
+  );
+  if (view === 'accessibility') return (
+    <Suspense fallback={<LoadingSpinner size="lg" />}>
+      <AccessibilityStatement onBack={() => { window.location.hash = ''; setView('landing'); }} />
+    </Suspense>
+  );
 
   if (view === 'landing') {
     // Default to Showcase unless explicitly disabled
     const showcaseDisabled = (import.meta as any)?.env?.VITE_LANDING_SHOWCASE === 'false';
     
     return !showcaseDisabled
-      ? <LandingPageShowcase onLogin={handleLogin} /> 
+      ? <Suspense fallback={<LoadingSpinner size="lg" />}><LandingPageShowcase onLogin={handleLogin} /></Suspense>
       : <LandingPage onLogin={handleLogin} />;
   }
   
-  if (view === 'welcome' && user) return <WelcomePage userName={user.name} onContinue={handleContinue} />;
+  if (view === 'welcome' && user) return (
+    <Suspense fallback={<LoadingSpinner size="lg" />}>
+      <WelcomePage userName={user.name} onContinue={handleContinue} />
+    </Suspense>
+  );
 
   // Safety check
   if (view === 'dashboard' && !user) {
@@ -471,25 +509,27 @@ const AppContent: React.FC = () => {
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
           <div className="max-w-[1200px] mx-auto w-full">
-            {activeTab === 'portfolio' ? (
-              <PortfolioView 
-                user={user!} 
-                onUpdateUser={setUser} 
-                currency={currency} 
-                onCurrencyChange={setCurrency} 
-              />
-            ) : activeTab === 'watchlist' ? (
-              <Watchlist 
-                currency={currency}
-                onAddToPortfolio={(symbol, name, type) => {
-                  // Switch to portfolio tab with pre-filled data
-                  setActiveTab('portfolio');
-                  // The add modal will be handled by PortfolioView
-                }}
-              />
-            ) : (
-              <Community />
-            )}
+            <Suspense fallback={<LoadingSpinner size="lg" />}>
+              {activeTab === 'portfolio' ? (
+                <PortfolioView 
+                  user={user!} 
+                  onUpdateUser={setUser} 
+                  currency={currency} 
+                  onCurrencyChange={setCurrency} 
+                />
+              ) : activeTab === 'watchlist' ? (
+                <Watchlist 
+                  currency={currency}
+                  onAddToPortfolio={(symbol, name, type) => {
+                    // Switch to portfolio tab with pre-filled data
+                    setActiveTab('portfolio');
+                    // The add modal will be handled by PortfolioView
+                  }}
+                />
+              ) : (
+                <Community />
+              )}
+            </Suspense>
           </div>
           <Footer onNavigate={handleNavigate} />
         </div>
@@ -497,75 +537,93 @@ const AppContent: React.FC = () => {
 
       <div className={`fixed inset-y-0 right-0 z-50 lg:relative lg:block transition-transform duration-500 transform ${isNewsSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
         <div className="h-full relative w-[85vw] sm:w-[380px] lg:w-[380px]">
-           <NewsSidebar userPlan={user?.plan || 'FREE'} user={user} onUpgradeClick={() => setIsPricingOpen(true)} />
+           <Suspense fallback={<LoadingSpinner />}>
+             <NewsSidebar userPlan={user?.plan || 'FREE'} user={user} onUpgradeClick={() => setIsPricingOpen(true)} />
+           </Suspense>
            <button onClick={() => setIsNewsSidebarOpen(false)} aria-label="Close news sidebar" className="absolute top-6 left-[-3rem] lg:hidden p-3 text-white bg-[#00e5ff] rounded-full">
              <X className="w-5 h-5 text-[#0b0e14]" aria-hidden="true" />
            </button>
         </div>
       </div>
 
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-        user={user!}
-        onUpgrade={handlePlanUpgrade}
-        onOpenPricing={() => { setIsSettingsOpen(false); setIsPricingOpen(true); }}
-        currentTheme={theme}
-        onThemeChange={setTheme}
-        onLogout={handleLogout}
-      />
+      <Suspense fallback={null}>
+        <SettingsModal 
+          isOpen={isSettingsOpen} 
+          onClose={() => setIsSettingsOpen(false)} 
+          user={user!}
+          onUpgrade={handlePlanUpgrade}
+          onOpenPricing={() => { setIsSettingsOpen(false); setIsPricingOpen(true); }}
+          currentTheme={theme}
+          onThemeChange={setTheme}
+          onLogout={handleLogout}
+        />
+      </Suspense>
 
-      <AdminPortal 
-        isOpen={isAdminOpen} 
-        onClose={() => setIsAdminOpen(false)} 
-        user={user!} 
-        onUpdateUser={setUser} 
-      />
+      <Suspense fallback={null}>
+        <AdminPortal 
+          isOpen={isAdminOpen} 
+          onClose={() => setIsAdminOpen(false)} 
+          user={user!} 
+          onUpdateUser={setUser} 
+        />
+      </Suspense>
 
-      <DebugPanel
-        isOpen={isDebugOpen}
-        onClose={() => setIsDebugOpen(false)}
-        currentUserId={user?.id || null}
-      />
+      <Suspense fallback={null}>
+        <DebugPanel
+          isOpen={isDebugOpen}
+          onClose={() => setIsDebugOpen(false)}
+          currentUserId={user?.id || null}
+        />
+      </Suspense>
 
       {user && (
-        <PricingModal
-          user={user}
-          isOpen={isPricingOpen}
-          onClose={() => setIsPricingOpen(false)}
-          onPlanChange={handlePlanUpgrade}
-        />
+        <Suspense fallback={null}>
+          <PricingModal
+            user={user}
+            isOpen={isPricingOpen}
+            onClose={() => setIsPricingOpen(false)}
+            onPlanChange={handlePlanUpgrade}
+          />
+        </Suspense>
       )}
 
-      <AIAssistant user={user!} onUpdateUsage={(credits) => setUser(u => u ? {...u, credits: {...u.credits, ai: credits}} : null)} />
+      <Suspense fallback={null}>
+        <AIAssistant user={user!} onUpdateUsage={(credits) => setUser(u => u ? {...u, credits: {...u.credits, ai: credits}} : null)} />
+      </Suspense>
 
       {/* Notification & Onboarding Overlays */}
       {showChangelog && currentChangelog && (
-        <ChangelogModal
-          isOpen={showChangelog}
-          onClose={dismissChangelog}
-          changelog={currentChangelog}
-        />
+        <Suspense fallback={null}>
+          <ChangelogModal
+            isOpen={showChangelog}
+            onClose={dismissChangelog}
+            changelog={currentChangelog}
+          />
+        </Suspense>
       )}
 
       {user && showOnboarding && (
-        <OnboardingFlow
-          isOpen={showOnboarding}
-          onComplete={completeOnboarding}
-          onSkip={skipOnboarding}
-          userName={user.name}
-          userPlan={user.plan}
-          onOpenPricing={() => setIsPricingOpen(true)}
-        />
+        <Suspense fallback={null}>
+          <OnboardingFlow
+            isOpen={showOnboarding}
+            onComplete={completeOnboarding}
+            onSkip={skipOnboarding}
+            userName={user.name}
+            userPlan={user.plan}
+            onOpenPricing={() => setIsPricingOpen(true)}
+          />
+        </Suspense>
       )}
 
       {user && activeMilestone && isMilestoneOpen && (
-        <MilestoneModal
-          isOpen={isMilestoneOpen}
-          milestone={activeMilestone}
-          onClose={handleMilestoneClose}
-          onAction={handleMilestoneAction}
-        />
+        <Suspense fallback={null}>
+          <MilestoneModal
+            isOpen={isMilestoneOpen}
+            milestone={activeMilestone}
+            onClose={handleMilestoneClose}
+            onAction={handleMilestoneAction}
+          />
+        </Suspense>
       )}
     </div>
   );
