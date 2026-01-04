@@ -206,7 +206,8 @@ const AppContent: React.FC = () => {
       const idToken = localStorage.getItem('finpulse_id_token');
       if (!idToken) return null;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod';
+      const response = await fetch(`${apiUrl}/auth/me`, {
         headers: { 'Authorization': `Bearer ${idToken}` },
       });
       
