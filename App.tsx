@@ -13,6 +13,7 @@ import { LandingPageShowcase } from './components/LandingPageShowcase';
 import { WelcomePage } from './components/WelcomePage';
 import { AdminPortal } from './components/AdminPortal';
 import { PricingModal } from './components/PricingModal';
+import { TermsOfService, PrivacyPolicy, PricingPage } from './components/LegalPages';
 import { Shield, Bell, LayoutGrid, Users, Menu, X, Terminal, Star, Globe } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
 import { auth } from './services/authService';
@@ -23,7 +24,14 @@ const USER_STORAGE_KEY = 'finpulse_user_session';
 // Inner App component that uses language context
 const AppContent: React.FC = () => {
   const { t, language, setLanguage, isRTL } = useLanguage();
-  const [view, setView] = useState<'landing' | 'welcome' | 'dashboard'>('landing');
+  const [view, setView] = useState<'landing' | 'welcome' | 'dashboard' | 'terms' | 'privacy' | 'pricing'>(() => {
+    // Check URL hash for legal pages
+    const hash = window.location.hash.slice(1);
+    if (hash === 'terms') return 'terms';
+    if (hash === 'privacy') return 'privacy';
+    if (hash === 'pricing') return 'pricing';
+    return 'landing';
+  });
   const [activeTab, setActiveTab] = useState<'portfolio' | 'watchlist' | 'community'>('portfolio');
   const [user, setUser] = useState<User | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -140,6 +148,11 @@ const AppContent: React.FC = () => {
   };
 
   const handleContinue = () => setView('dashboard');
+
+  // Legal pages (accessible via URL hash: #terms, #privacy, #pricing)
+  if (view === 'terms') return <TermsOfService onBack={() => { window.location.hash = ''; setView('landing'); }} />;
+  if (view === 'privacy') return <PrivacyPolicy onBack={() => { window.location.hash = ''; setView('landing'); }} />;
+  if (view === 'pricing') return <PricingPage onBack={() => { window.location.hash = ''; setView('landing'); }} />;
 
   if (view === 'landing') {
     // Default to Showcase unless explicitly disabled
