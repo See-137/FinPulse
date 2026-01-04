@@ -4,10 +4,10 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { 
   Plus, Download, Lock, Search, Trash2, Pencil, ShieldCheck, 
   TrendingUp, TrendingDown, Bitcoin, Activity, Gem, Eye, EyeOff,
-  ArrowUpDown, ArrowUp, ArrowDown, XCircle, Wifi, WifiOff
+  ArrowUpDown, ArrowUp, ArrowDown, XCircle, Wifi, WifiOff, Crown
 } from 'lucide-react';
 import { User, Currency } from '../types';
-import { CURRENCY_RATES } from '../constants';
+import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { useMarketData } from '../hooks/useMarketData';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
@@ -88,8 +88,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   const handleAddOrUpdateAsset = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check asset limit
     if (!editingAsset && holdings.length >= user.credits.maxAssets) {
-      alert(`Limit Reached: Your ${user.plan} plan allows only ${user.credits.maxAssets} assets. Please upgrade to unlock more slots.`);
+      alert(`Limit Reached: Your ${user.plan} plan allows only ${user.credits.maxAssets} assets. Upgrade to ProPulse or SuperPulse to unlock more slots.`);
+      return;
+    }
+
+    // Check commodity restriction for Free users
+    const planConfig = SaaS_PLANS[user.plan];
+    if (formData.type === 'COMMODITY' && !planConfig.allowCommodities) {
+      alert(`🔒 Commodities Locked: Gold, Oil, and other commodities are available on ProPulse ($9.90/mo) and SuperPulse plans. Upgrade to track commodities alongside your stocks and crypto.`);
       return;
     }
 

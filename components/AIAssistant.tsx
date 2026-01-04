@@ -180,7 +180,12 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
     if (!query.trim() || isTyping) return;
 
     if (user.credits.ai >= user.credits.maxAi) {
-      setMessages(prev => [...prev, { role: 'assistant', text: "Usage Limit Reached: You have consumed your daily AI mirror credits. Upgrade to PRO for unlimited institutional analysis." }]);
+      const upgradeMsg = user.plan === 'FREE' 
+        ? "🔒 **Daily AI Limit Reached** (5/5 queries)\n\nUpgrade to **ProPulse** ($9.90/mo) for 10 queries/day, or **SuperPulse** ($29.90/mo) for 50 queries/day with premium analytics."
+        : user.plan === 'PROPULSE'
+        ? "🔒 **Daily AI Limit Reached** (10/10 queries)\n\nUpgrade to **SuperPulse** ($29.90/mo) for 50 AI queries/day plus premium analytics and priority support."
+        : "🔒 **Daily AI Limit Reached**\n\nYour daily queries will reset at midnight UTC.";
+      setMessages(prev => [...prev, { role: 'assistant', text: upgradeMsg }]);
       setQuery('');
       return;
     }
