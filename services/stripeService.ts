@@ -1,6 +1,6 @@
 /**
- * Stripe Payment Service
- * Handles subscription checkout and management via Stripe
+ * Paddle Payment Service
+ * Handles subscription checkout and management via Paddle
  */
 
 import { PlanType } from '../types';
@@ -9,15 +9,15 @@ import { config } from '../config';
 // API base URL
 const API_BASE_URL = config.apiUrl;
 
-// Stripe Price IDs - these should match your Stripe Dashboard
-// Replace with your actual price IDs from Stripe
-export const STRIPE_PRICE_IDS: Record<Exclude<PlanType, 'FREE'>, string> = {
-  PRO: import.meta.env.VITE_STRIPE_PRICE_PRO || 'price_pro_monthly',
-  TEAM: import.meta.env.VITE_STRIPE_PRICE_TEAM || 'price_team_monthly'
+// Paddle Price IDs - these should match your Paddle Dashboard
+// Replace with your actual price IDs from Paddle
+export const PADDLE_PRICE_IDS: Record<Exclude<PlanType, 'FREE'>, string> = {
+  PROPULSE: import.meta.env.VITE_PADDLE_PRICE_PROPULSE || 'pri_propulse_monthly',
+  SUPERPULSE: import.meta.env.VITE_PADDLE_PRICE_SUPERPULSE || 'pri_superpulse_monthly'
 };
 
-// Stripe public key - safe to expose
-const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY || '';
+// Paddle client token - safe to expose
+const PADDLE_CLIENT_TOKEN = import.meta.env.VITE_PADDLE_CLIENT_TOKEN || '';
 
 interface CheckoutSessionResponse {
   sessionId: string;
@@ -36,19 +36,6 @@ interface SubscriptionStatus {
 }
 
 /**
- * Load Stripe.js dynamically
- */
-let stripePromise: Promise<any> | null = null;
-
-export const getStripe = async () => {
-  if (!stripePromise) {
-    const { loadStripe } = await import('@stripe/stripe-js');
-    stripePromise = loadStripe(STRIPE_PUBLIC_KEY);
-  }
-  return stripePromise;
-};
-
-/**
  * Create a checkout session for subscription upgrade
  */
 export const createCheckoutSession = async (
@@ -64,7 +51,7 @@ export const createCheckoutSession = async (
     body: JSON.stringify({
       userId,
       email,
-      priceId: STRIPE_PRICE_IDS[plan],
+      priceId: PADDLE_PRICE_IDS[plan],
       plan,
       successUrl: `${window.location.origin}?session_id={CHECKOUT_SESSION_ID}&success=true`,
       cancelUrl: `${window.location.origin}?canceled=true`
@@ -80,7 +67,7 @@ export const createCheckoutSession = async (
 };
 
 /**
- * Redirect to Stripe Checkout
+ * Redirect to Paddle Checkout
  */
 export const redirectToCheckout = async (
   userId: string,
@@ -90,7 +77,7 @@ export const redirectToCheckout = async (
   try {
     const { url } = await createCheckoutSession(userId, email, plan);
     
-    // Redirect to Stripe Checkout
+    // Redirect to Paddle Checkout
     window.location.href = url;
   } catch (error) {
     console.error('Checkout error:', error);

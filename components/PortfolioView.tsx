@@ -352,11 +352,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
           <button 
             disabled={user.plan === 'FREE'}
             onClick={exportCSV}
-            aria-label={user.plan === 'FREE' ? 'Export CSV (PRO feature)' : 'Export portfolio to CSV'}
+            aria-label={user.plan === 'FREE' ? 'Export CSV (ProPulse feature)' : 'Export portfolio to CSV'}
             className={`p-3 sm:p-4 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center gap-3 transition-all ${user.plan === 'FREE' ? 'opacity-30 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-[#00e5ff] hover:border-[#00e5ff]/30'}`}
           >
             {user.plan === 'FREE' ? <Lock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Export {user.plan === 'FREE' && '(PRO)'}</span>
+            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Export {user.plan === 'FREE' && '(ProPulse)'}</span>
           </button>
           <button 
             onClick={() => {
