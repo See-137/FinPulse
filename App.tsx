@@ -12,6 +12,7 @@ import { LandingPage } from './components/LandingPage';
 import { LandingPageShowcase } from './components/LandingPageShowcase';
 import { WelcomePage } from './components/WelcomePage';
 import { AdminPortal } from './components/AdminPortal';
+import { PricingModal } from './components/PricingModal';
 import { Shield, Bell, LayoutGrid, Users, Menu, X, Terminal, Star, Globe } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
 import { auth } from './services/authService';
@@ -28,6 +29,7 @@ const AppContent: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNewsSidebarOpen, setIsNewsSidebarOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isPricingOpen, setIsPricingOpen] = useState(false);
   
   // Currency State with Persistence
   const [currency, setCurrency] = useState<Currency>(() => {
@@ -251,6 +253,7 @@ const AppContent: React.FC = () => {
         onClose={() => setIsSettingsOpen(false)} 
         user={user!}
         onUpgrade={handlePlanUpgrade}
+        onOpenPricing={() => { setIsSettingsOpen(false); setIsPricingOpen(true); }}
         currentTheme={theme}
         onThemeChange={setTheme}
         onLogout={handleLogout}
@@ -262,6 +265,15 @@ const AppContent: React.FC = () => {
         user={user!} 
         onUpdateUser={setUser} 
       />
+
+      {user && (
+        <PricingModal
+          user={user}
+          isOpen={isPricingOpen}
+          onClose={() => setIsPricingOpen(false)}
+          onPlanChange={handlePlanUpgrade}
+        />
+      )}
 
       <AIAssistant user={user!} onUpdateUsage={(credits) => setUser(u => u ? {...u, credits: {...u.credits, ai: credits}} : null)} />
     </div>
