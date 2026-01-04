@@ -1,8 +1,13 @@
 // FinPulse Cognito Authentication Service
 // Handles user signup, login, and token management
+// Supports both localStorage (legacy) and httpOnly cookie token storage
 
 import { config } from '../config';
 import { api } from './apiService';
+
+// Token storage mode - set to 'cookie' for production security
+const TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' = 
+  (import.meta.env.VITE_TOKEN_STORAGE_MODE as 'localStorage' | 'cookie') || 'localStorage';
 
 interface AuthTokens {
   accessToken: string;
@@ -31,10 +36,12 @@ class AuthService {
   private clientId: string;
   private currentUser: CognitoUser | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
+  private useSecureCookies: boolean;
 
   constructor() {
     this.cognitoUrl = `https://cognito-idp.${config.cognito.region}.amazonaws.com`;
     this.clientId = config.cognito.clientId;
+    this.useSecureCookies = TOKEN_STORAGE_MODE === 'cookie';
     this.restoreSession();
   }
 
@@ -155,6 +162,13 @@ class AuthService {
 
   async signOut(): Promise<void> {
     this.currentUser = null;
+    
+    // Clear secure cookies if enabled
+    if (this.useSecureCookies) {
+      await this.clearSecureTokens();
+    }
+    
+    // Always clear localStorage
     localStorage.removeItem('finpulse_auth_tokens');
     localStorage.removeItem('finpulse_user');
     localStorage.removeItem('finpulse_id_token');
@@ -273,11 +287,50 @@ class AuthService {
   }
 
   private storeSession(tokens: AuthTokens, user: CognitoUser): void {
+    this.currentUser = user;
+    
+    if (this.useSecureCookies) {
+      // Store tokens via httpOnly cookies (server-side)
+      this.setSecureTokens(tokens).catch(err => {
+        console.error('Failed to set secure cookies, falling back to localStorage:', err);
+        this.storeSessionLocally(tokens, user);
+      });
+      // Still store user info locally (non-sensitive)
+      localStorage.setItem('finpulse_user', JSON.stringify(user));
+    } else {
+      this.storeSessionLocally(tokens, user);
+    }
+  }
+
+  private storeSessionLocally(tokens: AuthTokens, user: CognitoUser): void {
     localStorage.setItem('finpulse_auth_tokens', JSON.stringify(tokens));
     localStorage.setItem('finpulse_user', JSON.stringify(user));
     // Store ID token separately for API calls (required by API Gateway Cognito authorizer)
     localStorage.setItem('finpulse_id_token', tokens.idToken);
-    this.currentUser = user;
+  }
+
+  private async setSecureTokens(tokens: AuthTokens): Promise<void> {
+    const response = await fetch(`${config.apiUrl}/auth/set-tokens`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ tokens })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to set secure tokens');
+    }
+  }
+
+  private async clearSecureTokens(): Promise<void> {
+    try {
+      await fetch(`${config.apiUrl}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (err) {
+      console.error('Failed to clear secure tokens:', err);
+    }
   }
 
   private restoreSession(): void {

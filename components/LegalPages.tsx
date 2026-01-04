@@ -269,8 +269,11 @@ export const PricingPage: React.FC<LegalPageProps> = ({ onBack }) => (
 
       <div className="mt-12 text-center text-slate-400 text-sm">
         <p>All plans include a 14-day money-back guarantee • Cancel anytime</p>
-        <p className="mt-2">Payments securely processed by Paddle</p>
+        <p className="mt-2">Payments securely processed by Stripe</p>
       </div>
     </div>
   </div>
 );
+
+// Default export for lazy loading
+export default { TermsOfService, PrivacyPolicy, PricingPage };
