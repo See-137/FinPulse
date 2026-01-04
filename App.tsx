@@ -22,7 +22,7 @@ import { OnboardingFlow, useOnboarding } from './components/OnboardingFlow';
 import { MilestoneModal } from './components/MilestoneModal';
 import { milestoneService } from './services/milestoneService';
 import { Milestone } from './types/notifications';
-import { Shield, LayoutGrid, Users, Menu, X, Terminal, Star, Globe } from 'lucide-react';
+import { Shield, LayoutGrid, Users, Menu, X, Terminal, Star, Globe, Check } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
 import { auth, type CognitoUser } from './services/authService';
 import { LanguageProvider, useLanguage, type Language } from './i18n';
@@ -372,19 +372,59 @@ const AppContent: React.FC = () => {
 
           <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
             {/* Language Toggle */}
-            <div className="hidden sm:flex bg-slate-100 dark:bg-[#151921] rounded-lg p-0.5 border border-slate-200 dark:border-white/5">
-               <button onClick={() => setLanguage('en')} aria-label="Switch to English" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all flex items-center gap-1 ${language === 'en' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>
+            <div className="flex bg-slate-100 dark:bg-[#151921] rounded-xl p-1 border border-slate-200 dark:border-white/10">
+               <button 
+                 onClick={() => setLanguage('en')} 
+                 aria-label="Switch to English"
+                 className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 ${
+                   language === 'en' 
+                     ? 'bg-white dark:bg-white/10 text-[#00e5ff] shadow-sm' 
+                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                 }`}
+               >
+                 {language === 'en' && <Check className="w-3 h-3" />}
                  EN
                </button>
-               <button onClick={() => setLanguage('he')} aria-label="Switch to Hebrew" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all flex items-center gap-1 ${language === 'he' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>
+               <button 
+                 onClick={() => setLanguage('he')} 
+                 aria-label="Switch to Hebrew"
+                 className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 ${
+                   language === 'he' 
+                     ? 'bg-white dark:bg-white/10 text-[#00e5ff] shadow-sm' 
+                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                 }`}
+               >
+                 {language === 'he' && <Check className="w-3 h-3" />}
                  עב
                </button>
             </div>
 
             {/* Currency Toggle */}
-            <div className="hidden sm:flex bg-slate-100 dark:bg-[#151921] rounded-lg p-0.5 border border-slate-200 dark:border-white/5">
-               <button onClick={() => setCurrency('USD')} aria-label="Switch to USD currency" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${currency === 'USD' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>USD</button>
-               <button onClick={() => setCurrency('ILS')} aria-label="Switch to ILS currency" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${currency === 'ILS' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>ILS</button>
+            <div className="flex bg-slate-100 dark:bg-[#151921] rounded-xl p-1 border border-slate-200 dark:border-white/10">
+               <button 
+                 onClick={() => setCurrency('USD')} 
+                 aria-label="Switch to USD currency"
+                 className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 ${
+                   currency === 'USD' 
+                     ? 'bg-white dark:bg-white/10 text-[#00e5ff] shadow-sm' 
+                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                 }`}
+               >
+                 {currency === 'USD' && <Check className="w-3 h-3" />}
+                 USD
+               </button>
+               <button 
+                 onClick={() => setCurrency('ILS')} 
+                 aria-label="Switch to ILS currency"
+                 className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 ${
+                   currency === 'ILS' 
+                     ? 'bg-white dark:bg-white/10 text-[#00e5ff] shadow-sm' 
+                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                 }`}
+               >
+                 {currency === 'ILS' && <Check className="w-3 h-3" />}
+                 ILS
+               </button>
             </div>
 
             <NotificationBell userPlan={user?.plan || 'FREE'} onNavigate={handleNavigate} />
