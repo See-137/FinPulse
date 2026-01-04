@@ -104,16 +104,34 @@ const AppContent: React.FC = () => {
       if (cognitoUser) {
         // Step 5: Set idToken for all future API calls
         const idToken = localStorage.getItem('finpulse_id_token');
-        if (idToken) {
-          api.setIdToken(idToken);
+        if (!idToken) {
+          // No token stored - can't restore session
+          console.log('No idToken found, staying on landing');
+          return;
         }
         
+        api.setIdToken(idToken);
+        
         // Create User object from Cognito credentials + backend data
-        const backendUser = await fetchUserProfile(cognitoUser.userId);
-        if (backendUser) {
-          setUser(backendUser);
-          setCurrentUser(backendUser.id); // Set user for portfolio data isolation
-          setView('dashboard');
+        try {
+          const backendUser = await fetchUserProfile(cognitoUser.userId);
+          if (backendUser) {
+            setUser(backendUser);
+            setCurrentUser(backendUser.id); // Set user for portfolio data isolation
+            setView('dashboard');
+          } else {
+            // Profile fetch failed - clear stale session
+            console.log('Failed to restore user profile, clearing session');
+            auth.signOut();
+            api.setIdToken(null);
+            localStorage.removeItem('finpulse_id_token');
+          }
+        } catch (error) {
+          // Auth error (401/403) - token expired or invalid
+          console.error('Session restore failed:', error);
+          auth.signOut();
+          api.setIdToken(null);
+          localStorage.removeItem('finpulse_id_token');
         }
       }
     };
