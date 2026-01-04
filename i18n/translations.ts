@@ -151,8 +151,8 @@ export const translations = {
     // Plans
     plans: {
       free: 'Free',
-      pro: 'Pro',
-      enterprise: 'Enterprise',
+      propulse: 'ProPulse',
+      superpulse: 'SuperPulse',
     },
     
     // Pricing Modal
@@ -319,8 +319,8 @@ export const translations = {
     // Plans
     plans: {
       free: 'חינם',
-      pro: 'פרו',
-      enterprise: 'ארגוני',
+      propulse: 'פרופאלס',
+      superpulse: 'סופרפאלס',
     },
     
     // Pricing Modal
