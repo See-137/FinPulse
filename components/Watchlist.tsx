@@ -56,7 +56,8 @@ const FALLBACK_PRICES: Record<string, { price: number; change24h: number }> = {
 
 export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio }) => {
   const { t } = useLanguage();
-  const { watchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, setWatchlistAlert } = usePortfolioStore();
+  const { getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, setWatchlistAlert } = usePortfolioStore();
+  const watchlist = getWatchlist();
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [alertModal, setAlertModal] = useState<{ symbol: string; currentPrice: number } | null>(null);

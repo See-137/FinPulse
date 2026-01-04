@@ -155,6 +155,16 @@ export const translations = {
       superpulse: 'SuperPulse',
     },
     
+    // Asset Selector
+    assetSelector: {
+      selectAsset: 'Select Asset',
+      searchAssets: 'Search assets...',
+      popularAssets: 'Popular Assets',
+      noAssetsFound: 'No assets found',
+      typeToSearch: 'Type to search for assets',
+      searchPoweredBy: 'Search powered by',
+    },
+    
     // Pricing Modal
     pricing: {
       title: 'Choose Your Plan',
@@ -321,6 +331,16 @@ export const translations = {
       free: 'חינם',
       propulse: 'פרופאלס',
       superpulse: 'סופרפאלס',
+    },
+    
+    // Asset Selector
+    assetSelector: {
+      selectAsset: 'בחר נכס',
+      searchAssets: 'חפש נכסים...',
+      popularAssets: 'נכסים פופולריים',
+      noAssetsFound: 'לא נמצאו נכסים',
+      typeToSearch: 'הקלד לחיפוש נכסים',
+      searchPoweredBy: 'חיפוש מופעל על ידי',
     },
     
     // Pricing Modal

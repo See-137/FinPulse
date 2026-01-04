@@ -18,12 +18,14 @@ import { Shield, Bell, LayoutGrid, Users, Menu, X, Terminal, Star, Globe } from 
 import { User, PlanType, Theme, Currency } from './types';
 import { auth } from './services/authService';
 import { LanguageProvider, useLanguage, type Language } from './i18n';
+import { usePortfolioStore } from './store/portfolioStore';
 
 const USER_STORAGE_KEY = 'finpulse_user_session';
 
 // Inner App component that uses language context
 const AppContent: React.FC = () => {
   const { t, language, setLanguage, isRTL } = useLanguage();
+  const { setCurrentUser, clearCurrentUser } = usePortfolioStore();
   const [view, setView] = useState<'landing' | 'welcome' | 'dashboard' | 'terms' | 'privacy' | 'pricing'>(() => {
     // Check URL hash for legal pages
     const hash = window.location.hash.slice(1);
@@ -63,12 +65,13 @@ const AppContent: React.FC = () => {
       try {
         const parsed = JSON.parse(savedUser);
         setUser(parsed);
+        setCurrentUser(parsed.id); // Set user for portfolio data isolation
         setView('dashboard');
       } catch (e) {
         localStorage.removeItem(USER_STORAGE_KEY);
       }
     }
-  }, []);
+  }, [setCurrentUser]);
 
   // Persist session
   useEffect(() => {
@@ -111,8 +114,9 @@ const AppContent: React.FC = () => {
 
   const handleLogin = (email: string, name: string) => {
     const defaultPlan: PlanType = 'FREE';
+    const userId = Math.random().toString(36).substr(2, 9);
     const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: userId,
       name: name || email.split('@')[0],
       email,
       plan: defaultPlan,
@@ -125,6 +129,7 @@ const AppContent: React.FC = () => {
       subscriptionStatus: 'active'
     };
     setUser(newUser);
+    setCurrentUser(userId); // Set user for portfolio data isolation
     setView('dashboard');
   };
   
@@ -143,6 +148,7 @@ const AppContent: React.FC = () => {
 
   const handleLogout = () => {
     setUser(null);
+    clearCurrentUser(); // Clear portfolio user scope
     localStorage.removeItem(USER_STORAGE_KEY);
     setView('landing');
   };
