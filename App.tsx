@@ -16,7 +16,7 @@ import { PricingModal } from './components/PricingModal';
 import { TermsOfService, PrivacyPolicy, PricingPage } from './components/LegalPages';
 import { Shield, Bell, LayoutGrid, Users, Menu, X, Terminal, Star, Globe } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
-import { auth } from './services/authService';
+import { auth, type CognitoUser } from './services/authService';
 import { LanguageProvider, useLanguage, type Language } from './i18n';
 import { usePortfolioStore } from './store/portfolioStore';
 
@@ -58,19 +58,21 @@ const AppContent: React.FC = () => {
     return (localStorage.getItem('theme') as Theme) || 'system';
   });
 
-  // Restore session
+  // Restore session from Cognito (proper auth flow)
   useEffect(() => {
-    const savedUser = localStorage.getItem(USER_STORAGE_KEY);
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        setUser(parsed);
-        setCurrentUser(parsed.id); // Set user for portfolio data isolation
-        setView('dashboard');
-      } catch (e) {
-        localStorage.removeItem(USER_STORAGE_KEY);
+    const restoreAuth = async () => {
+      const cognitoUser = auth.getCurrentUser();
+      if (cognitoUser) {
+        // Create User object from Cognito credentials + backend data
+        const backendUser = await fetchUserProfile(cognitoUser.userId);
+        if (backendUser) {
+          setUser(backendUser);
+          setCurrentUser(backendUser.id); // Set user for portfolio data isolation
+          setView('dashboard');
+        }
       }
-    }
+    };
+    restoreAuth();
   }, [setCurrentUser]);
 
   // Persist session
@@ -112,25 +114,63 @@ const AppContent: React.FC = () => {
     };
   }, [theme]);
 
-  const handleLogin = (email: string, name: string) => {
-    const defaultPlan: PlanType = 'FREE';
-    const userId = Math.random().toString(36).substr(2, 9);
-    const newUser: User = {
-      id: userId,
-      name: name || email.split('@')[0],
-      email,
-      plan: defaultPlan,
-      credits: {
-        ai: 0,
-        maxAi: SaaS_PLANS[defaultPlan].maxAiQueries,
-        assets: 0,
-        maxAssets: SaaS_PLANS[defaultPlan].maxAssets
-      },
-      subscriptionStatus: 'active'
-    };
-    setUser(newUser);
-    setCurrentUser(userId); // Set user for portfolio data isolation
-    setView('dashboard');
+  // Step 1: Fetch user profile from backend (DynamoDB via /auth/me)
+  const fetchUserProfile = async (userId: string): Promise<User | null> => {
+    try {
+      const idToken = localStorage.getItem('finpulse_id_token');
+      if (!idToken) return null;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
+        headers: { 'Authorization': idToken },
+      });
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const backendUser = data.data || data;
+      
+      // Map backend user to frontend User type
+      return {
+        id: backendUser.userId,
+        email: backendUser.email,
+        name: backendUser.name,
+        plan: (backendUser.plan || 'FREE') as PlanType,
+        credits: {
+          ai: backendUser.credits?.ai || 0,
+          maxAi: SaaS_PLANS[backendUser.plan || 'FREE'].maxAiQueries,
+          assets: backendUser.credits?.assets || 0,
+          maxAssets: SaaS_PLANS[backendUser.plan || 'FREE'].maxAssets
+        },
+        subscriptionStatus: backendUser.subscriptionStatus || 'active'
+      };
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+      return null;
+    }
+  };
+
+  // Step 2: User profile created automatically by Lambda's getOrCreateUser
+  // No need for separate POST - /auth/me handles creation on first access
+
+  // Step 3-5: Handle login with full Cognito + backend flow
+  const handleLogin = async (email: string, name: string) => {
+    const cognitoUser = auth.getCurrentUser();
+    if (!cognitoUser) {
+      console.error('No Cognito user found');
+      return;
+    }
+
+    // /auth/me automatically creates user on first access (getOrCreateUser)
+    // So just fetch it - will be created if doesn't exist
+    const userProfile = await fetchUserProfile(cognitoUser.userId);
+
+    if (userProfile) {
+      setUser(userProfile);
+      setCurrentUser(userProfile.id); // Set persistent userId from Cognito
+      setView('dashboard');
+    } else {
+      console.error('Failed to setup user profile');
+    }
   };
   
   const handlePlanUpgrade = (plan: PlanType) => {
@@ -146,7 +186,8 @@ const AppContent: React.FC = () => {
     });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await auth.signOut(); // Clear Cognito session
     setUser(null);
     clearCurrentUser(); // Clear portfolio user scope
     localStorage.removeItem(USER_STORAGE_KEY);
