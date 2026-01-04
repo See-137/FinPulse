@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { usePortfolioStore, WatchlistItem, AssetType } from '../store/portfolioStore';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
+import { useLanguage } from '../i18n';
 import { Currency } from '../types';
 import { CURRENCY_RATES } from '../constants';
 
@@ -54,6 +55,7 @@ const FALLBACK_PRICES: Record<string, { price: number; change24h: number }> = {
 };
 
 export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio }) => {
+  const { t } = useLanguage();
   const { watchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, setWatchlistAlert } = usePortfolioStore();
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -138,8 +140,8 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
             <Star className="w-6 h-6 text-amber-400" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white">Watchlist</h2>
-            <p className="text-sm text-slate-500">Track assets without adding to portfolio</p>
+            <h2 className="text-2xl font-black text-white">{t('watchlist.title')}</h2>
+            <p className="text-sm text-slate-500">{t('watchlist.subtitle')}</p>
           </div>
         </div>
 
@@ -153,12 +155,12 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
             {isConnected ? (
               <>
                 <Wifi className="w-3 h-3 text-emerald-400" />
-                <span className="text-[9px] font-black text-emerald-400 uppercase">Live</span>
+                <span className="text-[9px] font-black text-emerald-400 uppercase">{t('common.live')}</span>
               </>
             ) : (
               <>
                 <WifiOff className="w-3 h-3 text-amber-400" />
-                <span className="text-[9px] font-black text-amber-400 uppercase">Delayed</span>
+                <span className="text-[9px] font-black text-amber-400 uppercase">{t('common.delayed')}</span>
               </>
             )}
           </div>
@@ -168,7 +170,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
             className="flex items-center gap-2 px-6 py-3 bg-[#00e5ff] text-[#0b0e14] font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-white transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Add Asset
+            {t('watchlist.addAsset')}
           </button>
         </div>
       </div>
@@ -177,16 +179,16 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
       {watchlist.length === 0 ? (
         <div className="card-surface rounded-[32px] p-12 text-center bg-gradient-to-br from-[#151921] to-[#0b0e14]">
           <Eye className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-          <h3 className="text-xl font-black text-white mb-2">Your Watchlist is Empty</h3>
+          <h3 className="text-xl font-black text-white mb-2">{t('watchlist.empty')}</h3>
           <p className="text-slate-500 mb-6 max-w-md mx-auto">
-            Add assets to your watchlist to track their prices without adding them to your portfolio.
+            {t('watchlist.emptyDesc')}
           </p>
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="inline-flex items-center gap-2 px-8 py-4 bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-white/10 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Add Your First Asset
+            {t('watchlist.addFirst')}
           </button>
         </div>
       ) : (
@@ -261,7 +263,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
                       onClick={() => onAddToPortfolio(item.symbol, item.name, item.type)}
                       className="flex items-center gap-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-wider text-slate-400 hover:text-[#00e5ff] hover:border-[#00e5ff]/30 transition-colors"
                     >
-                      Add to Mirror
+                      {t('watchlist.addToMirror')}
                       <ArrowRight className="w-3 h-3" />
                     </button>
                   )}
@@ -273,10 +275,10 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
                     alertTriggered ? 'animate-pulse' : ''
                   }`}>
                     <span className="text-[10px] text-slate-500 uppercase tracking-wider">
-                      Alert: {item.alertType} {currencySymbol}{item.alertPrice?.toLocaleString()}
+                      {t('watchlist.priceAlert')}: {item.alertType === 'above' ? t('watchlist.above') : t('watchlist.below')} {currencySymbol}{item.alertPrice?.toLocaleString()}
                     </span>
                     {alertTriggered && (
-                      <span className="text-[10px] font-black text-amber-400 uppercase">Triggered!</span>
+                      <span className="text-[10px] font-black text-amber-400 uppercase">{t('watchlist.triggered')}</span>
                     )}
                   </div>
                 )}
@@ -297,13 +299,13 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
               <X className="w-6 h-6" />
             </button>
 
-            <h2 className="text-2xl font-black text-white mb-6">Add to Watchlist</h2>
+            <h2 className="text-2xl font-black text-white mb-6">{t('watchlist.addAsset')}</h2>
 
             <div className="relative mb-4">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
-                placeholder="Search assets..."
+                placeholder={t('watchlist.searchAssets')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full bg-[#0b0e14] border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm font-medium outline-none text-white placeholder:text-slate-500 focus:ring-1 focus:ring-[#00e5ff]/50"
@@ -369,13 +371,13 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
                 <Bell className="w-6 h-6 text-amber-400" />
               </div>
               <div>
-                <h2 className="text-xl font-black text-white">Price Alert</h2>
+                <h2 className="text-xl font-black text-white">{t('watchlist.priceAlert')}</h2>
                 <p className="text-sm text-slate-500">{alertModal.symbol}</p>
               </div>
             </div>
 
             <p className="text-sm text-slate-400 mb-4">
-              Current price: <span className="text-white font-bold">{currencySymbol}{(alertModal.currentPrice * rate).toLocaleString()}</span>
+              {t('watchlist.currentPrice')}: <span className="text-white font-bold">{currencySymbol}{(alertModal.currentPrice * rate).toLocaleString()}</span>
             </p>
 
             <div className="space-y-4">
@@ -388,7 +390,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
                       : 'bg-white/5 text-slate-500 border border-white/10'
                   }`}
                 >
-                  Above
+                  {t('watchlist.above')}
                 </button>
                 <button
                   onClick={() => setAlertType('below')}
@@ -398,7 +400,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
                       : 'bg-white/5 text-slate-500 border border-white/10'
                   }`}
                 >
-                  Below
+                  {t('watchlist.below')}
                 </button>
               </div>
 
@@ -416,7 +418,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
                     onClick={() => { handleRemoveAlert(alertModal.symbol); setAlertModal(null); }}
                     className="flex-1 py-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-rose-500/20 transition-colors"
                   >
-                    Remove Alert
+                    {t('watchlist.removeAlert')}
                   </button>
                 )}
                 <button
@@ -424,7 +426,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
                   disabled={!alertPrice}
                   className="flex-1 py-3 bg-[#00e5ff] text-[#0b0e14] rounded-xl text-xs font-black uppercase tracking-wider hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Set Alert
+                  {t('watchlist.setAlert')}
                 </button>
               </div>
             </div>

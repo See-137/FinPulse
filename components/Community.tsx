@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, ThumbsUp, TrendingUp, Search, Plus, User, Calendar, Send, X, Loader2 } from 'lucide-react';
 import { getPosts, createPost, likePost, type Post } from '../services/communityService';
+import { useLanguage, formatT } from '../i18n';
 
 // Fallback mock data when API is unavailable
 const MOCK_POSTS: Post[] = [
@@ -76,6 +77,7 @@ function getCategoryFromType(type: string): string {
 }
 
 export const Community: React.FC = () => {
+  const { t } = useLanguage();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,10 +174,10 @@ export const Community: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-5 h-5 text-emerald-400" />
-            <span className="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-400">Global Pulse Feed</span>
+            <span className="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-400">{t('community.feedTitle')}</span>
           </div>
-          <h1 className="text-5xl font-black tracking-tighter text-white">Global Insight</h1>
-          <p className="text-slate-500 text-sm font-medium mt-1">Anonymized strategies from the world's most disciplined mirrors.</p>
+          <h1 className="text-5xl font-black tracking-tighter text-white">{t('community.title')}</h1>
+          <p className="text-slate-500 text-sm font-medium mt-1">{t('community.subtitle')}</p>
         </div>
         
         <button 
@@ -183,7 +185,7 @@ export const Community: React.FC = () => {
           className="flex items-center gap-3 px-8 py-4 bg-white text-[#0b0e14] font-black uppercase tracking-widest text-[11px] rounded-[24px] shadow-2xl hover:bg-[#00e5ff] transition-all"
         >
           <Plus className="w-5 h-5" />
-          Broadcast Insight
+          {t('community.broadcast')}
         </button>
       </div>
 
@@ -196,7 +198,7 @@ export const Community: React.FC = () => {
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-[#00e5ff] transition-colors" />
               <input 
                 type="text" 
-                placeholder="Search posts, tickers, tags..." 
+                placeholder={t('community.searchPlaceholder')} 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-[#0b0e14] border border-white/5 rounded-2xl pl-12 pr-6 py-4 text-xs font-bold outline-none focus:ring-1 focus:ring-[#00e5ff]/50 transition-all text-white placeholder:text-slate-500"
@@ -207,11 +209,11 @@ export const Community: React.FC = () => {
               onChange={(e) => setFilterType(e.target.value)}
               className="hidden sm:block bg-[#0b0e14] border border-white/5 rounded-2xl px-6 py-4 text-[10px] font-black uppercase tracking-widest outline-none appearance-none cursor-pointer text-white"
             >
-              <option value="">All Posts</option>
-              <option value="discussion">Discussion</option>
-              <option value="analysis">Analysis</option>
-              <option value="trade_idea">Trade Ideas</option>
-              <option value="question">Questions</option>
+              <option value="">{t('community.allPosts')}</option>
+              <option value="discussion">{t('community.discussion')}</option>
+              <option value="analysis">{t('community.analysis')}</option>
+              <option value="trade_idea">{t('community.tradeIdea')}</option>
+              <option value="question">{t('community.question')}</option>
             </select>
           </div>
 
@@ -289,7 +291,7 @@ export const Community: React.FC = () => {
           {/* No Posts */}
           {!loading && filteredPosts.length === 0 && (
             <div className="text-center py-20">
-              <p className="text-slate-500 font-medium">No posts found</p>
+              <p className="text-slate-500 font-medium">{t('community.noPosts')}</p>
             </div>
           )}
         </div>
@@ -297,7 +299,7 @@ export const Community: React.FC = () => {
         {/* Sidebar Intelligence */}
         <div className="space-y-6">
           <div className="card-surface p-8 rounded-[40px] sticky top-24 bg-gradient-to-b from-[#151921] to-transparent">
-            <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-8">Global Leaderboard</h3>
+            <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-8">{t('community.leaderboard')}</h3>
             
             <div className="space-y-6">
               {[
@@ -320,10 +322,10 @@ export const Community: React.FC = () => {
 
             <div className="mt-12 pt-8 border-t border-white/5 text-center">
               <p className="text-[10px] text-slate-600 font-medium leading-relaxed mb-6">
-                Your mirror is currently private. Public mirroring allows others to observe your performance without revealing absolute values.
+                {t('community.privateMessage')}
               </p>
               <button className="w-full py-4 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-                Enable Public Broadcast
+                {t('community.enableBroadcast')}
               </button>
             </div>
           </div>
@@ -341,7 +343,7 @@ export const Community: React.FC = () => {
               <X className="w-6 h-6" />
             </button>
 
-            <h2 className="text-2xl font-black text-white mb-6">Broadcast Insight</h2>
+            <h2 className="text-2xl font-black text-white mb-6">{t('community.broadcast')}</h2>
 
             <div className="space-y-4">
               <select
@@ -349,10 +351,10 @@ export const Community: React.FC = () => {
                 onChange={(e) => setNewPostType(e.target.value)}
                 className="w-full bg-[#0b0e14] border border-white/10 rounded-2xl px-6 py-4 text-xs font-bold outline-none text-white"
               >
-                <option value="discussion">Discussion</option>
-                <option value="analysis">Analysis</option>
-                <option value="trade_idea">Trade Idea</option>
-                <option value="question">Question</option>
+                <option value="discussion">{t('community.discussion')}</option>
+                <option value="analysis">{t('community.analysis')}</option>
+                <option value="trade_idea">{t('community.tradeIdea')}</option>
+                <option value="question">{t('community.question')}</option>
               </select>
 
               <textarea
