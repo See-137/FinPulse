@@ -108,7 +108,7 @@ const AppContent: React.FC = () => {
       plan: defaultPlan,
       credits: {
         ai: 0,
-        maxAi: Infinity,
+        maxAi: SaaS_PLANS[defaultPlan].maxAiQueries,
         assets: 0,
         maxAssets: SaaS_PLANS[defaultPlan].maxAssets
       },
@@ -125,7 +125,7 @@ const AppContent: React.FC = () => {
       plan,
       credits: {
         ...user.credits,
-        maxAi: Infinity,
+        maxAi: SaaS_PLANS[plan].maxAiQueries,
         maxAssets: SaaS_PLANS[plan].maxAssets
       }
     });
