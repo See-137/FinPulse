@@ -12,13 +12,16 @@ import { LandingPage } from './components/LandingPage';
 import { LandingPageShowcase } from './components/LandingPageShowcase';
 import { WelcomePage } from './components/WelcomePage';
 import { AdminPortal } from './components/AdminPortal';
-import { Shield, Bell, LayoutGrid, Users, Menu, X, Terminal, Star } from 'lucide-react';
+import { Shield, Bell, LayoutGrid, Users, Menu, X, Terminal, Star, Globe } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
 import { auth } from './services/authService';
+import { LanguageProvider, useLanguage, type Language } from './i18n';
 
 const USER_STORAGE_KEY = 'finpulse_user_session';
 
-const App: React.FC = () => {
+// Inner App component that uses language context
+const AppContent: React.FC = () => {
+  const { t, language, setLanguage, isRTL } = useLanguage();
   const [view, setView] = useState<'landing' | 'welcome' | 'dashboard'>('landing');
   const [activeTab, setActiveTab] = useState<'portfolio' | 'watchlist' | 'community'>('portfolio');
   const [user, setUser] = useState<User | null>(null);
@@ -164,18 +167,29 @@ const App: React.FC = () => {
             
             <div className="hidden md:flex items-center bg-slate-100 dark:bg-[#151921] p-1 rounded-2xl border border-slate-200 dark:border-white/5 shrink-0 transition-colors">
                <button onClick={() => setActiveTab('portfolio')} aria-label="View portfolio" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'portfolio' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
-                 <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> Mirror
+                 <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> {t('nav.mirror')}
                </button>
                <button onClick={() => setActiveTab('watchlist')} aria-label="View watchlist" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'watchlist' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
-                 <Star className="w-3.5 h-3.5" aria-hidden="true" /> Watchlist
+                 <Star className="w-3.5 h-3.5" aria-hidden="true" /> {t('nav.watchlist')}
                </button>
                <button onClick={() => setActiveTab('community')} aria-label="View community" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'community' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
-                 <Users className="w-3.5 h-3.5" aria-hidden="true" /> Community
+                 <Users className="w-3.5 h-3.5" aria-hidden="true" /> {t('nav.community')}
                </button>
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
+            {/* Language Toggle */}
+            <div className="hidden sm:flex bg-slate-100 dark:bg-[#151921] rounded-lg p-0.5 border border-slate-200 dark:border-white/5">
+               <button onClick={() => setLanguage('en')} aria-label="Switch to English" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all flex items-center gap-1 ${language === 'en' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>
+                 EN
+               </button>
+               <button onClick={() => setLanguage('he')} aria-label="Switch to Hebrew" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all flex items-center gap-1 ${language === 'he' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>
+                 עב
+               </button>
+            </div>
+
+            {/* Currency Toggle */}
             <div className="hidden sm:flex bg-slate-100 dark:bg-[#151921] rounded-lg p-0.5 border border-slate-200 dark:border-white/5">
                <button onClick={() => setCurrency('USD')} aria-label="Switch to USD currency" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${currency === 'USD' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>USD</button>
                <button onClick={() => setCurrency('ILS')} aria-label="Switch to ILS currency" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${currency === 'ILS' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>ILS</button>
@@ -185,7 +199,7 @@ const App: React.FC = () => {
               <Terminal className="w-5 h-5" aria-hidden="true" />
             </button>
             <button aria-label={`Current plan: ${user?.plan} Node`} className={`px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${user?.plan === 'PRO' ? 'border-cyan-500/50 text-cyan-400' : 'border-slate-200 dark:border-white/10 text-slate-500'}`}>
-              {user?.plan} Node
+              {user?.plan} {t('nav.node')}
             </button>
             <button onClick={() => setIsNewsSidebarOpen(!isNewsSidebarOpen)} aria-label={isNewsSidebarOpen ? 'Close news sidebar' : 'Open news sidebar'} className={`p-2 rounded-xl lg:hidden ${isNewsSidebarOpen ? 'text-[#00e5ff] bg-[#00e5ff]/10' : 'text-slate-400'}`}>
               <Menu className="w-5 h-5" aria-hidden="true" />
@@ -251,6 +265,15 @@ const App: React.FC = () => {
 
       <AIAssistant user={user!} onUpdateUsage={(credits) => setUser(u => u ? {...u, credits: {...u.credits, ai: credits}} : null)} />
     </div>
+  );
+};
+
+// Main App component with LanguageProvider wrapper
+const App: React.FC = () => {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
   );
 };
 
