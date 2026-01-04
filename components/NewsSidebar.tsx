@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { fetchNews } from '../hooks/useMarketData';
-import { PlanType } from '../types';
+import { PlanType, User } from '../types';
 import { usePortfolioStore } from '../store/portfolioStore';
+import { InfluencerTrends } from './InfluencerTrends';
 
 interface NewsArticle {
   id: string;
@@ -17,6 +18,8 @@ interface NewsArticle {
 
 interface NewsSidebarProps {
   userPlan: PlanType;
+  user?: User | null;
+  onUpgradeClick?: () => void;
 }
 
 // Keywords for holdings-based filtering
@@ -33,8 +36,8 @@ const SYMBOL_KEYWORDS: Record<string, string[]> = {
   'PLTR': ['palantir', 'pltr'],
 };
 
-export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan }) => {
-  const [activeFilter, setActiveFilter] = useState<'Holdings' | 'Watchlist' | 'All'>('All');
+export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan, user, onUpgradeClick }) => {
+  const [activeFilter, setActiveFilter] = useState<'Holdings' | 'Watchlist' | 'Whales' | 'All'>('All');
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
@@ -169,7 +172,7 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan }) => {
         </div>
         
         <div className="flex bg-[#0b0e14] p-1.5 rounded-xl gap-1 border border-white/5">
-          {(['Holdings', 'Watchlist', 'All'] as const).map(filter => (
+          {(['Holdings', 'Whales', 'All'] as const).map(filter => (
             <button 
               key={filter}
               onClick={() => setActiveFilter(filter)}
@@ -186,7 +189,10 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan }) => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-        {loading ? (
+        {activeFilter === 'Whales' ? (
+          // Influencer Trends Tab
+          <InfluencerTrends user={user || null} onUpgradeClick={onUpgradeClick} />
+        ) : loading ? (
           // Skeleton Loader
           Array(4).fill(0).map((_, i) => (
             <div key={i} className="bg-[#151921] border border-white/5 rounded-2xl p-4 animate-pulse">

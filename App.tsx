@@ -497,7 +497,7 @@ const AppContent: React.FC = () => {
 
       <div className={`fixed inset-y-0 right-0 z-50 lg:relative lg:block transition-transform duration-500 transform ${isNewsSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
         <div className="h-full relative w-[85vw] sm:w-[380px] lg:w-[380px]">
-           <NewsSidebar userPlan={user?.plan || 'FREE'} />
+           <NewsSidebar userPlan={user?.plan || 'FREE'} user={user} onUpgradeClick={() => setIsPricingOpen(true)} />
            <button onClick={() => setIsNewsSidebarOpen(false)} aria-label="Close news sidebar" className="absolute top-6 left-[-3rem] lg:hidden p-3 text-white bg-[#00e5ff] rounded-full">
              <X className="w-5 h-5 text-[#0b0e14]" aria-hidden="true" />
            </button>
