@@ -1,0 +1,27 @@
+{
+  "changelogs": [
+    {
+      "version": "2.0.0",
+      "releaseDate": "2026-01-04",
+      "features": [
+        "🚀 Complete platform redesign with new Mirror interface",
+        "🤖 AI Copilot powered by Google Gemini",
+        "📊 Real-time price tracking for Crypto & Stocks",
+        "🌐 New Community features with Global Pulse Feed",
+        "💹 Live FX rates for multi-currency support (USD/ILS)",
+        "🔔 Smart Watchlist with price alerts"
+      ],
+      "bugFixes": [
+        "Fixed price display rounding errors",
+        "Resolved community feed loading issues",
+        "Fixed user session persistence across devices"
+      ],
+      "improvements": [
+        "40% faster dashboard load times",
+        "Mobile responsive design updates",
+        "New hybrid asset selector with 35+ popular assets",
+        "Improved Hebrew (RTL) language support"
+      ]
+    }
+  ]
+}

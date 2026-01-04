@@ -11,35 +11,57 @@ interface ApiResponse<T> {
 
 class ApiService {
   private baseUrl: string;
-  private accessToken: string | null = null;
+  private idToken: string | null = null;
 
   constructor() {
     this.baseUrl = config.apiUrl;
-    // Try to restore token from storage
-    this.accessToken = localStorage.getItem('finpulse_access_token');
+    // Restore Cognito idToken from localStorage
+    this.idToken = localStorage.getItem('finpulse_id_token');
   }
 
-  setAccessToken(token: string | null) {
-    this.accessToken = token;
+  /**
+   * Set Cognito ID token for subsequent API calls
+   * Called after successful Cognito authentication
+   */
+  setIdToken(token: string | null) {
+    this.idToken = token;
     if (token) {
-      localStorage.setItem('finpulse_access_token', token);
+      localStorage.setItem('finpulse_id_token', token);
     } else {
-      localStorage.removeItem('finpulse_access_token');
+      localStorage.removeItem('finpulse_id_token');
     }
+  }
+
+  /**
+   * Legacy method for backward compatibility
+   */
+  setAccessToken(token: string | null) {
+    this.setIdToken(token);
+  }
+
+  /**
+   * Internal method: Add auth headers to all requests
+   * Automatically includes Cognito idToken as Authorization header
+   */
+  private buildHeaders(options: RequestInit = {}): HeadersInit {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    // Step 5: Auto-include idToken in all API requests
+    if (this.idToken) {
+      (headers as Record<string, string>)['Authorization'] = this.idToken;
+    }
+
+    return headers;
   }
 
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
-
-    if (this.accessToken) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.accessToken}`;
-    }
+    const headers = this.buildHeaders(options);
 
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
