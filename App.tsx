@@ -16,6 +16,7 @@ import { PricingModal } from './components/PricingModal';
 import { TermsOfService, PrivacyPolicy, PricingPage } from './components/LegalPages';
 import { AccessibilityStatement } from './components/AccessibilityStatement';
 import { Footer } from './components/Footer';
+import { DebugPanel } from './components/DebugPanel';
 // Notification & Onboarding Components
 import { ChangelogModal, useChangelog } from './components/ChangelogModal';
 import { NotificationBell } from './components/NotificationBell';
@@ -24,7 +25,7 @@ import { OnboardingFlow, useOnboarding } from './components/OnboardingFlow';
 import { MilestoneModal } from './components/MilestoneModal';
 import { milestoneService } from './services/milestoneService';
 import { Milestone } from './types/notifications';
-import { Shield, LayoutGrid, Users, Menu, X, Terminal, Star, Globe, Check } from 'lucide-react';
+import { Shield, LayoutGrid, Users, Menu, X, Terminal, Star, Globe, Check, Database } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
 import { auth, type CognitoUser } from './services/authService';
 import { LanguageProvider, useLanguage, type Language } from './i18n';
@@ -52,6 +53,7 @@ const AppContent: React.FC = () => {
   const [isNewsSidebarOpen, setIsNewsSidebarOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
+  const [isDebugOpen, setIsDebugOpen] = useState(false);
   
   // Notification & Onboarding State
   const { showChangelog, currentChangelog, dismissChangelog } = useChangelog();
@@ -447,6 +449,9 @@ const AppContent: React.FC = () => {
             </div>
 
             <NotificationBell userPlan={user?.plan || 'FREE'} onNavigate={handleNavigate} />
+            <button onClick={() => setIsDebugOpen(true)} aria-label="Open debug panel" className="p-2 text-slate-500 hover:text-amber-400 transition-all" title="Debug Panel - Asset Recovery">
+              <Database className="w-5 h-5" aria-hidden="true" />
+            </button>
             <button onClick={() => setIsAdminOpen(true)} aria-label="Open admin portal" className="p-2 text-slate-500 hover:text-[#00e5ff] transition-all">
               <Terminal className="w-5 h-5" aria-hidden="true" />
             </button>
@@ -515,6 +520,12 @@ const AppContent: React.FC = () => {
         onClose={() => setIsAdminOpen(false)} 
         user={user!} 
         onUpdateUser={setUser} 
+      />
+
+      <DebugPanel
+        isOpen={isDebugOpen}
+        onClose={() => setIsDebugOpen(false)}
+        currentUserId={user?.id || null}
       />
 
       {user && (
