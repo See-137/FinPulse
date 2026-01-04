@@ -17,6 +17,13 @@ export interface User {
   subscriptionStatus: 'active' | 'past_due' | 'trialing' | 'none';
 }
 
+export interface Influencer {
+  username: string;
+  name: string;
+  tier: PlanType;
+  focus: string;
+}
+
 export interface StockData {
   symbol: string;
   name: string;
