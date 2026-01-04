@@ -4,6 +4,7 @@ import { Logo, SaaS_PLANS } from './constants';
 import { NewsSidebar } from './components/NewsSidebar';
 import { PortfolioView } from './components/PortfolioView';
 import { Community } from './components/Community';
+import { Watchlist } from './components/Watchlist';
 import { SettingsModal } from './components/SettingsModal';
 import { MarketTicker } from './components/MarketTicker';
 import { AIAssistant } from './components/AIAssistant';
@@ -11,7 +12,7 @@ import { LandingPage } from './components/LandingPage';
 import { LandingPageShowcase } from './components/LandingPageShowcase';
 import { WelcomePage } from './components/WelcomePage';
 import { AdminPortal } from './components/AdminPortal';
-import { Shield, Bell, LayoutGrid, Users, Menu, X, Terminal } from 'lucide-react';
+import { Shield, Bell, LayoutGrid, Users, Menu, X, Terminal, Star } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
 import { auth } from './services/authService';
 
@@ -19,7 +20,7 @@ const USER_STORAGE_KEY = 'finpulse_user_session';
 
 const App: React.FC = () => {
   const [view, setView] = useState<'landing' | 'welcome' | 'dashboard'>('landing');
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'community'>('portfolio');
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'watchlist' | 'community'>('portfolio');
   const [user, setUser] = useState<User | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNewsSidebarOpen, setIsNewsSidebarOpen] = useState(false);
@@ -165,6 +166,9 @@ const App: React.FC = () => {
                <button onClick={() => setActiveTab('portfolio')} aria-label="View portfolio" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'portfolio' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
                  <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> Mirror
                </button>
+               <button onClick={() => setActiveTab('watchlist')} aria-label="View watchlist" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'watchlist' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
+                 <Star className="w-3.5 h-3.5" aria-hidden="true" /> Watchlist
+               </button>
                <button onClick={() => setActiveTab('community')} aria-label="View community" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'community' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
                  <Users className="w-3.5 h-3.5" aria-hidden="true" /> Community
                </button>
@@ -202,6 +206,15 @@ const App: React.FC = () => {
                 onUpdateUser={setUser} 
                 currency={currency} 
                 onCurrencyChange={setCurrency} 
+              />
+            ) : activeTab === 'watchlist' ? (
+              <Watchlist 
+                currency={currency}
+                onAddToPortfolio={(symbol, name, type) => {
+                  // Switch to portfolio tab with pre-filled data
+                  setActiveTab('portfolio');
+                  // The add modal will be handled by PortfolioView
+                }}
               />
             ) : (
               <Community />
