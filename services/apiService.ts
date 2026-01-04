@@ -49,9 +49,9 @@ class ApiService {
       ...options.headers,
     };
 
-    // Step 5: Auto-include idToken in all API requests
+    // Step 5: Auto-include idToken in all API requests with Bearer prefix
     if (this.idToken) {
-      (headers as Record<string, string>)['Authorization'] = this.idToken;
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.idToken}`;
     }
 
     return headers;

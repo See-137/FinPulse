@@ -207,7 +207,7 @@ const AppContent: React.FC = () => {
       if (!idToken) return null;
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
-        headers: { 'Authorization': idToken },
+        headers: { 'Authorization': `Bearer ${idToken}` },
       });
       
       if (!response.ok) return null;
