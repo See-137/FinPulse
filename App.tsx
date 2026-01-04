@@ -14,6 +14,8 @@ import { WelcomePage } from './components/WelcomePage';
 import { AdminPortal } from './components/AdminPortal';
 import { PricingModal } from './components/PricingModal';
 import { TermsOfService, PrivacyPolicy, PricingPage } from './components/LegalPages';
+import { AccessibilityStatement } from './components/AccessibilityStatement';
+import { Footer } from './components/Footer';
 // Notification & Onboarding Components
 import { ChangelogModal, useChangelog } from './components/ChangelogModal';
 import { NotificationBell } from './components/NotificationBell';
@@ -35,12 +37,13 @@ const USER_STORAGE_KEY = 'finpulse_user_session';
 const AppContent: React.FC = () => {
   const { t, language, setLanguage, isRTL } = useLanguage();
   const { setCurrentUser, clearCurrentUser, getHoldings } = usePortfolioStore();
-  const [view, setView] = useState<'landing' | 'welcome' | 'dashboard' | 'terms' | 'privacy' | 'pricing'>(() => {
+  const [view, setView] = useState<'landing' | 'welcome' | 'dashboard' | 'terms' | 'privacy' | 'pricing' | 'accessibility'>(() => {
     // Check URL hash for legal pages
     const hash = window.location.hash.slice(1);
     if (hash === 'terms') return 'terms';
     if (hash === 'privacy') return 'privacy';
     if (hash === 'pricing') return 'pricing';
+    if (hash === 'accessibility') return 'accessibility';
     return 'landing';
   });
   const [activeTab, setActiveTab] = useState<'portfolio' | 'watchlist' | 'community'>('portfolio');
@@ -59,23 +62,38 @@ const AppContent: React.FC = () => {
   // Simple in-app navigation handler for notification CTAs
   const handleNavigate = (target: string) => {
     if (!target) return;
-    if (target === '#pricing') {
+    if (target === '#pricing' || target === 'pricing') {
       setIsPricingOpen(true);
       return;
     }
-    if (target === '#community') {
+    if (target === '#community' || target === 'community') {
       setActiveTab('community');
       setView('dashboard');
       return;
     }
-    if (target === '#dashboard') {
+    if (target === '#dashboard' || target === 'dashboard') {
       setActiveTab('portfolio');
       setView('dashboard');
       return;
     }
-    if (target === '#ai') {
+    if (target === '#ai' || target === 'ai') {
       setActiveTab('portfolio');
       setView('dashboard');
+      return;
+    }
+    if (target === 'terms' || target === '#terms') {
+      window.location.hash = 'terms';
+      setView('terms');
+      return;
+    }
+    if (target === 'privacy' || target === '#privacy') {
+      window.location.hash = 'privacy';
+      setView('privacy');
+      return;
+    }
+    if (target === 'accessibility' || target === '#accessibility') {
+      window.location.hash = 'accessibility';
+      setView('accessibility');
       return;
     }
   };
@@ -325,10 +343,11 @@ const AppContent: React.FC = () => {
 
   const handleContinue = () => setView('dashboard');
 
-  // Legal pages (accessible via URL hash: #terms, #privacy, #pricing)
+  // Legal pages (accessible via URL hash: #terms, #privacy, #pricing, #accessibility)
   if (view === 'terms') return <TermsOfService onBack={() => { window.location.hash = ''; setView('landing'); }} />;
   if (view === 'privacy') return <PrivacyPolicy onBack={() => { window.location.hash = ''; setView('landing'); }} />;
   if (view === 'pricing') return <PricingPage onBack={() => { window.location.hash = ''; setView('landing'); }} />;
+  if (view === 'accessibility') return <AccessibilityStatement onBack={() => { window.location.hash = ''; setView('landing'); }} />;
 
   if (view === 'landing') {
     // Default to Showcase unless explicitly disabled
@@ -467,6 +486,7 @@ const AppContent: React.FC = () => {
               <Community />
             )}
           </div>
+          <Footer onNavigate={handleNavigate} />
         </div>
       </div>
 
