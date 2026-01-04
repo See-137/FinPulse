@@ -108,51 +108,54 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // Helper to clear all auth data
+  const clearAuthData = () => {
+    auth.signOut();
+    api.setIdToken(null);
+    localStorage.removeItem('finpulse_id_token');
+    localStorage.removeItem('finpulse_user_session');
+    localStorage.removeItem('finpulse_auth_tokens');
+    localStorage.removeItem('finpulse_user');
+    localStorage.removeItem('finpulse_cognito_user');
+  };
+
   // Restore session from Cognito (proper auth flow)
   useEffect(() => {
     const restoreAuth = async () => {
       const cognitoUser = auth.getCurrentUser();
-      if (cognitoUser) {
-        // Step 5: Set idToken for all future API calls
-        const idToken = localStorage.getItem('finpulse_id_token');
-        if (!idToken) {
-          // No token stored - can't restore session
-          console.log('No idToken found, staying on landing');
-          return;
+      if (!cognitoUser) {
+        return; // No session to restore
+      }
+      
+      const idToken = localStorage.getItem('finpulse_id_token');
+      if (!idToken) {
+        // Partial session state - clean it up
+        clearAuthData();
+        return;
+      }
+      
+      // Check if token is expired before making API call
+      if (isTokenExpired(idToken)) {
+        clearAuthData();
+        return;
+      }
+      
+      api.setIdToken(idToken);
+      
+      // Create User object from Cognito credentials + backend data
+      try {
+        const backendUser = await fetchUserProfile(cognitoUser.userId);
+        if (backendUser) {
+          setUser(backendUser);
+          setCurrentUser(backendUser.id);
+          setView('dashboard');
+        } else {
+          // Profile fetch returned null (401/error handled inside)
+          clearAuthData();
         }
-        
-        // Check if token is expired before making API call
-        if (isTokenExpired(idToken)) {
-          console.log('Token expired, clearing session');
-          auth.signOut();
-          api.setIdToken(null);
-          localStorage.removeItem('finpulse_id_token');
-          return;
-        }
-        
-        api.setIdToken(idToken);
-        
-        // Create User object from Cognito credentials + backend data
-        try {
-          const backendUser = await fetchUserProfile(cognitoUser.userId);
-          if (backendUser) {
-            setUser(backendUser);
-            setCurrentUser(backendUser.id); // Set user for portfolio data isolation
-            setView('dashboard');
-          } else {
-            // Profile fetch failed - clear stale session
-            console.log('Failed to restore user profile, clearing session');
-            auth.signOut();
-            api.setIdToken(null);
-            localStorage.removeItem('finpulse_id_token');
-          }
-        } catch (error) {
-          // Auth error (401/403) - token expired or invalid
-          console.error('Session restore failed:', error);
-          auth.signOut();
-          api.setIdToken(null);
-          localStorage.removeItem('finpulse_id_token');
-        }
+      } catch (error) {
+        // Auth error - clear and stay on landing
+        clearAuthData();
       }
     };
     restoreAuth();
