@@ -14,18 +14,27 @@ import { WelcomePage } from './components/WelcomePage';
 import { AdminPortal } from './components/AdminPortal';
 import { PricingModal } from './components/PricingModal';
 import { TermsOfService, PrivacyPolicy, PricingPage } from './components/LegalPages';
-import { Shield, Bell, LayoutGrid, Users, Menu, X, Terminal, Star, Globe } from 'lucide-react';
+// Notification & Onboarding Components
+import { ChangelogModal, useChangelog } from './components/ChangelogModal';
+import { NotificationBell } from './components/NotificationBell';
+import { TopBanner } from './components/TopBanner';
+import { OnboardingFlow, useOnboarding } from './components/OnboardingFlow';
+import { MilestoneModal } from './components/MilestoneModal';
+import { milestoneService } from './services/milestoneService';
+import { Milestone } from './types/notifications';
+import { Shield, LayoutGrid, Users, Menu, X, Terminal, Star, Globe } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
 import { auth, type CognitoUser } from './services/authService';
 import { LanguageProvider, useLanguage, type Language } from './i18n';
 import { usePortfolioStore } from './store/portfolioStore';
+import { api } from './services/apiService';
 
 const USER_STORAGE_KEY = 'finpulse_user_session';
 
 // Inner App component that uses language context
 const AppContent: React.FC = () => {
   const { t, language, setLanguage, isRTL } = useLanguage();
-  const { setCurrentUser, clearCurrentUser } = usePortfolioStore();
+  const { setCurrentUser, clearCurrentUser, getHoldings } = usePortfolioStore();
   const [view, setView] = useState<'landing' | 'welcome' | 'dashboard' | 'terms' | 'privacy' | 'pricing'>(() => {
     // Check URL hash for legal pages
     const hash = window.location.hash.slice(1);
@@ -40,6 +49,36 @@ const AppContent: React.FC = () => {
   const [isNewsSidebarOpen, setIsNewsSidebarOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
+  
+  // Notification & Onboarding State
+  const { showChangelog, currentChangelog, dismissChangelog } = useChangelog();
+  const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding();
+  const [activeMilestone, setActiveMilestone] = useState<Milestone | null>(null);
+  const [isMilestoneOpen, setIsMilestoneOpen] = useState(false);
+  
+  // Simple in-app navigation handler for notification CTAs
+  const handleNavigate = (target: string) => {
+    if (!target) return;
+    if (target === '#pricing') {
+      setIsPricingOpen(true);
+      return;
+    }
+    if (target === '#community') {
+      setActiveTab('community');
+      setView('dashboard');
+      return;
+    }
+    if (target === '#dashboard') {
+      setActiveTab('portfolio');
+      setView('dashboard');
+      return;
+    }
+    if (target === '#ai') {
+      setActiveTab('portfolio');
+      setView('dashboard');
+      return;
+    }
+  };
   
   // Currency State with Persistence
   const [currency, setCurrency] = useState<Currency>(() => {
@@ -63,6 +102,12 @@ const AppContent: React.FC = () => {
     const restoreAuth = async () => {
       const cognitoUser = auth.getCurrentUser();
       if (cognitoUser) {
+        // Step 5: Set idToken for all future API calls
+        const idToken = localStorage.getItem('finpulse_id_token');
+        if (idToken) {
+          api.setIdToken(idToken);
+        }
+        
         // Create User object from Cognito credentials + backend data
         const backendUser = await fetchUserProfile(cognitoUser.userId);
         if (backendUser) {
@@ -160,6 +205,12 @@ const AppContent: React.FC = () => {
       return;
     }
 
+    // Step 5: Set idToken for all API calls
+    const idToken = localStorage.getItem('finpulse_id_token');
+    if (idToken) {
+      api.setIdToken(idToken);
+    }
+
     // /auth/me automatically creates user on first access (getOrCreateUser)
     // So just fetch it - will be created if doesn't exist
     const userProfile = await fetchUserProfile(cognitoUser.userId);
@@ -172,6 +223,18 @@ const AppContent: React.FC = () => {
       console.error('Failed to setup user profile');
     }
   };
+
+  // Milestone checks when usage changes
+  useEffect(() => {
+    if (!user) return;
+
+    const stats = milestoneService.getUserStats(user, 0);
+    const result = milestoneService.checkMilestones(user, stats);
+    if (result?.shouldShow) {
+      setActiveMilestone(result.milestone);
+      setIsMilestoneOpen(true);
+    }
+  }, [user]);
   
   const handlePlanUpgrade = (plan: PlanType) => {
     if (!user) return;
@@ -186,8 +249,32 @@ const AppContent: React.FC = () => {
     });
   };
 
+  const handleMilestoneClose = () => {
+    if (activeMilestone) {
+      milestoneService.markCompleted(activeMilestone.id);
+    }
+    setIsMilestoneOpen(false);
+    setActiveMilestone(null);
+  };
+
+  const handleMilestoneAction = () => {
+    if (activeMilestone) {
+      if (activeMilestone.ctaUrl?.includes('pricing')) {
+        setIsPricingOpen(true);
+      }
+      if (activeMilestone.ctaUrl?.includes('community')) {
+        setActiveTab('community');
+        setView('dashboard');
+      }
+      milestoneService.markCompleted(activeMilestone.id);
+    }
+    setIsMilestoneOpen(false);
+    setActiveMilestone(null);
+  };
+
   const handleLogout = async () => {
     await auth.signOut(); // Clear Cognito session
+    api.setIdToken(null); // Clear API token for all future requests
     setUser(null);
     clearCurrentUser(); // Clear portfolio user scope
     localStorage.removeItem(USER_STORAGE_KEY);
@@ -222,6 +309,7 @@ const AppContent: React.FC = () => {
     <div className="flex h-screen h-[100dvh] w-screen bg-slate-50 dark:bg-[#0b0e14] text-slate-900 dark:text-white overflow-hidden animate-in fade-in duration-500 transition-colors">
       <div className="flex-1 flex flex-col min-w-0 relative h-full">
         <MarketTicker currency={currency} />
+        <TopBanner userPlan={user?.plan || 'FREE'} onNavigate={handleNavigate} />
         
         <nav className="h-20 flex-shrink-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#0b0e14]/50 backdrop-blur-md z-20 transition-colors">
           <div className="flex items-center gap-4 sm:gap-8 overflow-hidden">
@@ -257,10 +345,11 @@ const AppContent: React.FC = () => {
                <button onClick={() => setCurrency('ILS')} aria-label="Switch to ILS currency" className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${currency === 'ILS' ? 'bg-white dark:bg-white/10 text-black dark:text-white shadow-sm' : 'text-slate-500'}`}>ILS</button>
             </div>
 
+            <NotificationBell userPlan={user?.plan || 'FREE'} onNavigate={handleNavigate} />
             <button onClick={() => setIsAdminOpen(true)} aria-label="Open admin portal" className="p-2 text-slate-500 hover:text-[#00e5ff] transition-all">
               <Terminal className="w-5 h-5" aria-hidden="true" />
             </button>
-            <button aria-label={`Current plan: ${user?.plan} Node`} className={`px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${user?.plan === 'PRO' ? 'border-cyan-500/50 text-cyan-400' : 'border-slate-200 dark:border-white/10 text-slate-500'}`}>
+            <button aria-label={`Current plan: ${user?.plan} Node`} className={`px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${user?.plan !== 'FREE' ? 'border-cyan-500/50 text-cyan-400' : 'border-slate-200 dark:border-white/10 text-slate-500'}`}>
               {user?.plan} {t('nav.node')}
             </button>
             <button onClick={() => setIsNewsSidebarOpen(!isNewsSidebarOpen)} aria-label={isNewsSidebarOpen ? 'Close news sidebar' : 'Open news sidebar'} className={`p-2 rounded-xl lg:hidden ${isNewsSidebarOpen ? 'text-[#00e5ff] bg-[#00e5ff]/10' : 'text-slate-400'}`}>
@@ -336,6 +425,35 @@ const AppContent: React.FC = () => {
       )}
 
       <AIAssistant user={user!} onUpdateUsage={(credits) => setUser(u => u ? {...u, credits: {...u.credits, ai: credits}} : null)} />
+
+      {/* Notification & Onboarding Overlays */}
+      {showChangelog && currentChangelog && (
+        <ChangelogModal
+          isOpen={showChangelog}
+          onClose={dismissChangelog}
+          changelog={currentChangelog}
+        />
+      )}
+
+      {user && showOnboarding && (
+        <OnboardingFlow
+          isOpen={showOnboarding}
+          onComplete={completeOnboarding}
+          onSkip={skipOnboarding}
+          userName={user.name}
+          userPlan={user.plan}
+          onOpenPricing={() => setIsPricingOpen(true)}
+        />
+      )}
+
+      {user && activeMilestone && isMilestoneOpen && (
+        <MilestoneModal
+          isOpen={isMilestoneOpen}
+          milestone={activeMilestone}
+          onClose={handleMilestoneClose}
+          onAction={handleMilestoneAction}
+        />
+      )}
     </div>
   );
 };

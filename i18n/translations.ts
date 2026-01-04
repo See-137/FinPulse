@@ -182,6 +182,58 @@ export const translations = {
       securePayment: 'Secure payment powered by',
       cancelAnytime: 'Cancel anytime. No hidden fees.',
     },
+    
+    // Changelog Modal
+    changelog: {
+      whatsNew: "What's New",
+      newFeatures: 'New Features',
+      bugFixes: 'Bug Fixes',
+      improvements: 'Improvements',
+      gotIt: 'Got it!',
+    },
+    
+    // Notifications
+    notifications: {
+      title: 'Notifications',
+      markAllRead: 'Mark all read',
+      empty: 'No notifications yet',
+    },
+    
+    // Onboarding
+    onboarding: {
+      skip: 'Skip',
+      back: 'Back',
+      next: 'Next',
+      getStarted: 'Get Started',
+      welcomeDesc: 'Track your crypto, stocks, and commodities in one beautiful dashboard with real-time prices.',
+      yourMirror: 'Your Mirror',
+      dashboardDesc: 'Track all your assets with real-time prices, performance metrics, and AI-powered insights.',
+      searchAssets: 'Search for any asset...',
+      addAssetDesc: 'Choose from 35+ popular assets or search thousands more from our database.',
+      nextRefresh: 'until next refresh',
+      livePricesDesc: 'Prices update automatically. Upgrade to ProPulse for faster 30-second refresh rates.',
+      aiCopilot: 'AI Copilot',
+      unlockAI: 'Unlock AI Insights',
+      availableOn: 'Available on',
+      aiDesc: 'Get instant answers about market trends, portfolio analysis, and investment opportunities.',
+      globalPulse: 'Global Pulse Feed',
+      communityDesc: 'See what successful investors are tracking and share your own insights.',
+      recommended: 'Recommended',
+      comparePlans: 'Compare all plans',
+    },
+    
+    // Milestones
+    milestones: {
+      congratulations: 'Congratulations! 🎉',
+      headsUp: 'Heads Up!',
+      maybeLater: 'Maybe Later',
+    },
+    
+    // Locked Features
+    lockedFeature: {
+      unlockWith: 'Unlock with',
+      availableOn: 'Available on',
+    },
   },
   
   he: {
@@ -359,6 +411,58 @@ export const translations = {
       freeForever: 'חינם לנצח',
       securePayment: 'תשלום מאובטח באמצעות',
       cancelAnytime: 'בטל בכל עת. ללא עמלות נסתרות.',
+    },
+    
+    // Changelog Modal
+    changelog: {
+      whatsNew: 'מה חדש',
+      newFeatures: 'תכונות חדשות',
+      bugFixes: 'תיקוני באגים',
+      improvements: 'שיפורים',
+      gotIt: 'הבנתי!',
+    },
+    
+    // Notifications
+    notifications: {
+      title: 'התראות',
+      markAllRead: 'סמן הכל כנקרא',
+      empty: 'אין התראות עדיין',
+    },
+    
+    // Onboarding
+    onboarding: {
+      skip: 'דלג',
+      back: 'חזור',
+      next: 'הבא',
+      getStarted: 'בואו נתחיל',
+      welcomeDesc: 'עקוב אחר הקריפטו, המניות והסחורות שלך בדשבורד יפה אחד עם מחירים בזמן אמת.',
+      yourMirror: 'המראה שלך',
+      dashboardDesc: 'עקוב אחר כל הנכסים שלך עם מחירים בזמן אמת, מדדי ביצועים ותובנות מונעות AI.',
+      searchAssets: 'חפש כל נכס...',
+      addAssetDesc: 'בחר מ-35+ נכסים פופולריים או חפש אלפים נוספים ממסד הנתונים שלנו.',
+      nextRefresh: 'עד הרענון הבא',
+      livePricesDesc: 'המחירים מתעדכנים אוטומטית. שדרג לפרופאלס לקצב רענון מהיר יותר של 30 שניות.',
+      aiCopilot: 'AI קופילוט',
+      unlockAI: 'פתח תובנות AI',
+      availableOn: 'זמין ב',
+      aiDesc: 'קבל תשובות מיידיות על מגמות שוק, ניתוח תיק והזדמנויות השקעה.',
+      globalPulse: 'פיד הדופק הגלובלי',
+      communityDesc: 'ראה מה משקיעים מצליחים עוקבים ושתף את התובנות שלך.',
+      recommended: 'מומלץ',
+      comparePlans: 'השווה את כל התוכניות',
+    },
+    
+    // Milestones
+    milestones: {
+      congratulations: 'מזל טוב! 🎉',
+      headsUp: 'שים לב!',
+      maybeLater: 'אולי אחר כך',
+    },
+    
+    // Locked Features
+    lockedFeature: {
+      unlockWith: 'פתח עם',
+      availableOn: 'זמין ב',
     },
   },
 } as const;
