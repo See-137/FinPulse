@@ -4,12 +4,13 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { 
   Plus, Download, Lock, Search, Trash2, Pencil, ShieldCheck, 
   TrendingUp, TrendingDown, Bitcoin, Activity, Gem, Eye, EyeOff,
-  ArrowUpDown, ArrowUp, ArrowDown, XCircle
+  ArrowUpDown, ArrowUp, ArrowDown, XCircle, Wifi, WifiOff
 } from 'lucide-react';
 import { User, Currency } from '../types';
 import { CURRENCY_RATES } from '../constants';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { useMarketData } from '../hooks/useMarketData';
+import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
 
@@ -37,8 +38,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     setIsPrivate, setSearch, setFilterType, setHoldings, addHolding, updateHolding, removeHolding 
   } = usePortfolioStore();
 
-  // Fetch real-time market prices
+  // Fetch real-time market prices (REST API as fallback)
   const { prices: marketPrices, loading: pricesLoading } = useMarketData(30000);
+  
+  // Real-time WebSocket prices for crypto
+  const cryptoSymbols = useMemo(() => 
+    holdings.filter(h => h.type === 'CRYPTO').map(h => h.symbol),
+    [holdings]
+  );
+  const { prices: wsPrices, isConnected: wsConnected } = useWebSocketPrices({
+    symbols: cryptoSymbols.length > 0 ? cryptoSymbols : ['BTC', 'ETH', 'SOL'],
+    enabled: true,
+  });
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Holding | null>(null);
@@ -186,7 +197,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   // Helper to get real-time market price for an asset
   const getMarketPrice = (symbol: string, fallbackPrice: number): number => {
     const upperSymbol = symbol.toUpperCase();
-    // First try API data
+    // First try WebSocket data (most real-time)
+    const wsPrice = wsPrices.get(upperSymbol);
+    if (wsPrice?.price) {
+      return wsPrice.price;
+    }
+    // Then try REST API data
     if (marketPrices && marketPrices[upperSymbol]?.price) {
       return marketPrices[upperSymbol].price;
     }
