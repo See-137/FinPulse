@@ -29,27 +29,30 @@ export const Logo: React.FC<{ className?: string }> = ({ className = "h-8" }) =>
 
 export const SaaS_PLANS = {
   FREE: {
-    name: 'Standard Mirror',
+    name: 'Free',
     price: '$0',
-    maxAssets: 10,
+    maxAssets: 8,
     maxAiQueries: 5,
-    features: ['Manual Mirroring', 'Basic News', 'Community Access'],
+    allowCommodities: false,
+    features: ['Stocks & Crypto Tracking', 'Basic Analytics', 'Community Access', 'Market News'],
     color: 'slate'
   },
-  PRO: {
-    name: 'Alpha Mirror',
-    price: '$29',
-    maxAssets: 50,
-    maxAiQueries: 100,
-    features: ['Advanced Charts', 'Gemini 3 Pro Intelligence', 'CSV Exports', 'Ad-free News'],
+  PROPULSE: {
+    name: 'ProPulse',
+    price: '$9.90',
+    maxAssets: 20,
+    maxAiQueries: 10,
+    allowCommodities: true,
+    features: ['Everything in Free', 'Commodities (Gold, Oil, etc.)', '20 Asset Slots', '10 AI Queries/day', 'CSV Exports'],
     color: 'cyan'
   },
-  TEAM: {
-    name: 'Vault Mirror',
-    price: '$99',
-    maxAssets: 1000,
-    maxAiQueries: 1000,
-    features: ['Shared Mirror Nodes', 'Priority Support', 'White-label Exports', 'API Access'],
+  SUPERPULSE: {
+    name: 'SuperPulse',
+    price: '$29.90',
+    maxAssets: 50,
+    maxAiQueries: 50,
+    allowCommodities: true,
+    features: ['Everything in ProPulse', 'Premium Analytics', '50 Asset Slots', '50 AI Queries/day', 'Priority Support', 'Ad-free Experience'],
     color: 'purple'
   }
 };

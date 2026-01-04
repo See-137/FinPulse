@@ -111,14 +111,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="bg-slate-50 dark:bg-white/[0.02] p-8 rounded-[40px] border border-slate-200 dark:border-white/5">
              <h3 className="text-lg font-black mb-6">Upgrade Tier</h3>
              <div className="space-y-4">
-                {(['PRO', 'TEAM'] as PlanType[]).map(p => (
+                {(['PROPULSE', 'SUPERPULSE'] as PlanType[]).map(p => (
                   <button 
                     key={p}
                     onClick={onOpenPricing}
                     className="w-full p-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-2xl flex items-center justify-between hover:border-cyan-500/50 group transition-all shadow-sm dark:shadow-none"
                   >
                     <div className="flex items-center gap-4">
-                       <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400"><Sparkles className="w-5 h-5" /></div>
+                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${p === 'PROPULSE' ? 'bg-cyan-500/10 text-cyan-400' : 'bg-purple-500/10 text-purple-400'}`}><Sparkles className="w-5 h-5" /></div>
                        <div className="text-left">
                           <p className="text-sm font-black">{SaaS_PLANS[p].name}</p>
                           <p className="text-[10px] text-slate-500 font-bold uppercase">{SaaS_PLANS[p].price}/mo</p>

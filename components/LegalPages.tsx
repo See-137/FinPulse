@@ -37,9 +37,9 @@ export const TermsOfService: React.FC<LegalPageProps> = ({ onBack }) => (
           <h2 className="text-xl font-bold text-cyan-400">3. Subscription Plans</h2>
           <p className="text-slate-300">FinPulse offers the following plans:</p>
           <ul className="list-disc list-inside text-slate-300 ml-4">
-            <li><strong>Free:</strong> Basic features, up to 10 assets, 5 AI queries/day</li>
-            <li><strong>Pro ($29/month):</strong> Advanced features, up to 50 assets, 100 AI queries/day</li>
-            <li><strong>Team ($99/month):</strong> Full features, up to 1000 assets, unlimited AI queries</li>
+            <li><strong>Free:</strong> Stocks & crypto tracking, up to 8 assets, 5 AI queries/day</li>
+            <li><strong>ProPulse ($9.90/month):</strong> Add commodities, up to 20 assets, 10 AI queries/day</li>
+            <li><strong>SuperPulse ($29.90/month):</strong> Premium analytics, up to 50 assets, 50 AI queries/day</li>
           </ul>
         </section>
 
@@ -196,47 +196,47 @@ export const PricingPage: React.FC<LegalPageProps> = ({ onBack }) => (
       <div className="grid md:grid-cols-3 gap-8">
         {/* Free Plan */}
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-          <h3 className="text-xl font-bold mb-2">Standard Mirror</h3>
+          <h3 className="text-xl font-bold mb-2">Free</h3>
           <div className="text-4xl font-black mb-4">$0<span className="text-lg text-slate-400">/mo</span></div>
           <ul className="space-y-3 mb-8">
-            <li className="flex items-center gap-2 text-slate-300">✓ Up to 10 assets</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Up to 8 assets</li>
             <li className="flex items-center gap-2 text-slate-300">✓ 5 AI queries/day</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ Manual portfolio tracking</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ Basic market news</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Stocks & Crypto tracking</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Basic analytics</li>
             <li className="flex items-center gap-2 text-slate-300">✓ Community access</li>
+            <li className="flex items-center gap-2 text-slate-400">✗ Commodities (Gold, Oil)</li>
           </ul>
           <button className="w-full py-3 bg-white/10 rounded-xl font-bold">Get Started Free</button>
         </div>
 
-        {/* Pro Plan */}
+        {/* ProPulse Plan */}
         <div className="bg-gradient-to-b from-cyan-500/10 to-blue-500/10 border-2 border-cyan-500/50 rounded-3xl p-8 relative">
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-cyan-500 text-black text-xs font-bold px-4 py-1 rounded-full">MOST POPULAR</div>
-          <h3 className="text-xl font-bold mb-2">Alpha Mirror</h3>
-          <div className="text-4xl font-black mb-4">$29<span className="text-lg text-slate-400">/mo</span></div>
+          <h3 className="text-xl font-bold mb-2">ProPulse</h3>
+          <div className="text-4xl font-black mb-4">$9.90<span className="text-lg text-slate-400">/mo</span></div>
           <ul className="space-y-3 mb-8">
-            <li className="flex items-center gap-2 text-slate-300">✓ Up to 50 assets</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ 100 AI queries/day</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ Advanced charts</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ Gemini 3 Pro AI</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Up to 20 assets</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ 10 AI queries/day</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Commodities (Gold, Oil, etc.)</li>
             <li className="flex items-center gap-2 text-slate-300">✓ CSV exports</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ Ad-free news</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Everything in Free</li>
           </ul>
-          <button className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-bold">Upgrade to Pro</button>
+          <button className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-bold">Upgrade to ProPulse</button>
         </div>
 
-        {/* Team Plan */}
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-          <h3 className="text-xl font-bold mb-2">Vault Mirror</h3>
-          <div className="text-4xl font-black mb-4">$99<span className="text-lg text-slate-400">/mo</span></div>
+        {/* SuperPulse Plan */}
+        <div className="bg-gradient-to-b from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-3xl p-8">
+          <h3 className="text-xl font-bold mb-2">SuperPulse</h3>
+          <div className="text-4xl font-black mb-4">$29.90<span className="text-lg text-slate-400">/mo</span></div>
           <ul className="space-y-3 mb-8">
-            <li className="flex items-center gap-2 text-slate-300">✓ Up to 1000 assets</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ Unlimited AI queries</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ Shared mirror nodes</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Up to 50 assets</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ 50 AI queries/day</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Premium analytics</li>
             <li className="flex items-center gap-2 text-slate-300">✓ Priority support</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ White-label exports</li>
-            <li className="flex items-center gap-2 text-slate-300">✓ API access</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Ad-free experience</li>
+            <li className="flex items-center gap-2 text-slate-300">✓ Everything in ProPulse</li>
           </ul>
-          <button className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-bold">Go Vault</button>
+          <button className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-bold">Go SuperPulse</button>
         </div>
       </div>
 

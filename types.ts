@@ -1,5 +1,5 @@
 
-export type PlanType = 'FREE' | 'PRO' | 'TEAM';
+export type PlanType = 'FREE' | 'PROPULSE' | 'SUPERPULSE';
 export type Theme = 'light' | 'dark' | 'system';
 export type Currency = 'USD' | 'ILS';
 

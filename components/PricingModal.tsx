@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Crown, Building2, Zap, X, Loader2, ExternalLink, CreditCard } from 'lucide-react';
+import { Check, Crown, Rocket, Zap, X, Loader2, ExternalLink, CreditCard } from 'lucide-react';
 import { User, PlanType } from '../types';
 import { SaaS_PLANS } from '../constants';
 import { redirectToCheckout, redirectToCustomerPortal } from '../services/stripeService';
@@ -14,20 +14,20 @@ interface PricingModalProps {
 
 const planIcons: Record<PlanType, React.ReactNode> = {
   FREE: <Zap className="w-6 h-6" />,
-  PRO: <Crown className="w-6 h-6" />,
-  TEAM: <Building2 className="w-6 h-6" />
+  PROPULSE: <Crown className="w-6 h-6" />,
+  SUPERPULSE: <Rocket className="w-6 h-6" />
 };
 
 const planColors: Record<PlanType, string> = {
   FREE: 'from-slate-500 to-slate-600',
-  PRO: 'from-cyan-500 to-blue-500',
-  TEAM: 'from-purple-500 to-pink-500'
+  PROPULSE: 'from-cyan-500 to-blue-500',
+  SUPERPULSE: 'from-purple-500 to-pink-500'
 };
 
 const planBorderColors: Record<PlanType, string> = {
   FREE: 'border-slate-500/30',
-  PRO: 'border-cyan-500/50',
-  TEAM: 'border-purple-500/50'
+  PROPULSE: 'border-cyan-500/50',
+  SUPERPULSE: 'border-purple-500/50'
 };
 
 export const PricingModal: React.FC<PricingModalProps> = ({ 
@@ -109,9 +109,9 @@ export const PricingModal: React.FC<PricingModalProps> = ({
           {plans.map(([planKey, plan]) => {
             const isCurrentPlan = user.plan === planKey;
             const isUpgrade = planKey !== 'FREE' && 
-              (user.plan === 'FREE' || (user.plan === 'PRO' && planKey === 'TEAM'));
-            const isDowngrade = (user.plan === 'PRO' && planKey === 'FREE') ||
-              (user.plan === 'TEAM' && (planKey === 'FREE' || planKey === 'PRO'));
+              (user.plan === 'FREE' || (user.plan === 'PROPULSE' && planKey === 'SUPERPULSE'));
+            const isDowngrade = (user.plan === 'PROPULSE' && planKey === 'FREE') ||
+              (user.plan === 'SUPERPULSE' && (planKey === 'FREE' || planKey === 'PROPULSE'));
             
             return (
               <div
@@ -123,7 +123,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                 }`}
               >
                 {/* Popular Badge */}
-                {planKey === 'PRO' && !isCurrentPlan && (
+                {planKey === 'PROPULSE' && !isCurrentPlan && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                     <span className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs font-bold px-4 py-1 rounded-full">
                       {t('pricing.popular')}
