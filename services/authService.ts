@@ -283,6 +283,17 @@ class AuthService {
         const tokens: AuthTokens = JSON.parse(tokensJson);
         const user: CognitoUser = JSON.parse(userJson);
         
+        // Check if idToken is expired by decoding JWT
+        if (this.isTokenExpired(tokens.idToken)) {
+          console.log('Token expired, attempting refresh...');
+          // Try to refresh the token
+          this.refreshTokens(tokens.refreshToken).catch(() => {
+            console.log('Token refresh failed, clearing session');
+            this.signOut();
+          });
+          return;
+        }
+        
         this.currentUser = user;
         api.setAccessToken(tokens.accessToken);
         
@@ -291,6 +302,17 @@ class AuthService {
       }
     } catch (error) {
       this.signOut();
+    }
+  }
+
+  // Check if JWT token is expired
+  private isTokenExpired(token: string): boolean {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiry = payload.exp * 1000; // Convert to milliseconds
+      return Date.now() >= expiry;
+    } catch {
+      return true; // If we can't parse, assume expired
     }
   }
 
