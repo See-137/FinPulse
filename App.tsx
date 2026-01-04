@@ -97,6 +97,17 @@ const AppContent: React.FC = () => {
     return (localStorage.getItem('theme') as Theme) || 'system';
   });
 
+  // Helper to check if JWT is expired
+  const isTokenExpired = (token: string): boolean => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiry = payload.exp * 1000;
+      return Date.now() >= expiry;
+    } catch {
+      return true;
+    }
+  };
+
   // Restore session from Cognito (proper auth flow)
   useEffect(() => {
     const restoreAuth = async () => {
@@ -107,6 +118,15 @@ const AppContent: React.FC = () => {
         if (!idToken) {
           // No token stored - can't restore session
           console.log('No idToken found, staying on landing');
+          return;
+        }
+        
+        // Check if token is expired before making API call
+        if (isTokenExpired(idToken)) {
+          console.log('Token expired, clearing session');
+          auth.signOut();
+          api.setIdToken(null);
+          localStorage.removeItem('finpulse_id_token');
           return;
         }
         
