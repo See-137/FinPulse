@@ -167,16 +167,43 @@ export const PrivacyPolicy: React.FC<LegalPageProps> = ({ onBack }) => (
             <li>Export your portfolio data</li>
             <li>Opt out of marketing communications</li>
           </ul>
+          <p className="text-slate-300 mt-4">
+            <strong>GDPR (EU residents):</strong> You have additional rights under the General Data Protection Regulation, including the right to data portability and the right to object to processing.
+          </p>
+          <p className="text-slate-300 mt-2">
+            <strong>CCPA (California residents):</strong> You have the right to know what personal information is collected, request deletion, and opt-out of the "sale" of personal information (we do not sell your data).
+          </p>
         </section>
 
         <section>
           <h2 className="text-xl font-bold text-cyan-400">7. Data Retention</h2>
-          <p className="text-slate-300">We retain your data as long as your account is active. Upon account deletion, we remove your personal data within 30 days, except where required by law.</p>
+          <p className="text-slate-300">We retain your data as long as your account is active. Upon account deletion, we remove your personal data within 90 days, except where required by law for compliance, dispute resolution, or fraud prevention.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-cyan-400">8. Contact</h2>
+          <h2 className="text-xl font-bold text-cyan-400">8. Cookies & Tracking</h2>
+          <p className="text-slate-300">We use essential cookies for:</p>
+          <ul className="list-disc list-inside text-slate-300 ml-4">
+            <li><strong>Authentication:</strong> Session management and login state</li>
+            <li><strong>Preferences:</strong> Theme, language, and currency settings</li>
+            <li><strong>Security:</strong> Fraud prevention and secure access</li>
+          </ul>
+          <p className="text-slate-300 mt-4">
+            We do not use third-party advertising cookies or tracking pixels. You can manage cookies through your browser settings.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-bold text-cyan-400">9. International Data Transfers</h2>
+          <p className="text-slate-300">
+            Your data may be transferred to and processed in the United States and other countries where our service providers operate. We ensure appropriate safeguards are in place to protect your data in accordance with this Privacy Policy and applicable law.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-bold text-cyan-400">10. Contact</h2>
           <p className="text-slate-300">For privacy concerns, contact: <a href="mailto:privacy@finpulse.me" className="text-cyan-400 hover:underline">privacy@finpulse.me</a></p>
+          <p className="text-slate-300 mt-2">To exercise your rights under GDPR or CCPA, email: <a href="mailto:dpo@finpulse.me" className="text-cyan-400 hover:underline">dpo@finpulse.me</a></p>
         </section>
       </div>
     </div>

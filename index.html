@@ -92,6 +92,46 @@
         .animate-ticker:hover {
           animation-play-state: paused;
         }
+
+        /* WCAG AA - Focus Indicators */
+        button:focus-visible,
+        a:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        [role="button"]:focus-visible {
+          outline: 2px solid #00e5ff;
+          outline-offset: 2px;
+        }
+
+        /* High Contrast Text for Accessibility */
+        body {
+          letter-spacing: 0.3px;
+        }
+
+        /* Link Focus for keyboard navigation */
+        a:focus {
+          outline: 2px solid #00e5ff;
+          outline-offset: 2px;
+        }
+
+        /* Skip to main content link (for screen readers) */
+        .skip-to-main {
+          position: absolute;
+          top: -40px;
+          left: 0;
+          background: #00e5ff;
+          color: #0b0e14;
+          padding: 8px;
+          text-decoration: none;
+          border-radius: 0 0 4px 0;
+          font-weight: bold;
+        }
+
+        .skip-to-main:focus {
+          top: 0;
+          outline: none;
+        }
     </style>
 <script type="importmap">
 {
