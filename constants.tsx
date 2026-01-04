@@ -31,8 +31,8 @@ export const SaaS_PLANS = {
   FREE: {
     name: 'Standard Mirror',
     price: '$0',
-    maxAssets: 3,
-    maxAiQueries: 3,
+    maxAssets: 10,
+    maxAiQueries: 5,
     features: ['Manual Mirroring', 'Basic News', 'Community Access'],
     color: 'slate'
   },
