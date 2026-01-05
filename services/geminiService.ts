@@ -46,7 +46,7 @@ const queryBackendAI = async (query: string, callback: (text: string) => void) =
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { 'Authorization': token })
+        ...(token && { 'Authorization': `Bearer ${token}` })
       },
       body: JSON.stringify({ query })
     });
