@@ -60,7 +60,7 @@ const fetchWithAuth = async (endpoint: string) => {
   };
   
   if (token) {
-    headers['Authorization'] = token;
+    headers['Authorization'] = `Bearer ${token}`;
   }
   
   const response = await fetch(`${config.apiUrl}${endpoint}`, { headers });

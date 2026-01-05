@@ -18,11 +18,13 @@ export default [
         },
       },
       globals: {
+        // Browser globals
         window: 'readonly',
         document: 'readonly',
         console: 'readonly',
         fetch: 'readonly',
         localStorage: 'readonly',
+        sessionStorage: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         setInterval: 'readonly',
@@ -31,6 +33,33 @@ export default [
         global: 'readonly',
         React: 'readonly',
         JSX: 'readonly',
+        // DOM types needed by TypeScript
+        alert: 'readonly',
+        confirm: 'readonly',
+        navigator: 'readonly',
+        atob: 'readonly',
+        btoa: 'readonly',
+        Blob: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        FormData: 'readonly',
+        WebSocket: 'readonly',
+        // TypeScript DOM types
+        HTMLElement: 'readonly',
+        HTMLDivElement: 'readonly',
+        HTMLInputElement: 'readonly',
+        MouseEvent: 'readonly',
+        MediaQueryList: 'readonly',
+        MediaQueryListEvent: 'readonly',
+        Node: 'readonly',
+        NodeJS: 'readonly',
+        RequestInit: 'readonly',
+        HeadersInit: 'readonly',
+        // Node.js / Build tools
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        module: 'readonly',
+        require: 'readonly',
       },
     },
     plugins: {
@@ -51,13 +80,13 @@ export default [
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       
       // General rules
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-console': ['warn', { allow: ['warn', 'error', 'log'] }],
       'no-debugger': 'warn',
       'prefer-const': 'warn',
       'no-unused-vars': 'off', // Use TypeScript's version
     },
   },
   {
-    ignores: ['dist/', 'node_modules/', 'coverage/', 'playwright-report/', '*.config.js'],
+    ignores: ['dist/', 'node_modules/', 'coverage/', 'playwright-report/', '*.config.js', '*.config.ts'],
   },
 ];
