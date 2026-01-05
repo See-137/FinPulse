@@ -58,6 +58,13 @@ export const config = {
     admin: '/admin',
     payments: '/payments',
     ai: '/ai/query',
+    sync: '/sync',
+  },
+  
+  // API helper
+  api: {
+    baseUrl: import.meta.env.VITE_API_URL || defaults.apiUrl,
+    syncEndpoint: import.meta.env.VITE_SYNC_WS_URL || undefined,
   },
   
   // Helper to check environment
