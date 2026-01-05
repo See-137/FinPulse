@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { 
   Plus, Download, Lock, Search, Trash2, Pencil, ShieldCheck, 
@@ -11,6 +11,7 @@ import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { useMarketData } from '../hooks/useMarketData';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
+import { useDebounce } from '../hooks/useDebounce';
 import { AssetSelector } from './AssetSelector';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
@@ -286,18 +287,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     { name: 'Commodities', type: 'COMMODITY', value: holdings.filter(h => h.type === 'COMMODITY').reduce((sum, h) => sum + h.quantity * getMarketPrice(h.symbol, h.currentPrice), 0), color: '#fbbf24' },
   ].filter(d => d.value > 0);
 
-  // TODO: For scalability with large portfolios, consider implementing:
-  // - Server-side filtering, sorting, and pagination
-  // - Virtual scrolling for large datasets
-  // - Debounced search input to reduce re-renders
+  // Debounced search for better performance with large portfolios
+  const debouncedSearch = useDebounce(search, 300);
+  
+  // Optimized filtering with debounced search
   const filteredHoldings = useMemo(() => {
     return holdings.filter(h => {
-      const matchesSearch = h.symbol.toLowerCase().includes(search.toLowerCase()) || 
-                            h.name.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = h.symbol.toLowerCase().includes(debouncedSearch.toLowerCase()) || 
+                            h.name.toLowerCase().includes(debouncedSearch.toLowerCase());
       const matchesType = filterType ? h.type === filterType : true;
       return matchesSearch && matchesType;
     });
-  }, [holdings, search, filterType]);
+  }, [holdings, debouncedSearch, filterType]);
 
   const sortedHoldings = useMemo(() => {
     let sortableItems = [...filteredHoldings];
