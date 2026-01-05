@@ -358,11 +358,29 @@ class AuthService {
         this.currentUser = user;
         api.setAccessToken(tokens.accessToken);
         
-        // Schedule refresh
-        this.scheduleRefresh(tokens.expiresIn, tokens.refreshToken);
+        // Calculate remaining time from JWT exp claim instead of using original expiresIn
+        const remainingSeconds = this.getTokenRemainingTime(tokens.idToken);
+        if (remainingSeconds > 0) {
+          this.scheduleRefresh(remainingSeconds, tokens.refreshToken);
+        } else {
+          // Token about to expire, refresh immediately
+          this.refreshTokens(tokens.refreshToken).catch(() => this.signOut());
+        }
       }
     } catch (error) {
       this.signOut();
+    }
+  }
+
+  // Get remaining time in seconds until token expires
+  private getTokenRemainingTime(token: string): number {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiryMs = payload.exp * 1000;
+      const remainingMs = expiryMs - Date.now();
+      return Math.max(0, Math.floor(remainingMs / 1000));
+    } catch {
+      return 0;
     }
   }
 

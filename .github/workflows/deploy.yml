@@ -32,7 +32,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build for production
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL_PROD }}
+          VITE_COGNITO_USER_POOL_ID: ${{ secrets.VITE_COGNITO_USER_POOL_ID_PROD }}
+          VITE_COGNITO_CLIENT_ID: ${{ secrets.VITE_COGNITO_CLIENT_ID_PROD }}
+          VITE_COGNITO_REGION: us-east-1
+          VITE_ENABLE_AI: true
+          VITE_ENABLE_COMMUNITY: true
+          VITE_ENABLE_NEWS: true
         run: npm run build
 
       - name: Configure AWS credentials

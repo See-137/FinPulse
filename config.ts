@@ -1,42 +1,69 @@
 // FinPulse API Configuration
 // Supports multiple environments: development, staging, production
+//
+// IMPORTANT: Environment-specific values should be set via VITE_ environment variables
+// See .env.example, .env.staging, and .env.production for templates
+// Run `terraform output` in finpulse-infrastructure to get actual values
 
 // Environment detection
 const environment = import.meta.env.VITE_ENVIRONMENT || 
   (import.meta.env.DEV ? 'development' : 'production');
 
-// Environment-specific defaults
+// Environment-specific defaults (used only when env vars are not set)
+// NOTE: These are fallback values. In CI/CD, all values should come from secrets.
 const envDefaults = {
   development: {
-    apiUrl: 'https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod',
-    userPoolId: 'us-east-1_b36NPuJf3',
-    clientId: '4lhsbeeae63ne3vgosog38lieu',
+    // Development uses the production API for convenience (or set up local backend)
+    apiUrl: '',  // Set VITE_API_URL in .env
+    userPoolId: '',  // Set VITE_COGNITO_USER_POOL_ID in .env
+    clientId: '',  // Set VITE_COGNITO_CLIENT_ID in .env
   },
   staging: {
-    apiUrl: 'https://STAGING_API_ID.execute-api.us-east-1.amazonaws.com/staging',
-    userPoolId: 'us-east-1_STAGING_POOL',
-    clientId: 'STAGING_CLIENT_ID',
+    // Staging values come from: terraform output staging_api_url, staging_cognito_*
+    apiUrl: '',  // Set VITE_API_URL in .env.staging
+    userPoolId: '',  // Set VITE_COGNITO_USER_POOL_ID in .env.staging
+    clientId: '',  // Set VITE_COGNITO_CLIENT_ID in .env.staging
   },
   production: {
-    apiUrl: 'https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod',
-    userPoolId: 'us-east-1_b36NPuJf3',
-    clientId: '4lhsbeeae63ne3vgosog38lieu',
+    // Production values come from: terraform output api_gateway, cognito
+    apiUrl: '',  // Set VITE_API_URL in .env.production
+    userPoolId: '',  // Set VITE_COGNITO_USER_POOL_ID in .env.production
+    clientId: '',  // Set VITE_COGNITO_CLIENT_ID in .env.production
   },
 };
 
 const defaults = envDefaults[environment as keyof typeof envDefaults] || envDefaults.production;
 
+// Validate required config in non-development environments
+const validateConfig = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || defaults.apiUrl;
+  const userPoolId = import.meta.env.VITE_COGNITO_USER_POOL_ID || defaults.userPoolId;
+  const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID || defaults.clientId;
+  
+  if (!apiUrl || !userPoolId || !clientId) {
+    console.warn(
+      `[FinPulse Config] Missing required environment variables for ${environment} environment.\n` +
+      'Please set VITE_API_URL, VITE_COGNITO_USER_POOL_ID, and VITE_COGNITO_CLIENT_ID.\n' +
+      'Run "terraform output" in finpulse-infrastructure for values.'
+    );
+  }
+  
+  return { apiUrl, userPoolId, clientId };
+};
+
+const validated = validateConfig();
+
 export const config = {
   // Current environment
   environment,
   
-  // API Gateway endpoint
-  apiUrl: import.meta.env.VITE_API_URL || defaults.apiUrl,
+  // API Gateway endpoint (use validated value)
+  apiUrl: validated.apiUrl,
   
-  // Cognito
+  // Cognito (use validated values)
   cognito: {
-    userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || defaults.userPoolId,
-    clientId: import.meta.env.VITE_COGNITO_CLIENT_ID || defaults.clientId,
+    userPoolId: validated.userPoolId,
+    clientId: validated.clientId,
     region: import.meta.env.VITE_COGNITO_REGION || 'us-east-1',
   },
   
@@ -61,9 +88,9 @@ export const config = {
     sync: '/sync',
   },
   
-  // API helper
+  // API helper (use validated value)
   api: {
-    baseUrl: import.meta.env.VITE_API_URL || defaults.apiUrl,
+    baseUrl: validated.apiUrl,
     syncEndpoint: import.meta.env.VITE_SYNC_WS_URL || undefined,
   },
   
