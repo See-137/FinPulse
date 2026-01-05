@@ -406,7 +406,8 @@ class AuthService {
 
         const user = this.parseIdToken(tokens.idToken);
         this.storeSession(tokens, user);
-        api.setAccessToken(tokens.accessToken);
+        // Use idToken for API calls (NOT accessToken) - idToken has email claim needed by Cognito authorizer
+        api.setIdToken(tokens.idToken);
         this.scheduleRefresh(tokens.expiresIn, refreshToken);
       } else {
         // Refresh failed, sign out
