@@ -167,6 +167,17 @@ export const PrivacyPolicy: React.FC<LegalPageProps> = ({ onBack }) => (
             <li>Export your portfolio data</li>
             <li>Opt out of marketing communications</li>
           </ul>
+          
+          <div className="mt-4 p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
+            <h3 className="font-bold text-cyan-400 mb-2">How to Exercise Your Rights</h3>
+            <p className="text-slate-300 mb-2">
+              <strong>Export Your Data:</strong> Go to Settings → Account → "Download My Data" to receive a JSON file containing all your personal information, portfolio data, AI query history, and community posts.
+            </p>
+            <p className="text-slate-300">
+              <strong>Delete Your Account:</strong> Go to Settings → Account → "Delete Account" to permanently remove your account and all associated data. This action is irreversible.
+            </p>
+          </div>
+          
           <p className="text-slate-300 mt-4">
             <strong>GDPR (EU residents):</strong> You have additional rights under the General Data Protection Regulation, including the right to data portability and the right to object to processing.
           </p>
