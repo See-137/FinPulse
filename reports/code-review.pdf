@@ -9,7 +9,7 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
 endobj
 4 0 obj
-<< /Length 3041 >>
+<< /Length 3768 >>
 stream
 BT
 /F1 12 Tf
@@ -62,7 +62,29 @@ BT
 0 -16 Td
 () Tj
 0 -16 Td
-(### 3\) Sync service uses an access token key that is never set) Tj
+(### 3\) Cookie-mode API requests did not include credentials) Tj
+0 -16 Td
+(**Finding:** When relying on httpOnly cookies, the API calls and AI proxy calls did not include `credentials: 'include'`, which would prevent cookies from being sent.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Patch:** Added cookie-mode detection and ensured `credentials: 'include'` for API service calls, market data fetches, Gemini backend proxy, and sync device management calls.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Files:**) Tj
+0 -16 Td
+(- `services/apiService.ts`) Tj
+0 -16 Td
+(- `hooks/useMarketData.ts`) Tj
+0 -16 Td
+(- `services/geminiService.ts`) Tj
+0 -16 Td
+(- `services/syncService.ts`) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(### 4\) Sync service uses an access token key that is never set) Tj
 0 -16 Td
 (**Finding:** Sync was reading `finpulse_access_token`, but auth only stores `finpulse_id_token`, causing sync authorization headers to be empty.) Tj
 0 -16 Td
@@ -78,7 +100,7 @@ BT
 0 -16 Td
 () Tj
 0 -16 Td
-(### 4\) Partial failures in market data fetch were hidden) Tj
+(### 5\) Partial failures in market data fetch were hidden) Tj
 0 -16 Td
 (**Finding:** `Promise.allSettled` never threw, so API rejections were silently ignored and `error` was not updated.) Tj
 0 -16 Td
@@ -106,7 +128,7 @@ BT
 0 -16 Td
 (## Summary) Tj
 0 -16 Td
-(These changes reduce the risk of API key exposure, improve production auth defaults, unblock realtime sync authorization, and surface partial data failures to users without hard-failing the UI.) Tj
+(These changes reduce the risk of API key exposure, improve production auth defaults, ensure cookie-based auth works end-to-end, unblock realtime sync authorization, and surface partial data failures to users without hard-failing the UI.) Tj
 ET
 endstream
 endobj
@@ -120,9 +142,9 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000241 00000 n 
-0000003334 00000 n 
+0000004061 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-3404
+4131
 %%EOF

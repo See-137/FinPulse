@@ -2,6 +2,11 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { config } from '../config';
 
+const DEFAULT_TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' = import.meta.env.PROD ? 'cookie' : 'localStorage';
+const TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' =
+  (import.meta.env.VITE_TOKEN_STORAGE_MODE as 'localStorage' | 'cookie') || DEFAULT_TOKEN_STORAGE_MODE;
+const USE_SECURE_COOKIES = TOKEN_STORAGE_MODE === 'cookie';
+
 // Check if we have a Gemini API key available (from env or AI Studio)
 const getApiKey = (): string | null => {
   const allowClientKey = import.meta.env.DEV || import.meta.env.VITE_ALLOW_CLIENT_AI_KEY === 'true';
@@ -45,13 +50,14 @@ const handleApiError = async (error: any) => {
 // Backend-based AI query (for deployed version)
 const queryBackendAI = async (query: string, callback: (text: string) => void) => {
   try {
-    const token = localStorage.getItem('finpulse_id_token');
+    const token = USE_SECURE_COOKIES ? null : localStorage.getItem('finpulse_id_token');
     const response = await fetch(`${config.apiUrl}/ai/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` })
       },
+      ...(USE_SECURE_COOKIES ? { credentials: 'include' } : {}),
       body: JSON.stringify({ query })
     });
     

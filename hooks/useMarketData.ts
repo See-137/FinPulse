@@ -47,8 +47,16 @@ interface UseMarketDataReturn {
   lastUpdated: Date | null;
 }
 
+const DEFAULT_TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' = import.meta.env.PROD ? 'cookie' : 'localStorage';
+const TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' =
+  (import.meta.env.VITE_TOKEN_STORAGE_MODE as 'localStorage' | 'cookie') || DEFAULT_TOKEN_STORAGE_MODE;
+const USE_SECURE_COOKIES = TOKEN_STORAGE_MODE === 'cookie';
+
 // Get auth token from localStorage
 const getAuthToken = (): string | null => {
+  if (USE_SECURE_COOKIES) {
+    return null;
+  }
   return localStorage.getItem('finpulse_id_token');
 };
 
@@ -63,7 +71,10 @@ const fetchWithAuth = async (endpoint: string) => {
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`${config.apiUrl}${endpoint}`, { headers });
+  const response = await fetch(`${config.apiUrl}${endpoint}`, {
+    headers,
+    ...(USE_SECURE_COOKIES ? { credentials: 'include' } : {}),
+  });
   
   if (!response.ok) {
     throw new Error(`API Error: ${response.status}`);

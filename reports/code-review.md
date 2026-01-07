@@ -22,7 +22,18 @@ Focused on client security, authentication, realtime sync, and data loading resi
 **Files:**
 - `services/authService.ts`
 
-### 3) Sync service uses an access token key that is never set
+### 3) Cookie-mode API requests did not include credentials
+**Finding:** When relying on httpOnly cookies, the API calls and AI proxy calls did not include `credentials: 'include'`, which would prevent cookies from being sent.
+
+**Patch:** Added cookie-mode detection and ensured `credentials: 'include'` for API service calls, market data fetches, Gemini backend proxy, and sync device management calls.
+
+**Files:**
+- `services/apiService.ts`
+- `hooks/useMarketData.ts`
+- `services/geminiService.ts`
+- `services/syncService.ts`
+
+### 4) Sync service uses an access token key that is never set
 **Finding:** Sync was reading `finpulse_access_token`, but auth only stores `finpulse_id_token`, causing sync authorization headers to be empty.
 
 **Patch:** Added a token helper that reads `finpulse_id_token` first and falls back to `finpulse_access_token` for backward compatibility. This token is now used for sync fetch calls and reconnect logic.
@@ -30,7 +41,7 @@ Focused on client security, authentication, realtime sync, and data loading resi
 **Files:**
 - `services/syncService.ts`
 
-### 4) Partial failures in market data fetch were hidden
+### 5) Partial failures in market data fetch were hidden
 **Finding:** `Promise.allSettled` never threw, so API rejections were silently ignored and `error` was not updated.
 
 **Patch:** Added rejection detection to surface a partial-error message while still displaying available data.
@@ -44,4 +55,4 @@ Focused on client security, authentication, realtime sync, and data loading resi
 - Replace the placeholder Gemini tests with meaningful mocks and assertions.
 
 ## Summary
-These changes reduce the risk of API key exposure, improve production auth defaults, unblock realtime sync authorization, and surface partial data failures to users without hard-failing the UI.
+These changes reduce the risk of API key exposure, improve production auth defaults, ensure cookie-based auth works end-to-end, unblock realtime sync authorization, and surface partial data failures to users without hard-failing the UI.

@@ -3,6 +3,11 @@
 
 import { config } from '../config';
 
+const DEFAULT_TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' = import.meta.env.PROD ? 'cookie' : 'localStorage';
+const TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' =
+  (import.meta.env.VITE_TOKEN_STORAGE_MODE as 'localStorage' | 'cookie') || DEFAULT_TOKEN_STORAGE_MODE;
+const USE_SECURE_COOKIES = TOKEN_STORAGE_MODE === 'cookie';
+
 interface ApiResponse<T> {
   data?: T;
   error?: string;
@@ -15,8 +20,8 @@ class ApiService {
 
   constructor() {
     this.baseUrl = config.apiUrl;
-    // Restore Cognito idToken from localStorage
-    this.idToken = localStorage.getItem('finpulse_id_token');
+    // Restore Cognito idToken from localStorage when using token storage
+    this.idToken = USE_SECURE_COOKIES ? null : localStorage.getItem('finpulse_id_token');
   }
 
   /**
@@ -25,10 +30,12 @@ class ApiService {
    */
   setIdToken(token: string | null) {
     this.idToken = token;
-    if (token) {
-      localStorage.setItem('finpulse_id_token', token);
-    } else {
-      localStorage.removeItem('finpulse_id_token');
+    if (!USE_SECURE_COOKIES) {
+      if (token) {
+        localStorage.setItem('finpulse_id_token', token);
+      } else {
+        localStorage.removeItem('finpulse_id_token');
+      }
     }
   }
 
@@ -67,6 +74,7 @@ class ApiService {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         headers,
+        ...(USE_SECURE_COOKIES ? { credentials: 'include' } : {}),
       });
 
       const data = await response.json().catch(() => null);

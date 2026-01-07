@@ -6,6 +6,11 @@
 
 import { config } from '../config';
 
+const DEFAULT_TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' = import.meta.env.PROD ? 'cookie' : 'localStorage';
+const TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' =
+  (import.meta.env.VITE_TOKEN_STORAGE_MODE as 'localStorage' | 'cookie') || DEFAULT_TOKEN_STORAGE_MODE;
+const USE_SECURE_COOKIES = TOKEN_STORAGE_MODE === 'cookie';
+
 export interface SyncEvent {
   type: 'holding_add' | 'holding_update' | 'holding_remove' | 'settings_update' | 'watchlist_update';
   payload: any;
@@ -36,6 +41,9 @@ class RealTimeSyncService {
   private maxReconnectAttempts = 5;
   private reconnectAttempts = 0;
   private getAuthToken = (): string | null => {
+    if (USE_SECURE_COOKIES) {
+      return null;
+    }
     return localStorage.getItem('finpulse_id_token') || localStorage.getItem('finpulse_access_token');
   };
 
@@ -183,6 +191,7 @@ class RealTimeSyncService {
         headers: {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
+        ...(USE_SECURE_COOKIES ? { credentials: 'include' } : {}),
       });
 
       if (response.ok) {
@@ -243,6 +252,7 @@ class RealTimeSyncService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
         },
+        ...(USE_SECURE_COOKIES ? { credentials: 'include' } : {}),
         body: JSON.stringify(deviceInfo),
       });
     } catch (error) {
@@ -351,6 +361,7 @@ class RealTimeSyncService {
         headers: {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
+        ...(USE_SECURE_COOKIES ? { credentials: 'include' } : {}),
       });
 
       if (response.ok) {
@@ -377,6 +388,7 @@ class RealTimeSyncService {
         headers: {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
+        ...(USE_SECURE_COOKIES ? { credentials: 'include' } : {}),
       });
       return response.ok;
     } catch (error) {
@@ -397,6 +409,7 @@ class RealTimeSyncService {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           'X-Current-Device': this.deviceId,
         },
+        ...(USE_SECURE_COOKIES ? { credentials: 'include' } : {}),
       });
       return response.ok;
     } catch (error) {
