@@ -5,6 +5,26 @@ All notable changes to FinPulse Frontend will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-01-07
+
+### Added
+- **Backend Portfolio Sync** - Holdings now persist to DynamoDB, survives localStorage clear
+- **Dynamic Market Prices** - Fetches prices only for user's actual holdings (not hardcoded list)
+- **Portfolio Service** - New `portfolioService.ts` for backend API integration
+
+### Fixed
+- **PLTR/MSTR/BMNR** - Now correctly classified as stocks (were misrouted to crypto API)
+- **LAVA Crypto** - Added mapping to CoinGecko's lava-network
+- **Negative Value Sorting** - Portfolio 24h change column now sorts correctly with negative values
+- **Alpha Vantage Rate Limit** - Added 1.1s delay between API calls to prevent throttling
+
+### Changed
+- `useMarketData` hook now accepts dynamic `symbols` parameter
+- `portfolioStore` methods are now async with backend sync
+- Watchlist component fetches real-time prices for watchlist items
+
+---
+
 ## [1.0.0] - 2026-01-03
 
 ### Added
@@ -45,4 +65,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 2.0.0 | 2026-01-07 | Backend sync, dynamic prices, sorting fix |
 | 1.0.0 | 2026-01-03 | Initial production release |
