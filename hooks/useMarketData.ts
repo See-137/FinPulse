@@ -1,7 +1,8 @@
 // Real-time Market Data Hook
 // Fetches live data from AWS backend
+// Supports dynamic symbols based on user portfolio
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { config } from '../config';
 
 interface MarketPrice {
@@ -13,9 +14,6 @@ interface MarketPrice {
 }
 
 interface MarketData {
-  BTC: MarketPrice;
-  ETH: MarketPrice;
-  SOL: MarketPrice;
   [key: string]: MarketPrice;
 }
 
@@ -35,6 +33,13 @@ interface NewsItem {
   image?: string;
   publishedAt: string;
   category: string;
+}
+
+interface UseMarketDataOptions {
+  symbols?: string[];         // Dynamic symbols to fetch
+  refreshInterval?: number;   // Refresh interval in ms (default: 60000)
+  fetchNews?: boolean;        // Whether to fetch news (default: true)
+  fetchFx?: boolean;          // Whether to fetch FX rates (default: true)
 }
 
 interface UseMarketDataReturn {
@@ -72,32 +77,64 @@ const fetchWithAuth = async (endpoint: string) => {
   return response.json();
 };
 
-export const useMarketData = (refreshInterval = 60000): UseMarketDataReturn => {
+/**
+ * Hook for fetching real-time market data
+ * @param options - Configuration options including dynamic symbols
+ */
+export const useMarketData = (options: UseMarketDataOptions | number = {}): UseMarketDataReturn => {
+  // Support legacy signature: useMarketData(refreshInterval)
+  const opts: UseMarketDataOptions = typeof options === 'number' 
+    ? { refreshInterval: options } 
+    : options;
+  
+  const {
+    symbols = [],
+    refreshInterval = 60000,
+    fetchNews: shouldFetchNews = true,
+    fetchFx: shouldFetchFx = true,
+  } = opts;
+
   const [prices, setPrices] = useState<MarketData | null>(null);
   const [fxRates, setFxRates] = useState<FxRates | null>(null);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  
+  // Track previous symbols to detect changes
+  const prevSymbolsRef = useRef<string>('');
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (symbolsToFetch: string[]) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch all data in parallel
-      // Request both crypto and stock prices with type=all
-      const [pricesRes, fxRes, newsRes] = await Promise.allSettled([
-        fetchWithAuth('/market/prices?type=all&symbols=BTC,ETH,SOL,XRP,ADA,DOT,AVAX,MATIC,LINK,DOGE,AAPL,MSFT,GOOGL,AMZN,NVDA,TSLA,META,JPM,V,MA'),
-        fetchWithAuth('/fx/rates?base=USD'),
-        fetchWithAuth('/news/latest'),
-      ]);
+      // Build dynamic symbols list
+      // Always include some base symbols for general market overview
+      const baseSymbols = ['BTC', 'ETH', 'SOL'];
+      const allSymbols = [...new Set([...baseSymbols, ...symbolsToFetch])];
+      const symbolsParam = allSymbols.join(',');
 
-      // Process prices
+      // Build requests array
+      const requests: Promise<any>[] = [
+        fetchWithAuth(`/market/prices?type=all&symbols=${symbolsParam}`),
+      ];
+      
+      if (shouldFetchFx) {
+        requests.push(fetchWithAuth('/fx/rates?base=USD'));
+      }
+      
+      if (shouldFetchNews) {
+        requests.push(fetchWithAuth('/news/latest'));
+      }
+
+      const results = await Promise.allSettled(requests);
+      
+      // Process prices (always first)
+      const pricesRes = results[0];
       if (pricesRes.status === 'fulfilled' && pricesRes.value.success) {
         const priceData = pricesRes.value.data;
-        // Transform to include symbol in each price object
-        const transformed: MarketData = {} as MarketData;
+        const transformed: MarketData = {};
         Object.entries(priceData).forEach(([symbol, data]: [string, any]) => {
           transformed[symbol] = {
             symbol,
@@ -110,18 +147,26 @@ export const useMarketData = (refreshInterval = 60000): UseMarketDataReturn => {
         setPrices(transformed);
       }
 
-      // Process FX rates
-      if (fxRes.status === 'fulfilled' && fxRes.value.success) {
-        setFxRates({
-          base: fxRes.value.base,
-          rates: fxRes.value.rates,
-          timestamp: fxRes.value.timestamp,
-        });
+      // Process FX rates (second if enabled)
+      let resultIndex = 1;
+      if (shouldFetchFx && results[resultIndex]) {
+        const fxRes = results[resultIndex];
+        if (fxRes.status === 'fulfilled' && fxRes.value.success) {
+          setFxRates({
+            base: fxRes.value.base,
+            rates: fxRes.value.rates,
+            timestamp: fxRes.value.timestamp,
+          });
+        }
+        resultIndex++;
       }
 
-      // Process news
-      if (newsRes.status === 'fulfilled' && newsRes.value.success) {
-        setNews(newsRes.value.articles || newsRes.value.data || []);
+      // Process news (last if enabled)
+      if (shouldFetchNews && results[resultIndex]) {
+        const newsRes = results[resultIndex];
+        if (newsRes.status === 'fulfilled' && newsRes.value.success) {
+          setNews(newsRes.value.articles || newsRes.value.data || []);
+        }
       }
 
       setLastUpdated(new Date());
@@ -130,20 +175,29 @@ export const useMarketData = (refreshInterval = 60000): UseMarketDataReturn => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [shouldFetchNews, shouldFetchFx]);
+
+  // Refetch when symbols change
+  useEffect(() => {
+    const symbolsKey = symbols.sort().join(',');
+    if (symbolsKey !== prevSymbolsRef.current) {
+      prevSymbolsRef.current = symbolsKey;
+      fetchData(symbols);
+    }
+  }, [symbols, fetchData]);
 
   // Initial fetch
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData(symbols);
+  }, []);  // Only on mount
 
   // Auto-refresh
   useEffect(() => {
     if (refreshInterval <= 0) return;
     
-    const interval = setInterval(fetchData, refreshInterval);
+    const interval = setInterval(() => fetchData(symbols), refreshInterval);
     return () => clearInterval(interval);
-  }, [fetchData, refreshInterval]);
+  }, [fetchData, refreshInterval, symbols]);
 
   return {
     prices,
@@ -151,7 +205,7 @@ export const useMarketData = (refreshInterval = 60000): UseMarketDataReturn => {
     news,
     loading,
     error,
-    refresh: fetchData,
+    refresh: () => fetchData(symbols),
     lastUpdated,
   };
 };
