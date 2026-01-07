@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { portfolioService } from '../services/portfolioService';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
 
@@ -30,6 +31,10 @@ interface PortfolioState {
   userHoldings: Record<string, Holding[]>;
   userWatchlists: Record<string, WatchlistItem[]>;
   
+  // Sync state
+  isSyncing: boolean;
+  lastSyncError: string | null;
+  
   // UI state (not user-scoped)
   isPrivate: boolean;
   search: string;
@@ -44,11 +49,15 @@ interface PortfolioState {
   setSearch: (value: string) => void;
   setFilterType: (value: string | null) => void;
   
-  // Holdings actions (user-scoped)
+  // Holdings actions (user-scoped) - now with backend sync
   setHoldings: (holdings: Holding[]) => void;
-  addHolding: (holding: Holding) => void;
-  updateHolding: (symbol: string, holding: Holding) => void;
-  removeHolding: (symbol: string) => void;
+  addHolding: (holding: Holding, syncToBackend?: boolean) => Promise<void>;
+  updateHolding: (symbol: string, holding: Holding, syncToBackend?: boolean) => Promise<void>;
+  removeHolding: (symbol: string, syncToBackend?: boolean) => Promise<void>;
+  
+  // Backend sync actions
+  loadFromBackend: () => Promise<void>;
+  syncToBackend: () => Promise<void>;
   
   // Watchlist actions (user-scoped)
   addToWatchlist: (item: Omit<WatchlistItem, 'addedAt'>) => void;
@@ -68,6 +77,8 @@ export const usePortfolioStore = create<PortfolioState>()(
       currentUserId: null,
       userHoldings: {},
       userWatchlists: {},
+      isSyncing: false,
+      lastSyncError: null,
       isPrivate: false,
       search: '',
       filterType: null,
@@ -86,7 +97,7 @@ export const usePortfolioStore = create<PortfolioState>()(
         return userWatchlists[currentUserId] || [];
       },
       
-      // Set current user on login/restore
+      // Set current user on login/restore - also loads from backend
       setCurrentUser: (userId: string) => {
         set((state) => {
           const userHoldings = { ...state.userHoldings };
@@ -101,6 +112,9 @@ export const usePortfolioStore = create<PortfolioState>()(
           
           return { currentUserId: userId, userHoldings, userWatchlists };
         });
+        
+        // Load from backend after setting user
+        get().loadFromBackend();
       },
       
       // Clear current user on logout
@@ -113,7 +127,60 @@ export const usePortfolioStore = create<PortfolioState>()(
       setSearch: (value) => set({ search: value }),
       setFilterType: (value) => set({ filterType: value }),
       
-      // Holdings actions - user-scoped
+      // Load holdings from backend
+      loadFromBackend: async () => {
+        const { currentUserId } = get();
+        if (!currentUserId) return;
+        
+        set({ isSyncing: true, lastSyncError: null });
+        
+        try {
+          const portfolio = await portfolioService.getPortfolio();
+          const holdings: Holding[] = portfolio.holdings.map(h => ({
+            symbol: h.symbol,
+            name: h.name,
+            type: h.type,
+            quantity: h.quantity,
+            avgCost: h.avgCost,
+            currentPrice: h.currentPrice || h.avgCost,
+            dayPL: 0,
+          }));
+          
+          set((state) => ({
+            isSyncing: false,
+            userHoldings: {
+              ...state.userHoldings,
+              [currentUserId]: holdings
+            }
+          }));
+          
+          console.log(`Loaded ${holdings.length} holdings from backend`);
+        } catch (error) {
+          console.error('Failed to load from backend:', error);
+          set({ isSyncing: false, lastSyncError: String(error) });
+          // Keep local data if backend fails
+        }
+      },
+      
+      // Sync all local holdings to backend
+      syncToBackend: async () => {
+        const { currentUserId, userHoldings } = get();
+        if (!currentUserId) return;
+        
+        const holdings = userHoldings[currentUserId] || [];
+        set({ isSyncing: true, lastSyncError: null });
+        
+        try {
+          await portfolioService.syncLocalToBackend(holdings);
+          set({ isSyncing: false });
+          console.log(`Synced ${holdings.length} holdings to backend`);
+        } catch (error) {
+          console.error('Failed to sync to backend:', error);
+          set({ isSyncing: false, lastSyncError: String(error) });
+        }
+      },
+      
+      // Holdings actions - user-scoped with backend sync
       setHoldings: (holdings) => {
         const { currentUserId } = get();
         if (!currentUserId) return;
@@ -126,43 +193,79 @@ export const usePortfolioStore = create<PortfolioState>()(
         }));
       },
       
-      addHolding: (holding) => {
+      addHolding: async (holding, syncToBackend = true) => {
         const { currentUserId, userHoldings } = get();
         if (!currentUserId) return;
         
         const currentHoldings = userHoldings[currentUserId] || [];
+        
+        // Update local state immediately
         set((state) => ({
           userHoldings: {
             ...state.userHoldings,
             [currentUserId]: [...currentHoldings, holding]
           }
         }));
+        
+        // Sync to backend
+        if (syncToBackend) {
+          try {
+            await portfolioService.addHolding(holding);
+            console.log(`Added ${holding.symbol} to backend`);
+          } catch (error) {
+            console.error(`Failed to add ${holding.symbol} to backend:`, error);
+          }
+        }
       },
       
-      updateHolding: (symbol, holding) => {
+      updateHolding: async (symbol, holding, syncToBackend = true) => {
         const { currentUserId, userHoldings } = get();
         if (!currentUserId) return;
         
         const currentHoldings = userHoldings[currentUserId] || [];
+        
+        // Update local state immediately
         set((state) => ({
           userHoldings: {
             ...state.userHoldings,
             [currentUserId]: currentHoldings.map(h => h.symbol === symbol ? holding : h)
           }
         }));
+        
+        // Sync to backend
+        if (syncToBackend) {
+          try {
+            await portfolioService.updateHolding(symbol, holding);
+            console.log(`Updated ${symbol} in backend`);
+          } catch (error) {
+            console.error(`Failed to update ${symbol} in backend:`, error);
+          }
+        }
       },
       
-      removeHolding: (symbol) => {
+      removeHolding: async (symbol, syncToBackend = true) => {
         const { currentUserId, userHoldings } = get();
         if (!currentUserId) return;
         
         const currentHoldings = userHoldings[currentUserId] || [];
+        
+        // Update local state immediately
         set((state) => ({
           userHoldings: {
             ...state.userHoldings,
             [currentUserId]: currentHoldings.filter(h => h.symbol !== symbol)
           }
         }));
+        
+        // Sync to backend
+        if (syncToBackend) {
+          try {
+            await portfolioService.removeHolding(symbol);
+            console.log(`Removed ${symbol} from backend`);
+          } catch (error) {
+            console.error(`Failed to remove ${symbol} from backend:`, error);
+          }
+        }
       },
       
       // Watchlist actions - user-scoped

@@ -1,0 +1,200 @@
+/**
+ * Portfolio API Service
+ * Handles backend persistence of user holdings and watchlist
+ */
+
+import { config } from '../config';
+
+export interface Holding {
+  symbol: string;
+  name: string;
+  type: 'CRYPTO' | 'STOCK' | 'COMMODITY';
+  quantity: number;
+  avgCost: number;
+  currentPrice?: number;
+  notes?: string;
+}
+
+export interface PortfolioData {
+  holdings: Holding[];
+  totalValue?: number;
+  lastUpdated?: string;
+}
+
+// Get auth token from localStorage
+const getAuthToken = (): string | null => {
+  return localStorage.getItem('finpulse_id_token');
+};
+
+// API helper with auth
+const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
+  const token = getAuthToken();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+  
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const response = await fetch(`${config.apiUrl}${endpoint}`, {
+    ...options,
+    headers,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API Error ${response.status}: ${errorText}`);
+  }
+  
+  return response.json();
+};
+
+/**
+ * Portfolio API Service
+ */
+export const portfolioService = {
+  /**
+   * Get user's portfolio from backend
+   */
+  async getPortfolio(): Promise<PortfolioData> {
+    try {
+      const result = await fetchWithAuth('/portfolio');
+      if (result.success) {
+        return {
+          holdings: (result.holdings || []).map((h: any) => ({
+            symbol: h.symbol,
+            name: h.name || h.symbol,
+            type: h.type?.toUpperCase() || 'CRYPTO',
+            quantity: h.quantity,
+            avgCost: h.avgBuyPrice || h.avgCost || 0,
+            currentPrice: h.currentPrice || 0,
+            notes: h.notes || '',
+          })),
+          totalValue: result.totalValue,
+          lastUpdated: result.lastUpdated,
+        };
+      }
+      throw new Error(result.error || 'Failed to get portfolio');
+    } catch (error) {
+      console.error('Failed to fetch portfolio:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Add a new holding to portfolio
+   */
+  async addHolding(holding: Holding): Promise<Holding> {
+    try {
+      const result = await fetchWithAuth('/portfolio/holdings', {
+        method: 'POST',
+        body: JSON.stringify({
+          symbol: holding.symbol.toUpperCase(),
+          name: holding.name,
+          type: holding.type.toLowerCase(),
+          quantity: holding.quantity,
+          avgBuyPrice: holding.avgCost,
+          currentPrice: holding.currentPrice || holding.avgCost,
+          notes: holding.notes || '',
+        }),
+      });
+      
+      if (result.success) {
+        return {
+          symbol: result.holding.symbol,
+          name: result.holding.name || result.holding.symbol,
+          type: result.holding.type?.toUpperCase() || holding.type,
+          quantity: result.holding.quantity,
+          avgCost: result.holding.avgBuyPrice || result.holding.avgCost,
+          currentPrice: result.holding.currentPrice,
+        };
+      }
+      throw new Error(result.error || 'Failed to add holding');
+    } catch (error) {
+      console.error('Failed to add holding:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update an existing holding
+   */
+  async updateHolding(symbol: string, updates: Partial<Holding>): Promise<Holding> {
+    try {
+      const result = await fetchWithAuth(`/portfolio/holdings/${symbol}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          quantity: updates.quantity,
+          avgBuyPrice: updates.avgCost,
+          currentPrice: updates.currentPrice,
+          notes: updates.notes,
+        }),
+      });
+      
+      if (result.success) {
+        return {
+          symbol: result.holding.symbol,
+          name: result.holding.name || result.holding.symbol,
+          type: result.holding.type?.toUpperCase() || 'CRYPTO',
+          quantity: result.holding.quantity,
+          avgCost: result.holding.avgBuyPrice || result.holding.avgCost,
+          currentPrice: result.holding.currentPrice,
+        };
+      }
+      throw new Error(result.error || 'Failed to update holding');
+    } catch (error) {
+      console.error('Failed to update holding:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Remove a holding from portfolio
+   */
+  async removeHolding(symbol: string): Promise<void> {
+    try {
+      const result = await fetchWithAuth(`/portfolio/holdings/${symbol}`, {
+        method: 'DELETE',
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to remove holding');
+      }
+    } catch (error) {
+      console.error('Failed to remove holding:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Sync local holdings to backend (for migration)
+   */
+  async syncLocalToBackend(holdings: Holding[]): Promise<void> {
+    console.log(`Syncing ${holdings.length} holdings to backend...`);
+    
+    for (const holding of holdings) {
+      try {
+        await this.addHolding(holding);
+        console.log(`Synced: ${holding.symbol}`);
+      } catch (error) {
+        console.error(`Failed to sync ${holding.symbol}:`, error);
+      }
+    }
+  },
+
+  /**
+   * Check if user has any data in backend
+   */
+  async hasBackendData(): Promise<boolean> {
+    try {
+      const portfolio = await this.getPortfolio();
+      return portfolio.holdings.length > 0;
+    } catch {
+      return false;
+    }
+  },
+};
+
+export default portfolioService;
