@@ -315,30 +315,43 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     let sortableItems = [...filteredHoldings];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
-        let aValue: any = a[sortConfig.key as keyof Holding];
-        let bValue: any = b[sortConfig.key as keyof Holding];
+        let aValue: number;
+        let bValue: number;
 
-        if (sortConfig.key === 'value') {
-           aValue = a.quantity * getMarketPrice(a.symbol, a.avgCost);
-           bValue = b.quantity * getMarketPrice(b.symbol, b.avgCost);
-        }
-        
-        if (sortConfig.key === 'marketPrice') {
-           aValue = getMarketPrice(a.symbol, a.avgCost);
-           bValue = getMarketPrice(b.symbol, b.avgCost);
+        // Handle special computed columns
+        switch (sortConfig.key) {
+          case 'value':
+            aValue = a.quantity * getMarketPrice(a.symbol, a.avgCost);
+            bValue = b.quantity * getMarketPrice(b.symbol, b.avgCost);
+            break;
+          case 'marketPrice':
+            aValue = getMarketPrice(a.symbol, a.avgCost);
+            bValue = getMarketPrice(b.symbol, b.avgCost);
+            break;
+          case 'dayPL':
+            // Use actual market change for sorting (handles negatives correctly)
+            aValue = getMarketChange(a.symbol, a.dayPL);
+            bValue = getMarketChange(b.symbol, b.dayPL);
+            break;
+          default:
+            // For other columns, get value from holding object
+            aValue = a[sortConfig.key as keyof Holding] as number;
+            bValue = b[sortConfig.key as keyof Holding] as number;
         }
 
-        if (aValue < bValue) {
+        // Numeric comparison (properly handles negative values)
+        const diff = aValue - bValue;
+        if (diff < 0) {
           return sortConfig.direction === 'asc' ? -1 : 1;
         }
-        if (aValue > bValue) {
+        if (diff > 0) {
           return sortConfig.direction === 'asc' ? 1 : -1;
         }
         return 0;
       });
     }
     return sortableItems;
-  }, [filteredHoldings, sortConfig]);
+  }, [filteredHoldings, sortConfig, marketPrices, wsPrices]);
 
   const renderSortIcon = (key: string) => {
     if (sortConfig?.key !== key) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
