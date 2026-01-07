@@ -43,8 +43,19 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   // Get user-scoped holdings
   const holdings = getHoldings();
 
-  // Fetch real-time market prices (REST API as fallback)
-  const { prices: marketPrices, loading: pricesLoading } = useMarketData(30000);
+  // Extract all unique symbols from holdings for dynamic price fetching
+  const holdingSymbols = useMemo(() => 
+    holdings.map(h => h.symbol),
+    [holdings]
+  );
+
+  // Fetch real-time market prices (REST API) - dynamically based on user's holdings
+  const { prices: marketPrices, loading: pricesLoading } = useMarketData({
+    symbols: holdingSymbols,
+    refreshInterval: 30000,
+    fetchNews: false,  // News is fetched separately by NewsSidebar
+    fetchFx: true,
+  });
   
   // Real-time WebSocket prices for crypto
   const cryptoSymbols = useMemo(() => 

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { usePortfolioStore, WatchlistItem, AssetType } from '../store/portfolioStore';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
+import { useMarketData } from '../hooks/useMarketData';
 import { useLanguage } from '../i18n';
 import { Currency } from '../types';
 import { CURRENCY_RATES } from '../constants';
@@ -64,9 +65,15 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
   const [alertPrice, setAlertPrice] = useState('');
   const [alertType, setAlertType] = useState<'above' | 'below'>('above');
 
-  // Get watchlist symbols for WebSocket
+  // Get watchlist symbols for WebSocket (crypto only)
   const watchlistSymbols = useMemo(() => 
     watchlist.filter(w => w.type === 'CRYPTO').map(w => w.symbol),
+    [watchlist]
+  );
+
+  // Get all watchlist symbols for REST API (stocks + commodities)
+  const allWatchlistSymbols = useMemo(() => 
+    watchlist.map(w => w.symbol),
     [watchlist]
   );
 
@@ -75,16 +82,37 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
     enabled: true,
   });
 
+  // Fetch stock/commodity prices via REST API
+  const { prices: marketPrices } = useMarketData({
+    symbols: allWatchlistSymbols,
+    refreshInterval: 30000,
+    fetchNews: false,
+    fetchFx: false,
+  });
+
   const rate = CURRENCY_RATES[currency];
   const currencySymbol = currency === 'USD' ? '$' : '₪';
 
-  // Get price for a symbol
+  // Get price for a symbol - prefers WebSocket for crypto, REST API for stocks
   const getPrice = (symbol: string): { price: number; change24h: number } => {
-    const wsPrice = wsPrices.get(symbol.toUpperCase());
+    const upperSymbol = symbol.toUpperCase();
+    
+    // Try WebSocket prices first (best for crypto)
+    const wsPrice = wsPrices.get(upperSymbol);
     if (wsPrice) {
       return { price: wsPrice.price, change24h: wsPrice.change24h };
     }
-    return FALLBACK_PRICES[symbol.toUpperCase()] || { price: 0, change24h: 0 };
+    
+    // Try REST API prices (works for both stocks and crypto)
+    if (marketPrices && marketPrices[upperSymbol]) {
+      return { 
+        price: marketPrices[upperSymbol].price, 
+        change24h: marketPrices[upperSymbol].change24h 
+      };
+    }
+    
+    // Fallback to static prices
+    return FALLBACK_PRICES[upperSymbol] || { price: 0, change24h: 0 };
   };
 
   // Filter assets for search
