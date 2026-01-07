@@ -93,6 +93,11 @@ export const useMarketData = (refreshInterval = 60000): UseMarketDataReturn => {
         fetchWithAuth('/news/latest'),
       ]);
 
+      const rejected = [pricesRes, fxRes, newsRes].filter(result => result.status === 'rejected');
+      if (rejected.length > 0) {
+        setError('Some data sources failed to load. Showing partial data.');
+      }
+
       // Process prices
       if (pricesRes.status === 'fulfilled' && pricesRes.value.success) {
         const priceData = pricesRes.value.data;

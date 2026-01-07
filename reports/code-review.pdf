@@ -1,0 +1,128 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 3041 >>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(# FinPulse Code Review Findings & Patch Plan) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(## Scope) Tj
+0 -16 Td
+(Focused on client security, authentication, realtime sync, and data loading resiliency.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(## Findings & Patches Applied) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(### 1\) Client-side exposure of Gemini API key) Tj
+0 -16 Td
+(**Finding:** The build injected the Gemini key into the client bundle, which makes it retrievable by end users.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Patch:** Added `VITE_ALLOW_CLIENT_AI_KEY` gate and disabled client key injection by default; `geminiService` only reads keys in development or when explicitly allowed. This reduces accidental key exposure in production.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Files:**) Tj
+0 -16 Td
+(- `vite.config.ts`) Tj
+0 -16 Td
+(- `services/geminiService.ts`) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(### 2\) Token storage defaults to localStorage in production) Tj
+0 -16 Td
+(**Finding:** The auth service defaulted to `localStorage`, which increases XSS exposure in production.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Patch:** Default token storage now uses secure cookies in production unless overridden by `VITE_TOKEN_STORAGE_MODE`. The session restoration path skips localStorage in cookie mode to avoid false logouts.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Files:**) Tj
+0 -16 Td
+(- `services/authService.ts`) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(### 3\) Sync service uses an access token key that is never set) Tj
+0 -16 Td
+(**Finding:** Sync was reading `finpulse_access_token`, but auth only stores `finpulse_id_token`, causing sync authorization headers to be empty.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Patch:** Added a token helper that reads `finpulse_id_token` first and falls back to `finpulse_access_token` for backward compatibility. This token is now used for sync fetch calls and reconnect logic.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Files:**) Tj
+0 -16 Td
+(- `services/syncService.ts`) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(### 4\) Partial failures in market data fetch were hidden) Tj
+0 -16 Td
+(**Finding:** `Promise.allSettled` never threw, so API rejections were silently ignored and `error` was not updated.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Patch:** Added rejection detection to surface a partial-error message while still displaying available data.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(**Files:**) Tj
+0 -16 Td
+(- `hooks/useMarketData.ts`) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(## Follow-Up Recommendations) Tj
+0 -16 Td
+(- Add a backend session endpoint for cookie-mode session restoration \(e.g., `/auth/session`\) to rehydrate user state on refresh.) Tj
+0 -16 Td
+(- Replace WebSocket query-string auth with a safer mechanism \(subprotocol token or signed short-lived token\).) Tj
+0 -16 Td
+(- Replace the placeholder Gemini tests with meaningful mocks and assertions.) Tj
+0 -16 Td
+() Tj
+0 -16 Td
+(## Summary) Tj
+0 -16 Td
+(These changes reduce the risk of API key exposure, improve production auth defaults, unblock realtime sync authorization, and surface partial data failures to users without hard-failing the UI.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000003334 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3404
+%%EOF

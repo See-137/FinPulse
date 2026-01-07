@@ -35,6 +35,9 @@ class RealTimeSyncService {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private maxReconnectAttempts = 5;
   private reconnectAttempts = 0;
+  private getAuthToken = (): string | null => {
+    return localStorage.getItem('finpulse_id_token') || localStorage.getItem('finpulse_access_token');
+  };
 
   constructor() {
     this.deviceId = this.getOrCreateDeviceId();
@@ -175,9 +178,10 @@ class RealTimeSyncService {
 
     try {
       const lastSync = localStorage.getItem('finpulse_last_sync') || '0';
+      const token = this.getAuthToken();
       const response = await fetch(`${config.api.baseUrl}/sync/changes?since=${lastSync}&device=${this.deviceId}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('finpulse_access_token')}`,
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
       });
 
@@ -213,7 +217,7 @@ class RealTimeSyncService {
   private reconnect(): void {
     if (!this.userId || !this.isOnline) return;
     
-    const token = localStorage.getItem('finpulse_access_token');
+    const token = this.getAuthToken();
     if (token) {
       this.connectWebSocket(token);
     }
@@ -342,9 +346,10 @@ class RealTimeSyncService {
    */
   async getDevices(): Promise<DeviceInfo[]> {
     try {
+      const token = this.getAuthToken();
       const response = await fetch(`${config.api.baseUrl}/auth/devices`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('finpulse_access_token')}`,
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
       });
 
@@ -366,10 +371,11 @@ class RealTimeSyncService {
    */
   async revokeDevice(deviceId: string): Promise<boolean> {
     try {
+      const token = this.getAuthToken();
       const response = await fetch(`${config.api.baseUrl}/auth/devices/${deviceId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('finpulse_access_token')}`,
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
       });
       return response.ok;
@@ -384,10 +390,11 @@ class RealTimeSyncService {
    */
   async revokeAllOtherDevices(): Promise<boolean> {
     try {
+      const token = this.getAuthToken();
       const response = await fetch(`${config.api.baseUrl}/auth/devices/revoke-all`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('finpulse_access_token')}`,
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           'X-Current-Device': this.deviceId,
         },
       });

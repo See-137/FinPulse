@@ -5,9 +5,10 @@
 import { config } from '../config';
 import { api } from './apiService';
 
-// Token storage mode - set to 'cookie' for production security
-const TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' = 
-  (import.meta.env.VITE_TOKEN_STORAGE_MODE as 'localStorage' | 'cookie') || 'localStorage';
+// Token storage mode - default to secure cookies in production
+const DEFAULT_TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' = import.meta.env.PROD ? 'cookie' : 'localStorage';
+const TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' =
+  (import.meta.env.VITE_TOKEN_STORAGE_MODE as 'localStorage' | 'cookie') || DEFAULT_TOKEN_STORAGE_MODE;
 
 interface AuthTokens {
   accessToken: string;
@@ -261,6 +262,9 @@ class AuthService {
   }
 
   getCurrentUser(): CognitoUser | null {
+    if (this.useSecureCookies) {
+      return this.currentUser;
+    }
     // Also verify token exists - if not, user is effectively logged out
     const idToken = localStorage.getItem('finpulse_id_token');
     if (!idToken) {
@@ -334,6 +338,9 @@ class AuthService {
   }
 
   private restoreSession(): void {
+    if (this.useSecureCookies) {
+      return;
+    }
     try {
       const tokensJson = localStorage.getItem('finpulse_auth_tokens');
       const userJson = localStorage.getItem('finpulse_user');

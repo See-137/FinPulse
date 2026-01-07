@@ -4,6 +4,10 @@ import { config } from '../config';
 
 // Check if we have a Gemini API key available (from env or AI Studio)
 const getApiKey = (): string | null => {
+  const allowClientKey = import.meta.env.DEV || import.meta.env.VITE_ALLOW_CLIENT_AI_KEY === 'true';
+  if (!allowClientKey) {
+    return null;
+  }
   // Check process.env (set by Vite define)
   if (typeof process !== 'undefined' && process.env?.API_KEY) {
     return process.env.API_KEY;
