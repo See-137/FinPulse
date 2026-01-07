@@ -71,8 +71,10 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan, user, onUpgr
     try {
       const result = await fetchNews();
       
-      if (result.success && result.data) {
-        const parsedArticles: NewsArticle[] = result.data.slice(0, 8).map((item: any) => ({
+      // API returns articles field, not data
+      const newsData = result.articles || result.data || [];
+      if (result.success && newsData.length > 0) {
+        const parsedArticles: NewsArticle[] = newsData.slice(0, 8).map((item: any) => ({
           id: item.id,
           source: item.source || 'News',
           title: item.title,
