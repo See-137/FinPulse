@@ -121,7 +121,7 @@ export const useMarketData = (refreshInterval = 60000): UseMarketDataReturn => {
 
       // Process news
       if (newsRes.status === 'fulfilled' && newsRes.value.success) {
-        setNews(newsRes.value.data || []);
+        setNews(newsRes.value.articles || newsRes.value.data || []);
       }
 
       setLastUpdated(new Date());
