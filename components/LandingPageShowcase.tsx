@@ -331,9 +331,9 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
 
   return (
     <div className="h-screen h-[100dvh] bg-[#0b0e14] flex flex-col lg:flex-row overflow-hidden selection:bg-[#00e5ff] selection:text-[#0b0e14]">
-      {/* Left Side: Auth & Selector */}
-      <div className="w-full lg:w-[45%] h-full flex flex-col relative z-10 bg-[#0b0e14] overflow-y-auto custom-scrollbar">
-        <div className="p-6 sm:p-8 lg:p-16 flex flex-col min-h-min">
+      {/* Left Side: Auth Form */}
+      <div className="w-full lg:w-[35%] xl:w-[30%] h-full flex flex-col relative z-10 bg-[#0b0e14] overflow-y-auto custom-scrollbar">
+        <div className="p-6 sm:p-8 lg:p-12 flex flex-col min-h-min">
             <div className="mb-8 lg:mb-10">
               <Logo />
             </div>
@@ -561,8 +561,8 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                 </div>
             </div>
 
-            {/* Interactive Feature List */}
-            <div className="space-y-3 pb-12" onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
+            {/* Mobile Feature List - only visible on small screens */}
+            <div className="space-y-3 pb-12 lg:hidden" onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
               {SHOWCASE_ITEMS.map((item, index) => (
                 <button
                   key={item.id}
@@ -596,6 +596,46 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                 <Shield className="w-3 h-3 text-slate-700" />
             </div>
             </div>
+        </div>
+      </div>
+
+      {/* Middle: Feature Selector Cards - visible on large screens */}
+      <div className="hidden lg:flex w-[200px] xl:w-[220px] flex-col justify-center py-8 px-4 border-l border-white/5" onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
+        <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-4 px-2">Explore Features</p>
+        <div className="space-y-2">
+          {SHOWCASE_ITEMS.map((item, index) => (
+            <button
+              key={item.id}
+              onClick={() => handleManualSelect(index)}
+              className={`w-full text-left p-3 rounded-xl transition-all duration-300 group ${
+                activeIndex === index 
+                  ? 'bg-[#00e5ff]/10 border border-[#00e5ff]/30' 
+                  : 'hover:bg-white/[0.03] border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                 <div className={`p-1.5 rounded-lg transition-colors ${activeIndex === index ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-slate-800 text-slate-500 group-hover:text-slate-300'}`}>
+                    <item.icon className="w-4 h-4" />
+                 </div>
+                 <div className="flex-1 min-w-0">
+                    <h4 className={`text-[11px] font-bold truncate transition-colors ${activeIndex === index ? 'text-[#00e5ff]' : 'text-slate-400 group-hover:text-slate-300'}`}>{item.title}</h4>
+                 </div>
+              </div>
+            </button>
+          ))}
+        </div>
+        {/* Progress indicator */}
+        <div className="mt-6 px-2">
+          <div className="flex gap-1.5">
+            {SHOWCASE_ITEMS.map((_, index) => (
+              <div 
+                key={index}
+                className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                  activeIndex === index ? 'bg-[#00e5ff]' : 'bg-white/10'
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
