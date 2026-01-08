@@ -8,8 +8,8 @@ interface AccessibilityStatementProps {
 
 export const AccessibilityStatement: React.FC<AccessibilityStatementProps> = ({ onBack }) => {
   return (
-    <div className="min-h-screen max-h-screen overflow-y-auto bg-[#0b0e14] text-white p-8">
-      <div className="max-w-3xl mx-auto">
+    <div className="fixed inset-0 overflow-y-auto bg-[#0b0e14] text-white p-8 z-50">
+      <div className="max-w-3xl mx-auto pb-8">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-cyan-400 mb-8 hover:underline"
