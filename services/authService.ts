@@ -413,7 +413,6 @@ class AuthService {
       const response = await fetch(`${config.apiUrl}/auth/federated-signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           provider: provider.name,
           providerSubject: provider.subject,
