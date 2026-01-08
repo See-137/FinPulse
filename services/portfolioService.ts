@@ -102,13 +102,15 @@ export const portfolioService = {
       });
       
       if (result.success) {
+        // Lambda returns { success: true, data: holding }
+        const data = result.data || result.holding;
         return {
-          symbol: result.holding.symbol,
-          name: result.holding.name || result.holding.symbol,
-          type: result.holding.type?.toUpperCase() || holding.type,
-          quantity: result.holding.quantity,
-          avgCost: result.holding.avgBuyPrice || result.holding.avgCost,
-          currentPrice: result.holding.currentPrice,
+          symbol: data.symbol,
+          name: data.name || data.symbol,
+          type: data.type?.toUpperCase() || holding.type,
+          quantity: data.quantity,
+          avgCost: data.avgBuyPrice || data.avgCost,
+          currentPrice: data.currentPrice,
         };
       }
       throw new Error(result.error || 'Failed to add holding');
@@ -134,13 +136,15 @@ export const portfolioService = {
       });
       
       if (result.success) {
+        // Lambda returns { success: true, data: holding }
+        const data = result.data || result.holding;
         return {
-          symbol: result.holding.symbol,
-          name: result.holding.name || result.holding.symbol,
-          type: result.holding.type?.toUpperCase() || 'CRYPTO',
-          quantity: result.holding.quantity,
-          avgCost: result.holding.avgBuyPrice || result.holding.avgCost,
-          currentPrice: result.holding.currentPrice,
+          symbol: data.symbol,
+          name: data.name || data.symbol,
+          type: data.type?.toUpperCase() || 'CRYPTO',
+          quantity: data.quantity,
+          avgCost: data.avgBuyPrice || data.avgCost,
+          currentPrice: data.currentPrice,
         };
       }
       throw new Error(result.error || 'Failed to update holding');
