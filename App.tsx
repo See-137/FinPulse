@@ -78,7 +78,7 @@ const AppContent: React.FC = () => {
   
   // Notification & Onboarding State
   const { showChangelog, currentChangelog, dismissChangelog } = useChangelog();
-  const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding(userCreatedAt);
+  const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding(userCreatedAt, user?.id);
   const [activeMilestone, setActiveMilestone] = useState<Milestone | null>(null);
   const [isMilestoneOpen, setIsMilestoneOpen] = useState(false);
   
@@ -367,7 +367,7 @@ const AppContent: React.FC = () => {
     setUserCreatedAt(undefined); // Clear for next user
     clearCurrentUser(); // Clear portfolio user scope
     localStorage.removeItem(USER_STORAGE_KEY);
-    localStorage.removeItem('finpulse_onboarding_completed'); // Reset onboarding for next user
+    // Note: onboarding state is now user-scoped, so no need to clear it
     setView('landing');
   };
 
