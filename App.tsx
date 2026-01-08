@@ -56,7 +56,19 @@ const USER_STORAGE_KEY = 'finpulse_user_session';
 const AppContent: React.FC = () => {
   const { t, language, setLanguage, isRTL } = useLanguage();
   const { setCurrentUser, clearCurrentUser, getHoldings } = usePortfolioStore();
+  
+  // OAuth callback handling state
+  const [isOAuthProcessing, setIsOAuthProcessing] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+  
   const [view, setView] = useState<'landing' | 'welcome' | 'dashboard' | 'terms' | 'privacy' | 'pricing' | 'accessibility'>(() => {
+    // Check for OAuth callback in URL
+    const pathname = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    if (pathname.includes('/oauth/callback') || searchParams.has('code')) {
+      return 'landing'; // Will be processed by OAuth handler
+    }
+    
     // Check URL hash for legal pages
     const hash = window.location.hash.slice(1);
     if (hash === 'terms') return 'terms';
@@ -202,6 +214,78 @@ const AppContent: React.FC = () => {
     };
     restoreAuth();
   }, [setCurrentUser]);
+
+  // Handle OAuth callback (Google Sign-In)
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const pathname = window.location.pathname;
+      
+      // Check if this is an OAuth callback
+      if (!searchParams.has('code') && !pathname.includes('/oauth/callback')) {
+        return;
+      }
+
+      // Parse the callback
+      const callbackResult = auth.parseOAuthCallback();
+      
+      if (!callbackResult.success) {
+        setOauthError(callbackResult.errorDescription || callbackResult.error || 'OAuth failed');
+        // Clear the URL params
+        window.history.replaceState({}, '', window.location.pathname);
+        return;
+      }
+
+      if (!callbackResult.code) {
+        return;
+      }
+
+      setIsOAuthProcessing(true);
+      setOauthError(null);
+
+      try {
+        // Exchange code for tokens and complete sign-in
+        const result = await auth.exchangeOAuthCode(callbackResult.code);
+        
+        // Clear the URL params
+        window.history.replaceState({}, '', '/');
+        
+        if (result.success && result.user) {
+          // Sign-in successful
+          const idToken = localStorage.getItem('finpulse_id_token');
+          if (idToken) {
+            api.setIdToken(idToken);
+          }
+          
+          const profile = await fetchUserProfile(result.user.userId);
+          if (profile) {
+            setUser(profile.user);
+            setUserCreatedAt(profile.createdAt);
+            setCurrentUser(profile.user.id);
+            setView('dashboard');
+          }
+        } else if (result.requiresLinking) {
+          // Account collision - needs password verification
+          // Store linking info and show linking UI
+          sessionStorage.setItem('oauth_linking', JSON.stringify({
+            existingUserId: result.existingUserId,
+            linkingToken: result.linkingToken,
+            error: result.error
+          }));
+          setOauthError(result.error || 'An account with this email already exists. Please sign in with your password to link accounts.');
+        } else {
+          setOauthError(result.error || 'OAuth sign-in failed');
+        }
+      } catch (error) {
+        console.error('OAuth callback error:', error);
+        setOauthError('Failed to complete sign-in. Please try again.');
+      } finally {
+        setIsOAuthProcessing(false);
+      }
+    };
+
+    handleOAuthCallback();
+  }, []); // Run once on mount
 
   // Persist session
   useEffect(() => {
@@ -399,8 +483,20 @@ const AppContent: React.FC = () => {
     // Default to Showcase unless explicitly disabled
     const showcaseDisabled = (import.meta as any)?.env?.VITE_LANDING_SHOWCASE === 'false';
     
+    // Show loading spinner while processing OAuth
+    if (isOAuthProcessing) {
+      return (
+        <div className="h-screen flex items-center justify-center bg-[#0b0e14]">
+          <div className="text-center">
+            <div className="w-12 h-12 border-2 border-[#00e5ff]/20 border-t-[#00e5ff] rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-white text-sm">Completing sign-in...</p>
+          </div>
+        </div>
+      );
+    }
+    
     return !showcaseDisabled
-      ? <Suspense fallback={<LoadingSpinner size="lg" />}><LandingPageShowcase onLogin={handleLogin} /></Suspense>
+      ? <Suspense fallback={<LoadingSpinner size="lg" />}><LandingPageShowcase onLogin={handleLogin} initialError={oauthError} /></Suspense>
       : <LandingPage onLogin={handleLogin} />;
   }
   

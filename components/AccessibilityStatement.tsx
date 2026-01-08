@@ -243,5 +243,3 @@ export const AccessibilityStatement: React.FC<AccessibilityStatementProps> = ({ 
     </div>
   );
 };
-  );
-};
