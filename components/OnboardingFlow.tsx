@@ -433,14 +433,24 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 };
 
 // Hook to manage onboarding state
-// Now accepts optional userCreatedAt to distinguish new vs returning users
-export const useOnboarding = (userCreatedAt?: string) => {
+// Accepts userCreatedAt to distinguish new vs returning users
+// Accepts userId to make completion state user-scoped
+export const useOnboarding = (userCreatedAt?: string, userId?: string) => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  // User-scoped storage key
+  const getStorageKey = () => userId 
+    ? `finpulse_onboarding_completed_${userId}` 
+    : NOTIFICATION_STORAGE_KEYS.ONBOARDING_COMPLETED;
+
   useEffect(() => {
-    const hasCompleted = localStorage.getItem(NOTIFICATION_STORAGE_KEYS.ONBOARDING_COMPLETED);
+    // Wait for userId to be available
+    if (!userId) return;
+
+    const storageKey = getStorageKey();
+    const hasCompleted = localStorage.getItem(storageKey);
     
-    // If already completed, don't show
+    // If already completed for this user, don't show
     if (hasCompleted) {
       return;
     }
@@ -454,7 +464,7 @@ export const useOnboarding = (userCreatedAt?: string) => {
       // If account is older than 5 minutes, this is a returning user
       // who cleared localStorage - auto-complete onboarding
       if (now - createdTime > fiveMinutes) {
-        localStorage.setItem(NOTIFICATION_STORAGE_KEYS.ONBOARDING_COMPLETED, 'true');
+        localStorage.setItem(storageKey, 'true');
         console.log('Returning user detected, skipping onboarding');
         return;
       }
@@ -463,12 +473,20 @@ export const useOnboarding = (userCreatedAt?: string) => {
     // For new users (or unknown state), show onboarding after delay
     const timer = setTimeout(() => setShowOnboarding(true), 500);
     return () => clearTimeout(timer);
-  }, [userCreatedAt]);
+  }, [userCreatedAt, userId]);
 
-  const completeOnboarding = () => setShowOnboarding(false);
-  const skipOnboarding = () => setShowOnboarding(false);
+  const completeOnboarding = () => {
+    localStorage.setItem(getStorageKey(), 'true');
+    setShowOnboarding(false);
+  };
+  
+  const skipOnboarding = () => {
+    localStorage.setItem(getStorageKey(), 'true');
+    setShowOnboarding(false);
+  };
+  
   const resetOnboarding = () => {
-    localStorage.removeItem(NOTIFICATION_STORAGE_KEYS.ONBOARDING_COMPLETED);
+    localStorage.removeItem(getStorageKey());
     localStorage.removeItem(NOTIFICATION_STORAGE_KEYS.USER_SIGNUP_DATE);
     setShowOnboarding(true);
   };
