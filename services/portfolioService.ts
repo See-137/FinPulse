@@ -62,8 +62,11 @@ export const portfolioService = {
     try {
       const result = await fetchWithAuth('/portfolio');
       if (result.success) {
+        // Lambda returns { success: true, data: { holdings: [...], ... } }
+        const data = result.data || result;
+        const holdings = data.holdings || [];
         return {
-          holdings: (result.holdings || []).map((h: any) => ({
+          holdings: holdings.map((h: any) => ({
             symbol: h.symbol,
             name: h.name || h.symbol,
             type: h.type?.toUpperCase() || 'CRYPTO',
@@ -72,8 +75,8 @@ export const portfolioService = {
             currentPrice: h.currentPrice || 0,
             notes: h.notes || '',
           })),
-          totalValue: result.totalValue,
-          lastUpdated: result.lastUpdated,
+          totalValue: data.totalValue,
+          lastUpdated: data.lastUpdated,
         };
       }
       throw new Error(result.error || 'Failed to get portfolio');
