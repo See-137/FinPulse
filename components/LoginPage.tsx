@@ -6,22 +6,6 @@ interface LoginPageProps {
   onLogin: (email: string, name: string) => void;
 }
 
-// Google SSO configuration
-const COGNITO_DOMAIN = import.meta.env.VITE_COGNITO_DOMAIN || 'finpulse-auth.auth.us-east-1.amazoncognito.com';
-const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || '4lhsbeeae63ne3vgosog38lieu';
-const REDIRECT_URI = import.meta.env.VITE_OAUTH_REDIRECT_URI || 'https://finpulse.me/oauth/callback';
-
-const getGoogleSignInUrl = () => {
-  const params = new URLSearchParams({
-    identity_provider: 'Google',
-    redirect_uri: REDIRECT_URI,
-    response_type: 'code',
-    client_id: CLIENT_ID,
-    scope: 'email openid profile',
-  });
-  return `https://${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
-};
-
 type AuthMode = 'login' | 'signup' | 'confirm' | 'forgot' | 'reset';
 
 const Spinner = () => (
@@ -281,7 +265,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       </div>
       
       {/* Google Sign-In Button */}
-      <a href={getGoogleSignInUrl()}
+      <button
+        type="button"
+        onClick={() => auth.initiateGoogleSignIn()}
         className="w-full py-4 bg-white text-gray-800 font-semibold rounded-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-3 border border-white/20">
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -290,7 +276,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
         </svg>
         Continue with Google
-      </a>
+      </button>
       
       <p className="text-center text-sm text-slate-500">
         Don't have an account?{' '}
