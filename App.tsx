@@ -73,9 +73,12 @@ const AppContent: React.FC = () => {
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
   
+  // Track user creation date for onboarding logic
+  const [userCreatedAt, setUserCreatedAt] = useState<string | undefined>(undefined);
+  
   // Notification & Onboarding State
   const { showChangelog, currentChangelog, dismissChangelog } = useChangelog();
-  const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding();
+  const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding(userCreatedAt);
   const [activeMilestone, setActiveMilestone] = useState<Milestone | null>(null);
   const [isMilestoneOpen, setIsMilestoneOpen] = useState(false);
   
@@ -182,10 +185,11 @@ const AppContent: React.FC = () => {
       
       // Create User object from Cognito credentials + backend data
       try {
-        const backendUser = await fetchUserProfile(cognitoUser.userId);
-        if (backendUser) {
-          setUser(backendUser);
-          setCurrentUser(backendUser.id);
+        const result = await fetchUserProfile(cognitoUser.userId);
+        if (result) {
+          setUser(result.user);
+          setUserCreatedAt(result.createdAt);
+          setCurrentUser(result.user.id);
           setView('dashboard');
         } else {
           // Profile fetch returned null (401/error handled inside)
@@ -239,7 +243,8 @@ const AppContent: React.FC = () => {
   }, [theme]);
 
   // Step 1: Fetch user profile from backend (DynamoDB via /auth/me)
-  const fetchUserProfile = async (userId: string): Promise<User | null> => {
+  // Returns user object and createdAt timestamp for onboarding logic
+  const fetchUserProfile = async (userId: string): Promise<{ user: User; createdAt?: string } | null> => {
     try {
       const idToken = localStorage.getItem('finpulse_id_token');
       if (!idToken) return null;
@@ -255,7 +260,7 @@ const AppContent: React.FC = () => {
       const backendUser = data.data || data;
       
       // Map backend user to frontend User type
-      return {
+      const user: User = {
         id: backendUser.userId,
         email: backendUser.email,
         name: backendUser.name,
@@ -268,6 +273,8 @@ const AppContent: React.FC = () => {
         },
         subscriptionStatus: backendUser.subscriptionStatus || 'active'
       };
+      
+      return { user, createdAt: backendUser.createdAt };
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
       return null;
@@ -293,11 +300,12 @@ const AppContent: React.FC = () => {
 
     // /auth/me automatically creates user on first access (getOrCreateUser)
     // So just fetch it - will be created if doesn't exist
-    const userProfile = await fetchUserProfile(cognitoUser.userId);
+    const result = await fetchUserProfile(cognitoUser.userId);
 
-    if (userProfile) {
-      setUser(userProfile);
-      setCurrentUser(userProfile.id); // Set persistent userId from Cognito
+    if (result) {
+      setUser(result.user);
+      setUserCreatedAt(result.createdAt); // Pass to onboarding hook
+      setCurrentUser(result.user.id); // Set persistent userId from Cognito
       setView('dashboard');
     } else {
       console.error('Failed to setup user profile');
