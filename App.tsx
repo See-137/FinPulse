@@ -364,8 +364,10 @@ const AppContent: React.FC = () => {
     await auth.signOut(); // Clear Cognito session
     api.setIdToken(null); // Clear API token for all future requests
     setUser(null);
+    setUserCreatedAt(undefined); // Clear for next user
     clearCurrentUser(); // Clear portfolio user scope
     localStorage.removeItem(USER_STORAGE_KEY);
+    localStorage.removeItem('finpulse_onboarding_completed'); // Reset onboarding for next user
     setView('landing');
   };
 
