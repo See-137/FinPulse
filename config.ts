@@ -53,6 +53,18 @@ const validateConfig = () => {
 
 const validated = validateConfig();
 
+// OAuth configuration
+const oauthConfig = {
+  // Cognito domain for hosted UI
+  domain: import.meta.env.VITE_COGNITO_DOMAIN || '',
+  // OAuth scopes
+  scopes: ['email', 'openid', 'profile'],
+  // Callback URL (where Cognito redirects after OAuth)
+  redirectUri: import.meta.env.VITE_OAUTH_REDIRECT_URI || `${window.location.origin}/oauth/callback`,
+  // Logout URL
+  logoutUri: import.meta.env.VITE_OAUTH_LOGOUT_URI || window.location.origin,
+};
+
 export const config = {
   // Current environment
   environment,
@@ -65,6 +77,9 @@ export const config = {
     userPoolId: validated.userPoolId,
     clientId: validated.clientId,
     region: import.meta.env.VITE_COGNITO_REGION || 'us-east-1',
+    // OAuth settings
+    domain: oauthConfig.domain,
+    oauth: oauthConfig,
   },
   
   // Feature flags

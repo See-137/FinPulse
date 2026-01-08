@@ -29,6 +29,24 @@ interface AuthResult {
   tokens?: AuthTokens;
   error?: string;
   needsConfirmation?: boolean;
+  requiresLinking?: boolean;
+  existingUserId?: string;
+  linkingToken?: string;
+}
+
+interface LinkedIdentity {
+  provider: string;
+  providerSubject: string;
+  email: string;
+  linkedAt: string;
+}
+
+interface OAuthCallbackResult {
+  success: boolean;
+  code?: string;
+  state?: string;
+  error?: string;
+  errorDescription?: string;
 }
 
 class AuthService {
@@ -260,6 +278,317 @@ class AuthService {
     }
   }
 
+  // ============== OAuth / Social Sign-In Methods ==============
+
+  /**
+   * Initiate Google Sign-In via Cognito Hosted UI
+   * Redirects user to Google login page
+   */
+  initiateGoogleSignIn(): void {
+    const { oauth, domain, clientId } = config.cognito;
+    
+    if (!domain) {
+      console.error('Cognito domain not configured for OAuth');
+      return;
+    }
+
+    // Generate state for CSRF protection
+    const state = this.generateOAuthState();
+    sessionStorage.setItem('oauth_state', state);
+
+    // Build authorization URL
+    const authUrl = new URL(`https://${domain}/oauth2/authorize`);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', clientId);
+    authUrl.searchParams.set('redirect_uri', oauth.redirectUri);
+    authUrl.searchParams.set('scope', oauth.scopes.join(' '));
+    authUrl.searchParams.set('identity_provider', 'Google');
+    authUrl.searchParams.set('state', state);
+
+    // Redirect to Google login
+    window.location.href = authUrl.toString();
+  }
+
+  /**
+   * Parse OAuth callback URL parameters
+   */
+  parseOAuthCallback(): OAuthCallbackResult {
+    const params = new URLSearchParams(window.location.search);
+    
+    const code = params.get('code');
+    const state = params.get('state');
+    const error = params.get('error');
+    const errorDescription = params.get('error_description');
+
+    if (error) {
+      return { success: false, error, errorDescription: errorDescription || undefined };
+    }
+
+    if (!code) {
+      return { success: false, error: 'no_code', errorDescription: 'No authorization code received' };
+    }
+
+    // Verify state matches
+    const storedState = sessionStorage.getItem('oauth_state');
+    if (state !== storedState) {
+      return { success: false, error: 'state_mismatch', errorDescription: 'OAuth state mismatch - possible CSRF attack' };
+    }
+
+    sessionStorage.removeItem('oauth_state');
+    return { success: true, code, state: state || undefined };
+  }
+
+  /**
+   * Exchange OAuth authorization code for tokens
+   */
+  async exchangeOAuthCode(code: string): Promise<AuthResult> {
+    const { oauth, domain, clientId } = config.cognito;
+
+    try {
+      // Exchange code for tokens via Cognito token endpoint
+      const tokenUrl = `https://${domain}/oauth2/token`;
+      
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: clientId,
+          code,
+          redirect_uri: oauth.redirectUri,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { 
+          success: false, 
+          error: data.error_description || data.error || 'Token exchange failed' 
+        };
+      }
+
+      const tokens: AuthTokens = {
+        accessToken: data.access_token,
+        idToken: data.id_token,
+        refreshToken: data.refresh_token,
+        expiresIn: data.expires_in,
+      };
+
+      // Parse user from ID token
+      const tokenPayload = this.parseIdToken(tokens.idToken);
+      
+      // Extract provider info from token
+      const provider = this.extractProviderFromToken(tokens.idToken);
+      
+      // Call our backend to handle federated sign-in
+      // This handles account linking and identity management
+      const federatedResult = await this.handleFederatedSignIn(
+        provider,
+        tokenPayload,
+        tokens
+      );
+
+      return federatedResult;
+    } catch (error) {
+      console.error('OAuth code exchange error:', error);
+      return { success: false, error: 'Failed to exchange authorization code' };
+    }
+  }
+
+  /**
+   * Handle federated sign-in with backend
+   * Manages account linking and identity tracking
+   */
+  private async handleFederatedSignIn(
+    provider: { name: string; subject: string },
+    tokenPayload: CognitoUser,
+    tokens: AuthTokens
+  ): Promise<AuthResult> {
+    try {
+      const response = await fetch(`${config.apiUrl}/auth/federated-signin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          provider: provider.name,
+          providerSubject: provider.subject,
+          email: tokenPayload.email,
+          name: tokenPayload.name,
+          accessToken: tokens.accessToken,
+          idToken: tokens.idToken,
+          refreshToken: tokens.refreshToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      // Account collision - needs password verification to link
+      if (response.status === 409 && data.requiresLinking) {
+        return {
+          success: false,
+          requiresLinking: true,
+          existingUserId: data.existingUserId,
+          linkingToken: data.linkingToken,
+          error: data.message,
+        };
+      }
+
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Federated sign-in failed' };
+      }
+
+      // Success - store session
+      const user: CognitoUser = {
+        userId: data.data.user.userId,
+        email: tokenPayload.email,
+        name: tokenPayload.name,
+        emailVerified: true, // OAuth emails are verified
+      };
+
+      this.storeSession(tokens, user);
+      api.setIdToken(tokens.idToken);
+      this.scheduleRefresh(tokens.expiresIn, tokens.refreshToken);
+
+      return { success: true, user, tokens };
+    } catch (error) {
+      console.error('Federated sign-in error:', error);
+      return { success: false, error: 'Failed to complete federated sign-in' };
+    }
+  }
+
+  /**
+   * Link an OAuth provider to existing account (requires password verification)
+   */
+  async linkOAuthProvider(
+    provider: string,
+    providerSubject: string,
+    password: string,
+    linkingToken: string
+  ): Promise<AuthResult> {
+    const idToken = localStorage.getItem('finpulse_id_token');
+    
+    try {
+      const response = await fetch(`${config.apiUrl}/auth/link-identity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          provider,
+          providerSubject,
+          password,
+          linkingToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to link account' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Network error during account linking' };
+    }
+  }
+
+  /**
+   * Get all linked identities for current user
+   */
+  async getLinkedIdentities(): Promise<LinkedIdentity[]> {
+    const idToken = localStorage.getItem('finpulse_id_token');
+    
+    if (!idToken) {
+      return [];
+    }
+
+    try {
+      const response = await fetch(`${config.apiUrl}/auth/identities`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+        },
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to get identities:', data.error);
+        return [];
+      }
+
+      return data.data || [];
+    } catch (error) {
+      console.error('Error fetching identities:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Unlink an OAuth provider from account
+   */
+  async unlinkOAuthProvider(provider: string): Promise<AuthResult> {
+    const idToken = localStorage.getItem('finpulse_id_token');
+    
+    try {
+      const response = await fetch(`${config.apiUrl}/auth/identities/${provider}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+        },
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to unlink account' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Network error during unlinking' };
+    }
+  }
+
+  // ============== OAuth Helper Methods ==============
+
+  private generateOAuthState(): string {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  private extractProviderFromToken(idToken: string): { name: string; subject: string } {
+    try {
+      const payload = JSON.parse(atob(idToken.split('.')[1]));
+      
+      // Cognito adds identities claim for federated users
+      if (payload.identities && payload.identities.length > 0) {
+        const identity = payload.identities[0];
+        return {
+          name: identity.providerName || 'Google',
+          subject: identity.userId || payload.sub,
+        };
+      }
+
+      // Fallback - check issuer
+      if (payload.iss?.includes('accounts.google.com')) {
+        return { name: 'Google', subject: payload.sub };
+      }
+
+      return { name: 'cognito', subject: payload.sub };
+    } catch {
+      return { name: 'unknown', subject: '' };
+    }
+  }
+
   getCurrentUser(): CognitoUser | null {
     // Also verify token exists - if not, user is effectively logged out
     const idToken = localStorage.getItem('finpulse_id_token');
@@ -455,4 +784,4 @@ class AuthService {
 // Export singleton
 export const auth = new AuthService();
 export default auth;
-export type { CognitoUser, AuthResult, AuthTokens };
+export type { CognitoUser, AuthResult, AuthTokens, LinkedIdentity, OAuthCallbackResult };
