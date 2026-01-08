@@ -433,17 +433,37 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 };
 
 // Hook to manage onboarding state
-export const useOnboarding = () => {
+// Now accepts optional userCreatedAt to distinguish new vs returning users
+export const useOnboarding = (userCreatedAt?: string) => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     const hasCompleted = localStorage.getItem(NOTIFICATION_STORAGE_KEYS.ONBOARDING_COMPLETED);
-    if (!hasCompleted) {
-      // Small delay to let app load
-      const timer = setTimeout(() => setShowOnboarding(true), 500);
-      return () => clearTimeout(timer);
+    
+    // If already completed, don't show
+    if (hasCompleted) {
+      return;
     }
-  }, []);
+    
+    // If we have user creation date, check if this is a returning user
+    if (userCreatedAt) {
+      const createdTime = new Date(userCreatedAt).getTime();
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      // If account is older than 5 minutes, this is a returning user
+      // who cleared localStorage - auto-complete onboarding
+      if (now - createdTime > fiveMinutes) {
+        localStorage.setItem(NOTIFICATION_STORAGE_KEYS.ONBOARDING_COMPLETED, 'true');
+        console.log('Returning user detected, skipping onboarding');
+        return;
+      }
+    }
+    
+    // For new users (or unknown state), show onboarding after delay
+    const timer = setTimeout(() => setShowOnboarding(true), 500);
+    return () => clearTimeout(timer);
+  }, [userCreatedAt]);
 
   const completeOnboarding = () => setShowOnboarding(false);
   const skipOnboarding = () => setShowOnboarding(false);

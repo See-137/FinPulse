@@ -37,7 +37,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   // Use Zustand store for shared state (including holdings for news filtering)
   const { 
     isPrivate, search, filterType, getHoldings, getWatchlist,
-    setIsPrivate, setSearch, setFilterType, setHoldings, addHolding, updateHolding, removeHolding 
+    setIsPrivate, setSearch, setFilterType, setHoldings, addHolding, updateHolding, removeHolding,
+    isSyncing
   } = usePortfolioStore();
   
   // Get user-scoped holdings
@@ -474,7 +475,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
 
            {/* Holdings Table */}
            <div className="space-y-4">
-              {filteredHoldings.length === 0 ? (
+              {isSyncing ? (
+                <div className="card-surface p-12 rounded-[40px] text-center border border-slate-200 dark:border-white/5">
+                  <div className="w-8 h-8 mx-auto mb-4 border-2 border-[#00e5ff]/20 border-t-[#00e5ff] rounded-full animate-spin" />
+                  <p className="text-slate-500 font-medium text-sm">Syncing your portfolio...</p>
+                </div>
+              ) : filteredHoldings.length === 0 ? (
                 <div className="card-surface p-12 rounded-[40px] text-center border-dashed border-slate-300 dark:border-white/10">
                   <p className="text-slate-500 font-medium text-sm">No assets match your filters.</p>
                 </div>
