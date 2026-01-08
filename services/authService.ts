@@ -393,8 +393,10 @@ class AuthService {
 
       return federatedResult;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('OAuth code exchange error:', error);
-      return { success: false, error: 'Failed to exchange authorization code' };
+      console.error('Token exchange details:', { domain, clientId, redirectUri: oauth.redirectUri, errorMessage });
+      return { success: false, error: `Failed to exchange authorization code: ${errorMessage}` };
     }
   }
 
@@ -454,8 +456,15 @@ class AuthService {
 
       return { success: true, user, tokens };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Federated sign-in error:', error);
-      return { success: false, error: 'Failed to complete federated sign-in' };
+      console.error('Error details:', { 
+        apiUrl: config.apiUrl, 
+        provider: provider?.name, 
+        email: tokenPayload?.email,
+        errorMessage 
+      });
+      return { success: false, error: `Failed to complete federated sign-in: ${errorMessage}` };
     }
   }
 
