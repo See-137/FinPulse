@@ -2,6 +2,7 @@
 export type PlanType = 'FREE' | 'PROPULSE' | 'SUPERPULSE';
 export type Theme = 'light' | 'dark' | 'system';
 export type Currency = 'USD' | 'ILS';
+export type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
 
 export interface User {
   id: string;
@@ -15,6 +16,16 @@ export interface User {
     maxAssets: number;
   };
   subscriptionStatus: 'active' | 'past_due' | 'trialing' | 'none';
+}
+
+export interface Holding {
+  id: string;
+  symbol: string;
+  name: string;
+  type: AssetType;
+  quantity: number;
+  avgBuyPrice: number;
+  currentPrice: number;
 }
 
 export interface Influencer {

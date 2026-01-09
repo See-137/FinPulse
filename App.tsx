@@ -50,6 +50,25 @@ const LoadingSpinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }
   );
 };
 
+// Map backend plan names to frontend plan types
+const mapBackendPlanToFrontend = (backendPlan: string | undefined): PlanType => {
+  const planMap: Record<string, PlanType> = {
+    'FREE': 'FREE',
+    'free': 'FREE',
+    'PROPULSE': 'PROPULSE',
+    'propulse': 'PROPULSE',
+    'PREMIUM': 'PROPULSE',    // Backend 'premium' maps to 'PROPULSE'
+    'premium': 'PROPULSE',
+    'SUPERPULSE': 'SUPERPULSE',
+    'superpulse': 'SUPERPULSE',
+    'PRO': 'SUPERPULSE',       // Backend 'PRO' maps to 'SUPERPULSE' (highest tier)
+    'pro': 'SUPERPULSE',
+    'ENTERPRISE': 'SUPERPULSE',
+    'enterprise': 'SUPERPULSE'
+  };
+  return planMap[backendPlan || 'FREE'] || 'FREE';
+};
+
 const USER_STORAGE_KEY = 'finpulse_user_session';
 
 // Inner App component that uses language context
@@ -343,17 +362,20 @@ const AppContent: React.FC = () => {
       const data = await response.json();
       const backendUser = data.data || data;
       
+      // Map backend plan to frontend plan type
+      const frontendPlan = mapBackendPlanToFrontend(backendUser.plan);
+      
       // Map backend user to frontend User type
       const user: User = {
         id: backendUser.userId,
         email: backendUser.email,
         name: backendUser.name,
-        plan: (backendUser.plan || 'FREE') as PlanType,
+        plan: frontendPlan,
         credits: {
           ai: backendUser.credits?.ai || 0,
-          maxAi: SaaS_PLANS[backendUser.plan || 'FREE'].maxAiQueries,
+          maxAi: backendUser.credits?.maxAi || SaaS_PLANS[frontendPlan].maxAiQueries,
           assets: backendUser.credits?.assets || 0,
-          maxAssets: SaaS_PLANS[backendUser.plan || 'FREE'].maxAssets
+          maxAssets: backendUser.credits?.maxAssets || SaaS_PLANS[frontendPlan].maxAssets
         },
         subscriptionStatus: backendUser.subscriptionStatus || 'active'
       };
@@ -621,7 +643,8 @@ const AppContent: React.FC = () => {
                   user={user!} 
                   onUpdateUser={setUser} 
                   currency={currency} 
-                  onCurrencyChange={setCurrency} 
+                  onCurrencyChange={setCurrency}
+                  onUpgradeClick={() => setIsPricingOpen(true)}
                 />
               ) : activeTab === 'watchlist' ? (
                 <Watchlist 
