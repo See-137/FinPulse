@@ -33,6 +33,7 @@ export interface Influencer {
   name: string;
   tier: PlanType;
   focus: string;
+  bio?: string;
 }
 
 export interface StockData {

@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { influencerService } from '../services/influencerService';
-import { Influencer, User } from '../types';
-import { Lock, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { Influencer, User, PlanType } from '../types';
+import { 
+  Lock, TrendingUp, ExternalLink, Crown, Sparkles, 
+  Users, Filter, Search, Star, Zap, ChevronRight 
+} from 'lucide-react';
 import { INFLUENCER_LIST } from '../constants';
 
 interface InfluencerTrendsProps {
@@ -9,138 +12,312 @@ interface InfluencerTrendsProps {
   onUpgradeClick?: () => void;
 }
 
+// Focus area icons mapping
+const FOCUS_ICONS: Record<string, string> = {
+  'BTC': '₿',
+  'ETH': 'Ξ',
+  'BTC/DOGE': '🚀',
+  'Binance/BNB': '🔶',
+  'Tech stocks': '📈',
+  'Coinbase': '🔵',
+  'Crypto macro': '🌐',
+  'Macro': '📊',
+  'Trading': '📉',
+  'On-chain': '⛓️',
+  'Analytics': '📱',
+  'Whales': '🐋',
+  'Tech': '💻',
+  'TSLA/Tech': '⚡',
+  'Data': '📊',
+  'Sentiment': '🎭',
+  'TA': '📐',
+  'BTC news': '📰',
+  'S2F model': '📈',
+  'Research': '🔬',
+  'VC': '💰',
+  'DeFi': '🏦',
+  'Galaxy': '🌌',
+  'Messari': '📑',
+  'Inverse signal': '🔄',
+  'LUNA': '🌙',
+};
+
+// Tier badge colors
+const TIER_COLORS: Record<PlanType, { bg: string; text: string; border: string }> = {
+  FREE: { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/20' },
+  PROPULSE: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20' },
+  SUPERPULSE: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20' },
+};
+
 /**
- * InfluencerTrends Component
- * Displays X.com influencers based on user's subscription plan
- * FREE: 5 | PROPULSE: 15 | SUPERPULSE: 30
+ * InfluencerTrends Component - "Whales" Tab
+ * Track influential crypto/finance voices on X.com
+ * Plan-gated: FREE: 5 | PROPULSE: 15 | SUPERPULSE: 30
  */
 export const InfluencerTrends: React.FC<InfluencerTrendsProps> = ({ user, onUpgradeClick }) => {
-  const [accessibleInfluencers, setAccessibleInfluencers] = useState<Influencer[]>([]);
-  const [groupedInfluencers, setGroupedInfluencers] = useState<Record<string, Influencer[]>>({});
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFocus, setSelectedFocus] = useState<string | null>(null);
+  const [showLocked, setShowLocked] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      const influencers = influencerService.getAccessibleInfluencers(user.plan);
-      setAccessibleInfluencers(influencers);
-      const grouped = influencerService.groupByFocus(influencers);
-      setGroupedInfluencers(grouped);
-      // Set first category as default
-      if (Object.keys(grouped).length > 0) {
-        setSelectedCategory(Object.keys(grouped)[0]);
-      }
+  // Get accessible influencers based on user plan
+  const accessibleInfluencers = useMemo(() => {
+    if (!user) return [];
+    return influencerService.getAccessibleInfluencers(user.plan);
+  }, [user?.plan]);
+
+  // Get locked influencers (higher tier)
+  const lockedInfluencers = useMemo(() => {
+    if (!user) return INFLUENCER_LIST;
+    return INFLUENCER_LIST.filter(inf => !accessibleInfluencers.some(a => a.username === inf.username));
+  }, [user?.plan, accessibleInfluencers]);
+
+  // Get unique focus areas from accessible influencers
+  const focusAreas = useMemo(() => {
+    const areas = new Set(accessibleInfluencers.map(inf => inf.focus));
+    return Array.from(areas);
+  }, [accessibleInfluencers]);
+
+  // Filter influencers by search and focus
+  const filteredInfluencers = useMemo(() => {
+    let result = showLocked ? [...accessibleInfluencers, ...lockedInfluencers] : accessibleInfluencers;
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(inf => 
+        inf.name.toLowerCase().includes(query) || 
+        inf.username.toLowerCase().includes(query) ||
+        inf.focus.toLowerCase().includes(query)
+      );
     }
-  }, [user]);
+    
+    if (selectedFocus) {
+      result = result.filter(inf => inf.focus === selectedFocus);
+    }
+    
+    return result;
+  }, [accessibleInfluencers, lockedInfluencers, searchQuery, selectedFocus, showLocked]);
+
+  // Check if influencer is locked
+  const isLocked = (influencer: Influencer) => {
+    return !accessibleInfluencers.some(a => a.username === influencer.username);
+  };
 
   if (!user) {
     return (
-      <div className="p-4 bg-slate-900 rounded-lg border border-slate-700">
-        <p className="text-sm text-slate-400">Loading user information...</p>
+      <div className="p-6 bg-[#151921] rounded-[24px] border border-white/5">
+        <div className="animate-pulse space-y-3">
+          <div className="h-4 bg-slate-800 rounded w-1/2"></div>
+          <div className="h-3 bg-slate-800 rounded w-3/4"></div>
+        </div>
       </div>
     );
   }
 
-  const upgrade = influencerService.getUpgradeSuggestion(user.plan);
   const limits = influencerService.getInfluencerLimits();
-  const maxInfluencers = limits[user.plan];
+  const upgrade = influencerService.getUpgradeSuggestion(user.plan);
 
   return (
     <div className="space-y-4">
-      {/* Header with Plan Info */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-4 rounded-lg border border-slate-700">
-        <div className="flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-cyan-400" />
-              Influencer Trends
-            </h3>
-            <p className="text-sm text-slate-400 mt-1">
-              Following {accessibleInfluencers.length} / {maxInfluencers} influencers on X.com
-            </p>
+      {/* Header Card */}
+      <div className="bg-gradient-to-br from-[#151921] to-[#0d1117] p-5 rounded-[24px] border border-white/5 relative overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 blur-3xl" />
+        
+        <div className="relative">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
+                <Users className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-white">Whale Tracker</h3>
+                <p className="text-[10px] text-slate-500">X.com Influencer Feed</p>
+              </div>
+            </div>
+            <div className={`px-2 py-1 rounded-lg ${TIER_COLORS[user.plan].bg} ${TIER_COLORS[user.plan].border} border`}>
+              <span className={`text-[9px] font-bold ${TIER_COLORS[user.plan].text}`}>{user.plan}</span>
+            </div>
           </div>
-          <div className="text-right">
-            <div className="text-xs text-slate-500 mb-1">Your Plan</div>
-            <div className="text-sm font-semibold text-cyan-400">{user.plan}</div>
+          
+          {/* Progress bar */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full transition-all duration-500"
+                  style={{ width: `${(accessibleInfluencers.length / 30) * 100}%` }}
+                />
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-slate-400">
+              {accessibleInfluencers.length}/{limits[user.plan]}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Category Tabs */}
-      {Object.keys(groupedInfluencers).length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-700">
-          {Object.entries(groupedInfluencers).map(([category, influencers]) => (
+      {/* Search & Filter */}
+      <div className="flex gap-2">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search influencers..."
+            className="w-full bg-[#151921] border border-white/5 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/30"
+          />
+        </div>
+        <button
+          onClick={() => setShowLocked(!showLocked)}
+          className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+            showLocked 
+              ? 'bg-purple-500/10 border-purple-500/30 text-purple-400' 
+              : 'bg-[#151921] border-white/5 text-slate-500 hover:text-white'
+          }`}
+          title={showLocked ? 'Hide locked' : 'Show all'}
+        >
+          <Lock className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Focus Filter Pills */}
+      {focusAreas.length > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          <button
+            onClick={() => setSelectedFocus(null)}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all ${
+              !selectedFocus
+                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                : 'bg-[#151921] text-slate-500 border border-white/5 hover:text-white'
+            }`}
+          >
+            All
+          </button>
+          {focusAreas.slice(0, 5).map(focus => (
             <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={`px-3 py-2 rounded text-sm font-medium whitespace-nowrap transition-colors ${
-                selectedCategory === category
-                  ? 'bg-cyan-500 text-black'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              key={focus}
+              onClick={() => setSelectedFocus(selectedFocus === focus ? null : focus)}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all flex items-center gap-1 ${
+                selectedFocus === focus
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                  : 'bg-[#151921] text-slate-500 border border-white/5 hover:text-white'
               }`}
             >
-              {category} ({influencers.length})
+              <span>{FOCUS_ICONS[focus] || '📌'}</span>
+              {focus}
             </button>
           ))}
         </div>
       )}
 
       {/* Influencers List */}
-      {selectedCategory && groupedInfluencers[selectedCategory] && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {groupedInfluencers[selectedCategory].map(influencer => (
-            <a
-              key={influencer.username}
-              href={`https://x.com/${influencer.username}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-3 bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 transition-colors group"
-            >
-              <div className="flex-1">
-                <div className="font-medium text-white group-hover:text-cyan-400">
-                  {influencer.name}
-                </div>
-                <div className="text-xs text-slate-400">@{influencer.username}</div>
-                <div className="text-xs text-slate-500 mt-1">{influencer.focus}</div>
+      <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
+        {filteredInfluencers.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-slate-800 flex items-center justify-center">
+              <Search className="w-5 h-5 text-slate-600" />
+            </div>
+            <p className="text-xs text-slate-500">No influencers found</p>
+          </div>
+        ) : (
+          filteredInfluencers.map((influencer, index) => {
+            const locked = isLocked(influencer);
+            return (
+              <div
+                key={influencer.username}
+                className={`group relative rounded-2xl border transition-all duration-200 ${
+                  locked
+                    ? 'bg-[#151921]/50 border-white/5 opacity-60'
+                    : 'bg-[#151921] border-white/5 hover:border-cyan-500/30 hover:bg-[#1a1f2a]'
+                }`}
+              >
+                {locked ? (
+                  // Locked influencer (non-clickable)
+                  <div className="p-3 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-lg">
+                      <Lock className="w-4 h-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-500 truncate">{influencer.name}</span>
+                        <span className={`text-[8px] px-1.5 py-0.5 rounded ${TIER_COLORS[influencer.tier].bg} ${TIER_COLORS[influencer.tier].text}`}>
+                          {influencer.tier}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-600">@{influencer.username}</p>
+                    </div>
+                  </div>
+                ) : (
+                  // Accessible influencer (clickable)
+                  <a
+                    href={`https://x.com/${influencer.username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 flex items-center gap-3 block"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-lg shrink-0">
+                      {FOCUS_ICONS[influencer.focus] || '👤'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors truncate">
+                          {influencer.name}
+                        </span>
+                        {influencer.tier === 'FREE' && index < 3 && (
+                          <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-slate-500">@{influencer.username}</p>
+                        <span className="text-[9px] text-slate-600">•</span>
+                        <span className="text-[10px] text-cyan-500/70">{influencer.focus}</span>
+                      </div>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-600 group-hover:text-cyan-400 transition-colors shrink-0" />
+                  </a>
+                )}
               </div>
-              <div className="ml-2">
-                <CheckCircle2 className="h-5 w-5 text-cyan-400" />
-              </div>
-            </a>
-          ))}
-        </div>
-      )}
+            );
+          })
+        )}
+      </div>
 
       {/* Upgrade CTA */}
       {upgrade && (
-        <div className="bg-gradient-to-r from-purple-900 to-purple-800 p-4 rounded-lg border border-purple-700">
+        <button
+          onClick={onUpgradeClick}
+          className="w-full p-4 rounded-2xl bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all group"
+        >
           <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Lock className="h-4 w-4 text-purple-300" />
-                <span className="text-sm font-semibold text-white">Unlock {upgrade.additionalInfluencers} More Influencers</span>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-cyan-500/20 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-purple-400" />
               </div>
-              <p className="text-xs text-purple-200">
-                Upgrade to <span className="font-semibold">{upgrade.nextPlan}</span> to track {limits[upgrade.nextPlan]} influencers
-              </p>
+              <div className="text-left">
+                <p className="text-xs font-bold text-white">
+                  Unlock {upgrade.additionalInfluencers} more voices
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  Upgrade to {upgrade.nextPlan} • {limits[upgrade.nextPlan]} total
+                </p>
+              </div>
             </div>
-            <button
-              onClick={onUpgradeClick}
-              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded transition-colors"
-            >
-              Upgrade
-            </button>
+            <ChevronRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
           </div>
-        </div>
+        </button>
       )}
 
-      {/* Info about unavailable influencers */}
-      {accessibleInfluencers.length < INFLUENCER_LIST.length && (
-        <div className="p-3 bg-slate-800 rounded border border-slate-700 text-xs text-slate-400">
-          <p>
-            {INFLUENCER_LIST.length - accessibleInfluencers.length} additional influencers available in higher plans
-          </p>
+      {/* Footer Stats */}
+      <div className="flex items-center justify-center gap-4 pt-2 border-t border-white/5">
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Live on X.com
         </div>
-      )}
+        <div className="text-[10px] text-slate-600">
+          {INFLUENCER_LIST.length} influencers tracked
+        </div>
+      </div>
     </div>
   );
 };
