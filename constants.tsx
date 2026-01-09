@@ -71,43 +71,43 @@ export const MOCK_STOCKS = [
 ];
 
 // X.com Influencer List - Plan Gating
-// FREE: 5 influencers | PRO: 15 influencers | TEAM: 30 influencers
+// FREE: 5 influencers | PROPULSE: 15 influencers | SUPERPULSE: 30 influencers
 export const INFLUENCER_LIST = [
-  // Tier 1: Core Crypto (FREE tier - 5)
-  { username: 'elonmusk', name: 'Elon Musk', tier: 'FREE' as const, focus: 'BTC/DOGE' },
-  { username: 'saylor', name: 'Michael Saylor', tier: 'FREE' as const, focus: 'BTC' },
-  { username: 'cz_binance', name: 'CZ', tier: 'FREE' as const, focus: 'Binance/BNB' },
-  { username: 'VitalikButerin', name: 'Vitalik Buterin', tier: 'FREE' as const, focus: 'ETH' },
-  { username: 'CathieDWood', name: 'Cathie Wood', tier: 'FREE' as const, focus: 'Tech stocks' },
+  // Tier 1: Core Crypto Leaders (FREE tier - 5)
+  { username: 'elonmusk', name: 'Elon Musk', tier: 'FREE' as const, focus: 'BTC/DOGE', bio: 'Tesla & SpaceX CEO, major market mover' },
+  { username: 'saylor', name: 'Michael Saylor', tier: 'FREE' as const, focus: 'BTC', bio: 'MicroStrategy CEO, Bitcoin maximalist' },
+  { username: 'cz_binance', name: 'CZ 🔶', tier: 'FREE' as const, focus: 'Binance/BNB', bio: 'Former Binance CEO' },
+  { username: 'VitalikButerin', name: 'Vitalik Buterin', tier: 'FREE' as const, focus: 'ETH', bio: 'Ethereum co-founder' },
+  { username: 'CathieDWood', name: 'Cathie Wood', tier: 'FREE' as const, focus: 'Tech stocks', bio: 'ARK Invest CEO, innovation investor' },
   
-  // Tier 2: PRO (15 total - adds 10 more)
-  { username: 'brian_armstrong', name: 'Brian Armstrong', tier: 'PROPULSE' as const, focus: 'Coinbase' },
-  { username: 'balajis', name: 'Balaji Srinivasan', tier: 'PROPULSE' as const, focus: 'Crypto macro' },
-  { username: 'RaoulGMI', name: 'Raoul Pal', tier: 'PROPULSE' as const, focus: 'Macro' },
-  { username: 'APompliano', name: 'Anthony Pompliano', tier: 'PROPULSE' as const, focus: 'BTC' },
-  { username: 'CryptoHayes', name: 'Arthur Hayes', tier: 'PROPULSE' as const, focus: 'Trading' },
-  { username: 'woonomic', name: 'Willy Woo', tier: 'PROPULSE' as const, focus: 'On-chain' },
-  { username: 'glassnode', name: 'Glassnode', tier: 'PROPULSE' as const, focus: 'Analytics' },
-  { username: 'lookonchain', name: 'Lookonchain', tier: 'PROPULSE' as const, focus: 'Whales' },
-  { username: 'chamath', name: 'Chamath Palihapitiya', tier: 'PROPULSE' as const, focus: 'Tech' },
-  { username: 'garyblack00', name: 'Gary Black', tier: 'PROPULSE' as const, focus: 'TSLA/Tech' },
+  // Tier 2: PRO Analysts & Traders (PROPULSE - adds 10 more)
+  { username: 'brian_armstrong', name: 'Brian Armstrong', tier: 'PROPULSE' as const, focus: 'Coinbase', bio: 'Coinbase CEO' },
+  { username: 'balajis', name: 'Balaji Srinivasan', tier: 'PROPULSE' as const, focus: 'Crypto macro', bio: 'Former CTO of Coinbase, author' },
+  { username: 'RaoulGMI', name: 'Raoul Pal', tier: 'PROPULSE' as const, focus: 'Macro', bio: 'Real Vision CEO, macro expert' },
+  { username: 'APompliano', name: 'Anthony Pompliano', tier: 'PROPULSE' as const, focus: 'BTC', bio: 'Pomp Investments founder' },
+  { username: 'CryptoHayes', name: 'Arthur Hayes', tier: 'PROPULSE' as const, focus: 'Trading', bio: 'BitMEX co-founder, trader' },
+  { username: 'woonomic', name: 'Willy Woo', tier: 'PROPULSE' as const, focus: 'On-chain', bio: 'On-chain analyst, bitcoin metrics' },
+  { username: 'glassnode', name: 'Glassnode', tier: 'PROPULSE' as const, focus: 'Analytics', bio: 'On-chain market intelligence' },
+  { username: 'lookonchain', name: 'Lookonchain', tier: 'PROPULSE' as const, focus: 'Whales', bio: 'Whale wallet tracker, alerts' },
+  { username: 'chamath', name: 'Chamath Palihapitiya', tier: 'PROPULSE' as const, focus: 'Tech', bio: 'Social Capital CEO, VC' },
+  { username: 'garyblack00', name: 'Gary Black', tier: 'PROPULSE' as const, focus: 'TSLA/Tech', bio: 'Future Fund Managing Partner' },
   
-  // Tier 3: TEAM (30 total - adds 15 more)
-  { username: 'nic__carter', name: 'Nic Carter', tier: 'SUPERPULSE' as const, focus: 'BTC' },
-  { username: 'santimentfeed', name: 'Santiment', tier: 'SUPERPULSE' as const, focus: 'Data' },
-  { username: 'cobie', name: 'Cobie', tier: 'SUPERPULSE' as const, focus: 'Trading' },
-  { username: 'crypto_cobain', name: 'Crypto Cobain', tier: 'SUPERPULSE' as const, focus: 'Sentiment' },
-  { username: 'HsakaTrades', name: 'Hsaka', tier: 'SUPERPULSE' as const, focus: 'TA' },
-  { username: 'stablekwon', name: 'Do Kwon', tier: 'SUPERPULSE' as const, focus: 'LUNA' },
-  { username: 'jimcramer', name: 'Jim Cramer', tier: 'SUPERPULSE' as const, focus: 'Inverse signal' },
-  { username: 'DocumentingBTC', name: 'Bitcoin Archive', tier: 'SUPERPULSE' as const, focus: 'BTC news' },
-  { username: 'WClementeIII', name: 'Will Clemente', tier: 'SUPERPULSE' as const, focus: 'On-chain' },
-  { username: '100trillionUSD', name: 'PlanB', tier: 'SUPERPULSE' as const, focus: 'S2F model' },
-  { username: 'twobitidiot', name: 'Ryan Selkis', tier: 'SUPERPULSE' as const, focus: 'Messari' },
-  { username: 'hasufl', name: 'Hasu', tier: 'SUPERPULSE' as const, focus: 'Research' },
-  { username: 'cburniske', name: 'Chris Burniske', tier: 'SUPERPULSE' as const, focus: 'VC' },
-  { username: 'novogratz', name: 'Mike Novogratz', tier: 'SUPERPULSE' as const, focus: 'Galaxy' },
-  { username: 'lawmaster', name: 'Compound248', tier: 'SUPERPULSE' as const, focus: 'DeFi' },
+  // Tier 3: Deep Research & Signals (SUPERPULSE - adds 15 more)
+  { username: 'nic__carter', name: 'Nic Carter', tier: 'SUPERPULSE' as const, focus: 'BTC', bio: 'Castle Island Ventures, PoW advocate' },
+  { username: 'santimentfeed', name: 'Santiment', tier: 'SUPERPULSE' as const, focus: 'Data', bio: 'Crypto behavior analytics platform' },
+  { username: 'cobie', name: 'Cobie', tier: 'SUPERPULSE' as const, focus: 'Trading', bio: 'Crypto trader, UpOnly podcast' },
+  { username: 'crypto_cobain', name: 'Crypto Cobain', tier: 'SUPERPULSE' as const, focus: 'Sentiment', bio: 'Market sentiment expert' },
+  { username: 'HsakaTrades', name: 'Hsaka', tier: 'SUPERPULSE' as const, focus: 'TA', bio: 'Technical analysis, charts' },
+  { username: 'DocumentingBTC', name: 'Bitcoin Archive', tier: 'SUPERPULSE' as const, focus: 'BTC news', bio: 'Bitcoin news aggregator' },
+  { username: 'jimcramer', name: 'Jim Cramer', tier: 'SUPERPULSE' as const, focus: 'Inverse signal', bio: 'CNBC host, inverse indicator' },
+  { username: 'WClementeIII', name: 'Will Clemente', tier: 'SUPERPULSE' as const, focus: 'On-chain', bio: 'Reflexivity Research co-founder' },
+  { username: '100trillionUSD', name: 'PlanB', tier: 'SUPERPULSE' as const, focus: 'S2F model', bio: 'Stock-to-Flow model creator' },
+  { username: 'twobitidiot', name: 'Ryan Selkis', tier: 'SUPERPULSE' as const, focus: 'Messari', bio: 'Messari CEO, crypto research' },
+  { username: 'hasufl', name: 'Hasu', tier: 'SUPERPULSE' as const, focus: 'Research', bio: 'Flashbots strategist, researcher' },
+  { username: 'cburniske', name: 'Chris Burniske', tier: 'SUPERPULSE' as const, focus: 'VC', bio: 'Placeholder VC, crypto valuations' },
+  { username: 'novogratz', name: 'Mike Novogratz', tier: 'SUPERPULSE' as const, focus: 'Galaxy', bio: 'Galaxy Digital CEO' },
+  { username: 'DeItaone', name: 'Walter Bloomberg', tier: 'SUPERPULSE' as const, focus: 'Breaking', bio: 'Fast financial news alerts' },
+  { username: 'zaborovv', name: 'Zaborov', tier: 'SUPERPULSE' as const, focus: 'DeFi', bio: 'DeFi alpha, yield strategies' },
 ];
 
 // Helper function to get influencers by user plan
