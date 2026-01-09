@@ -685,7 +685,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
               type: h.type,
               quantity: h.quantity,
               avgBuyPrice: h.avgCost,
-              currentPrice: getLatestPrice(h.symbol, h.type),
+              currentPrice: getMarketPrice(h.symbol, h.avgCost),
             }))}
             user={user}
             onUpgradeClick={onUpgradeClick || (() => {})}
