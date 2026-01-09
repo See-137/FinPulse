@@ -13,6 +13,7 @@ import { useMarketData } from '../hooks/useMarketData';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
 import { useDebounce } from '../hooks/useDebounce';
 import { AssetSelector } from './AssetSelector';
+import { PremiumAnalytics } from './PremiumAnalytics';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
 
@@ -31,9 +32,10 @@ interface PortfolioViewProps {
   onUpdateUser: (user: User) => void;
   currency: Currency;
   onCurrencyChange: (currency: Currency) => void;
+  onUpgradeClick?: () => void;
 }
 
-export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser, currency, onCurrencyChange }) => {
+export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser, currency, onCurrencyChange, onUpgradeClick }) => {
   // Use Zustand store for shared state (including holdings for news filtering)
   const { 
     isPrivate, search, filterType, getHoldings, getWatchlist,
@@ -671,6 +673,28 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
            </div>
         </div>
       </div>
+
+      {/* Premium Analytics Section */}
+      {holdings.length > 0 && (
+        <div className="mt-8">
+          <PremiumAnalytics
+            holdings={holdings.map(h => ({
+              id: h.id,
+              symbol: h.symbol,
+              name: h.name,
+              type: h.type,
+              quantity: h.quantity,
+              avgBuyPrice: h.avgCost,
+              currentPrice: getLatestPrice(h.symbol, h.type),
+            }))}
+            user={user}
+            onUpgradeClick={onUpgradeClick || (() => {})}
+            currency={currency}
+            currencySymbol={currencySymbol}
+            exchangeRate={rate}
+          />
+        </div>
+      )}
 
       {/* Asset Modal */}
       {isAddModalOpen && (
