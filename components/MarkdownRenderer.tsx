@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
-// Advanced Markdown Renderer for AI Copilot
+// Secure Markdown Renderer using marked + DOMPurify
+// Prevents XSS attacks by sanitizing all HTML output
 // Supports: headings, bold, italic, code, lists, blockquotes, links, tables
 
 interface MarkdownRendererProps {
@@ -8,46 +11,57 @@ interface MarkdownRendererProps {
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
+  const sanitizedHtml = useMemo(() => {
+    if (!text) return '';
+
+    // Configure marked for secure rendering
+    marked.setOptions({
+      breaks: true, // Convert \n to <br>
+      gfm: true, // GitHub Flavored Markdown
+      headerIds: false, // Disable header IDs to reduce attack surface
+      mangle: false, // Don't mangle email addresses
+    });
+
+    // Parse markdown to HTML
+    const rawHtml = marked.parse(text) as string;
+
+    // Sanitize HTML with DOMPurify to prevent XSS
+    const cleanHtml = DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS: [
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'p', 'br', 'strong', 'em', 'code', 'pre',
+        'ul', 'ol', 'li',
+        'blockquote',
+        'a',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'span', 'div'
+      ],
+      ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+    });
+
+    // Apply custom styling classes
+    return cleanHtml
+      .replace(/<h1>/g, '<h1 class="text-xl font-black text-white mt-3 mb-2">')
+      .replace(/<h2>/g, '<h2 class="text-lg font-bold text-white mt-4 mb-2 border-b border-white/10 pb-2">')
+      .replace(/<h3>/g, '<h3 class="text-base font-bold text-cyan-400 mt-2 mb-1">')
+      .replace(/<h4>/g, '<h4 class="text-base font-bold text-cyan-400 mt-2 mb-1">')
+      .replace(/<h5>/g, '<h5 class="text-sm font-bold text-cyan-400 mt-2 mb-1">')
+      .replace(/<h6>/g, '<h6 class="text-xs font-bold text-cyan-400 mt-2 mb-1">')
+      .replace(/<p>/g, '<p class="text-slate-300 leading-relaxed my-1.5">')
+      .replace(/<strong>/g, '<strong class="font-bold text-white">')
+      .replace(/<em>/g, '<em class="italic text-slate-300">')
+      .replace(/<code>/g, '<code class="bg-slate-700/50 px-1.5 py-0.5 rounded text-cyan-400 font-mono text-[10px]">')
+      .replace(/<blockquote>/g, '<blockquote class="border-l-4 border-cyan-400 pl-4 italic text-slate-300 my-2">')
+      .replace(/<ul>/g, '<ul class="list-disc ml-6 my-2">')
+      .replace(/<ol>/g, '<ol class="list-decimal ml-6 my-2">')
+      .replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" class="text-cyan-400 underline hover:text-cyan-300" ')
+      .replace(/<table>/g, '<table class="my-2 border-collapse border border-slate-700">')
+      .replace(/<th>/g, '<th class="px-2 py-1 border border-slate-700 bg-slate-800 font-bold">')
+      .replace(/<td>/g, '<td class="px-2 py-1 border border-slate-700">');
+  }, [text]);
+
   if (!text) return null;
 
-  // Simple HTML escaping
-  const escapeHtml = (str: string) =>
-    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-  // Parse markdown to HTML (basic, safe)
-  let html = escapeHtml(text)
-    // Headings
-    .replace(/^###### (.*)$/gm, '<h6 class="text-xs font-bold text-cyan-400 mt-2 mb-1">$1</h6>')
-    .replace(/^##### (.*)$/gm, '<h5 class="text-sm font-bold text-cyan-400 mt-2 mb-1">$1</h5>')
-    .replace(/^#### (.*)$/gm, '<h4 class="text-base font-bold text-cyan-400 mt-2 mb-1">$1</h4>')
-    .replace(/^### (.*)$/gm, '<h3 class="text-base font-bold text-cyan-400 mt-2 mb-1 flex items-center gap-2"><span class="w-1 h-4 bg-cyan-400 rounded-full"></span>$1</h3>')
-    .replace(/^## (.*)$/gm, '<h2 class="text-lg font-bold text-white mt-4 mb-2 border-b border-white/10 pb-2">$1</h2>')
-    .replace(/^# (.*)$/gm, '<h1 class="text-xl font-black text-white mt-3 mb-2">$1</h1>')
-    // Blockquotes
-    .replace(/^> (.*)$/gm, '<blockquote class="border-l-4 border-cyan-400 pl-4 italic text-slate-300 my-2">$1</blockquote>')
-    // Bold/italic/code
-    .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em class="italic text-slate-300">$1</em>')
-    .replace(/`([^`]+)`/g, '<code class="bg-slate-700/50 px-1.5 py-0.5 rounded text-cyan-400 font-mono text-[10px]">$1</code>')
-    // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-cyan-400 underline">$1</a>')
-    // Unordered lists
-    .replace(/^(\s*)[-*•] (.*)$/gm, '$1<li>$2</li>')
-    .replace(/(<li>.*<\/li>)/g, '<ul class="list-disc ml-6 my-2">$1</ul>')
-    // Ordered lists
-    .replace(/^(\s*)\d+\. (.*)$/gm, '$1<li>$2</li>')
-    .replace(/(<li>.*<\/li>)/g, '<ol class="list-decimal ml-6 my-2">$1</ol>')
-    // Tables (very basic)
-    .replace(/\|([^|]+)\|([^|]+)\|/g, '<tr><td class="px-2 py-1 border border-slate-700">$1</td><td class="px-2 py-1 border border-slate-700">$2</td></tr>')
-    .replace(/(<tr>.*<\/tr>)/g, '<table class="my-2 border-collapse">$1</table>')
-    // Paragraphs
-    .replace(/\n{2,}/g, '</p><p class="text-slate-300 leading-relaxed my-1.5">')
-    .replace(/\n/g, '<br />');
-
-  // Wrap in a paragraph if not already
-  if (!/^<p/.test(html)) {
-    html = `<p class="text-slate-300 leading-relaxed my-1.5">${html}</p>`;
-  }
-
-  return <div className="space-y-0.5" dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div className="space-y-0.5" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />;
 };
