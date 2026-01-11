@@ -7,6 +7,7 @@ import { LandingPage } from './components/LandingPage';
 import { Footer } from './components/Footer';
 import { NotificationBell } from './components/NotificationBell';
 import { TopBanner } from './components/TopBanner';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Lazy-loaded components (code splitting)
 const NewsSidebar = lazy(() => import('./components/NewsSidebar').then(m => ({ default: m.NewsSidebar })));
@@ -758,12 +759,14 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Main App component with LanguageProvider wrapper
+// Main App component with LanguageProvider and ErrorBoundary wrappers
 const App: React.FC = () => {
   return (
-    <LanguageProvider>
-      <AppContent />
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 };
 
