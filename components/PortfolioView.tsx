@@ -306,7 +306,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   }, [holdings, debouncedSearch, filterType]);
 
   const sortedHoldings = useMemo(() => {
-    let sortableItems = [...filteredHoldings];
+    const sortableItems = [...filteredHoldings];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
         let aValue: number;
