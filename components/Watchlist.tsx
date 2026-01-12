@@ -53,6 +53,7 @@ const FALLBACK_PRICES: Record<string, { price: number; change24h: number }> = {
   NVDA: { price: 188.85, change24h: 5.16 },
   TSLA: { price: 410.30, change24h: 3.5 },
   META: { price: 595.80, change24h: 0.9 },
+  PLTR: { price: 67.85, change24h: 2.4 },
   GOLD: { price: 2650, change24h: 0.3 },
 };
 
