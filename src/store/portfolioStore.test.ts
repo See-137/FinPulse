@@ -3,7 +3,7 @@
  * Tests for Zustand portfolio state management
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { usePortfolioStore } from '../../store/portfolioStore';
 
 const TEST_USER_ID = 'test-user-123';

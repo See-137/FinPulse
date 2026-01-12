@@ -76,6 +76,6 @@ export const createMockMarketData = () => [
  */
 export const waitForAsync = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-// Re-export everything from testing-library
-export * from '@testing-library/react';
+// Re-export testing-library functions
+export { render as renderTL } from '@testing-library/react';
 export { customRender as render };
