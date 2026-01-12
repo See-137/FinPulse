@@ -205,7 +205,8 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
   exchangeRate
 }) => {
   const { t } = useLanguage();
-  const isUnlocked = user.plan === 'SUPERPULSE';
+  // Unlock for SUPERPULSE plan OR internal_tester role
+  const isUnlocked = user.plan === 'SUPERPULSE' || user.userRole === 'internal_tester';
   
   // Generate data
   const historicalData = useMemo(() => generateHistoricalData(holdings, 30), [holdings]);

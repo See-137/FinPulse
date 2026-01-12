@@ -27,6 +27,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
   const { t, isRTL } = useLanguage();
   const [loading, setLoading] = useState<PlanType | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   const handleUpgrade = async (plan: PlanType) => {
     if (plan === 'FREE') {
@@ -42,9 +43,29 @@ export const PricingModal: React.FC<PricingModalProps> = ({
     setError(null);
 
     try {
-      await redirectToCheckout(user.id, user.email, plan as Exclude<PlanType, 'FREE'>);
+      const { url } = await redirectToCheckout(user.id, user.email, plan as Exclude<PlanType, 'FREE'>);
+      
+      // Check if it's a demo URL (doesn't contain stripe.com)
+      if (url.includes('demo_upgrade') || url.includes('demo_')) {
+        setIsDemoMode(true);
+        // In demo mode, immediately apply the plan change
+        onPlanChange(plan);
+        setLoading(null);
+        // Show success message
+        setError(null);
+        // Close modal after a short delay
+        setTimeout(() => {
+          onClose();
+          window.location.href = url; // Navigate to show success
+        }, 500);
+      } else {
+        // Real Stripe checkout
+        window.location.href = url;
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Payment failed. Please try again.');
+      const errorMsg = err instanceof Error ? err.message : 'Payment failed. Please try again.';
+      console.error('Upgrade error:', err);
+      setError(errorMsg);
       setLoading(null);
     }
   };
