@@ -316,6 +316,32 @@ const AppContent: React.FC = () => {
     }
   }, [user]);
 
+  // Handle demo_upgrade parameter from pricing modal
+  useEffect(() => {
+    if (!user) return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const demoUpgrade = searchParams.get('demo_upgrade');
+
+    if (demoUpgrade && demoUpgrade.toUpperCase() !== user.plan) {
+      const newPlan = demoUpgrade.toUpperCase() as PlanType;
+      
+      // Apply the plan change
+      setUser({
+        ...user,
+        plan: newPlan,
+        credits: {
+          ...user.credits,
+          maxAi: SaaS_PLANS[newPlan].maxAiQueries,
+          maxAssets: SaaS_PLANS[newPlan].maxAssets
+        }
+      });
+
+      // Clear the demo parameter from URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [user]);
+
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');

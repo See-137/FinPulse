@@ -21,6 +21,8 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     replaysOnErrorSampleRate: 1.0,
   });
 }
+
+const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
