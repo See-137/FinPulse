@@ -6,7 +6,7 @@ import {
   TrendingUp, TrendingDown, Bitcoin, Activity, Gem, Eye, EyeOff,
   ArrowUpDown, ArrowUp, ArrowDown, XCircle, Wifi, WifiOff, Crown
 } from 'lucide-react';
-import { User, Currency } from '../types';
+import { User, Currency, Holding, AssetType } from '../types';
 import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { useMarketData } from '../hooks/useMarketData';
@@ -14,18 +14,6 @@ import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
 import { useDebounce } from '../hooks/useDebounce';
 import { AssetSelector } from './AssetSelector';
 import { PremiumAnalytics } from './PremiumAnalytics';
-
-type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
-
-interface Holding {
-  symbol: string;
-  name: string;
-  type: AssetType;
-  quantity: number;
-  avgCost: number;
-  currentPrice: number;
-  dayPL: number;
-}
 
 interface PortfolioViewProps {
   user: User;

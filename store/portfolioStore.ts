@@ -1,18 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { Holding } from '../types';
 import { portfolioService } from '../services/portfolioService';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
-
-interface Holding {
-  symbol: string;
-  name: string;
-  type: AssetType;
-  quantity: number;
-  avgCost: number;
-  currentPrice: number;
-  dayPL: number;
-}
 
 interface WatchlistItem {
   symbol: string;

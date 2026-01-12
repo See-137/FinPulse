@@ -18,8 +18,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
     marked.setOptions({
       breaks: true, // Convert \n to <br>
       gfm: true, // GitHub Flavored Markdown
-      headerIds: false, // Disable header IDs to reduce attack surface
-      mangle: false, // Don't mangle email addresses
+      // Note: headerIds and mangle removed in marked v5+
     });
 
     // Parse markdown to HTML

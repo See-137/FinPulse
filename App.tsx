@@ -26,7 +26,9 @@ const OnboardingFlow = lazy(() => import('./components/OnboardingFlow').then(m =
 const MilestoneModal = lazy(() => import('./components/MilestoneModal').then(m => ({ default: m.MilestoneModal })));
 
 // Legal pages - very rarely accessed
-const LegalPages = lazy(() => import('./components/LegalPages'));
+const TermsOfService = lazy(() => import('./components/LegalPages').then(m => ({ default: m.TermsOfService })));
+const PrivacyPolicy = lazy(() => import('./components/LegalPages').then(m => ({ default: m.PrivacyPolicy })));
+const PricingPage = lazy(() => import('./components/LegalPages').then(m => ({ default: m.PricingPage })));
 const AccessibilityStatement = lazy(() => import('./components/AccessibilityStatement').then(m => ({ default: m.AccessibilityStatement })));
 
 // Hooks for changelog and onboarding (small, non-lazy)
@@ -483,17 +485,17 @@ const AppContent: React.FC = () => {
   // Legal pages (accessible via URL hash: #terms, #privacy, #pricing, #accessibility)
   if (view === 'terms') return (
     <Suspense fallback={<LoadingSpinner size="lg" />}>
-      <LegalPages.TermsOfService onBack={() => { window.location.hash = ''; setView('landing'); }} />
+      <TermsOfService onBack={() => { window.location.hash = ''; setView('landing'); }} />
     </Suspense>
   );
   if (view === 'privacy') return (
     <Suspense fallback={<LoadingSpinner size="lg" />}>
-      <LegalPages.PrivacyPolicy onBack={() => { window.location.hash = ''; setView('landing'); }} />
+      <PrivacyPolicy onBack={() => { window.location.hash = ''; setView('landing'); }} />
     </Suspense>
   );
   if (view === 'pricing') return (
     <Suspense fallback={<LoadingSpinner size="lg" />}>
-      <LegalPages.PricingPage onBack={() => { window.location.hash = ''; setView('landing'); }} />
+      <PricingPage onBack={() => { window.location.hash = ''; setView('landing'); }} />
     </Suspense>
   );
   if (view === 'accessibility') return (

@@ -7,7 +7,7 @@ import { api } from './apiService';
 
 // Token storage mode - set to 'cookie' for production security
 const TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' = 
-  (import.meta.env.VITE_TOKEN_STORAGE_MODE as 'localStorage' | 'cookie') || 'localStorage';
+  (import.meta.env.VITE_TOKEN_STORAGE_MODE as 'localStorage' | 'cookie') || 'cookie';
 
 interface AuthTokens {
   accessToken: string;
