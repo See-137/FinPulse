@@ -57,6 +57,28 @@ export const SaaS_PLANS = {
   }
 };
 
+/**
+ * SIGNAL CONFIDENCE SCORING
+ * Weights: Whale (40%) + Trade (35%) + Sentiment (25%)
+ * Conflict penalty: ×0.7 when signals contradict
+ * Base accuracy range: 65-75% per signal type
+ */
+export const SIGNAL_SCORING = {
+  WEIGHTS: {
+    whale: 0.40,
+    trade: 0.35,
+    sentiment: 0.25,
+  },
+  CONFLICT_PENALTY: 0.7, // Multiply confidence by this when conflict detected
+  BASE_ACCURACY: {
+    whale: 72, // %
+    trade: 68, // %
+    sentiment: 65, // %
+  },
+  MIN_CONFIDENCE: 0,
+  MAX_CONFIDENCE: 100,
+} as const;
+
 // Fallback stock/crypto data (real data fetched from CoinGecko API)
 // Live endpoint: https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod/market/prices
 export const MOCK_STOCKS = [
