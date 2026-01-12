@@ -6,7 +6,7 @@ import {
   TrendingUp, TrendingDown, Bitcoin, Activity, Gem, Eye, EyeOff,
   ArrowUpDown, ArrowUp, ArrowDown, XCircle, Wifi, WifiOff, Crown
 } from 'lucide-react';
-import { User, Currency, Holding, AssetType } from '../types';
+import { User, Currency, Holding, AssetType, CombinedSignal } from '../types';
 import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { useMarketData } from '../hooks/useMarketData';
@@ -14,6 +14,8 @@ import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
 import { useDebounce } from '../hooks/useDebounce';
 import { AssetSelector } from './AssetSelector';
 import { PremiumAnalytics } from './PremiumAnalytics';
+import { SignalCard } from './SignalCard';
+import signalService from '../services/signalService';
 
 interface PortfolioViewProps {
   user: User;
@@ -345,6 +347,28 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     return sortableItems;
   }, [filteredHoldings, sortConfig, marketPrices, wsPrices]);
 
+  // Generate signals for each holding
+  const signals = useMemo<Record<string, CombinedSignal>>(() => {
+    const signalMap: Record<string, CombinedSignal> = {};
+    
+    sortedHoldings.forEach(holding => {
+      // Generate mock signals for this symbol
+      const mockSignals = signalService.createMockSignals(holding.symbol);
+      
+      // Combine the signals
+      const combined = signalService.combineSignals(
+        holding.symbol,
+        mockSignals.whale,
+        mockSignals.trade,
+        mockSignals.sentiment
+      );
+      
+      signalMap[holding.symbol] = combined;
+    });
+    
+    return signalMap;
+  }, [sortedHoldings]);
+
   const renderSortIcon = (key: string) => {
     if (sortConfig?.key !== key) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
     return sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-[#00e5ff]" /> : <ArrowDown className="w-3 h-3 text-[#00e5ff]" />;
@@ -481,21 +505,22 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                       <thead>
                         <tr className="border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
                           {[
-                            { label: 'Asset', key: 'name', width: 'w-[22%]' },
-                            { label: 'Avg Cost', key: 'avgCost', width: 'w-[14%]' },
-                            { label: 'Price', key: 'marketPrice', width: 'w-[18%]' },
+                            { label: 'Asset', key: 'name', width: 'w-[18%]' },
+                            { label: 'Avg Cost', key: 'avgCost', width: 'w-[12%]' },
+                            { label: 'Price', key: 'marketPrice', width: 'w-[14%]' },
                             { label: 'Qty', key: 'quantity', width: 'w-[10%]' },
-                            { label: 'Value', key: 'value', width: 'w-[14%]' },
-                            { label: '24h', key: 'dayPL', width: 'w-[10%]' }
+                            { label: 'Value', key: 'value', width: 'w-[12%]' },
+                            { label: '24h', key: 'dayPL', width: 'w-[8%]' },
+                            { label: 'Signal', key: 'signal', width: 'w-[26%]' }
                           ].map((header) => (
                             <th 
                               key={header.key}
-                              onClick={() => handleSort(header.key)}
-                              className={`px-3 py-3 text-[8px] font-black uppercase text-slate-500 tracking-wider cursor-pointer hover:text-[#00e5ff] transition-colors ${header.width}`}
+                              onClick={() => header.key !== 'signal' && handleSort(header.key)}
+                              className={`px-3 py-3 text-[8px] font-black uppercase text-slate-500 tracking-wider ${header.key !== 'signal' ? 'cursor-pointer hover:text-[#00e5ff] transition-colors' : ''} ${header.width}`}
                             >
                               <div className="flex items-center gap-1">
                                 {header.label}
-                                {renderSortIcon(header.key)}
+                                {header.key !== 'signal' && renderSortIcon(header.key)}
                               </div>
                             </th>
                           ))}
@@ -547,6 +572,15 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                               <span className={`font-bold text-xs ${liveChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {liveChange >= 0 ? '+' : ''}{liveChange.toFixed(1)}%
                               </span>
+                            </td>
+                            <td className="px-3 py-3">
+                              {signals[asset.symbol] && (
+                                <SignalCard 
+                                  signal={signals[asset.symbol]} 
+                                  compact={true}
+                                  showComponents={false}
+                                />
+                              )}
                             </td>
                             <td className="px-3 py-3">
                               <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
