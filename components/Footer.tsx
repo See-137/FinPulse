@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 
 interface FooterProps {
   onNavigate?: (route: string) => void;
@@ -54,10 +54,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Copyright */}
           <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             <span>© {new Date().getFullYear()} FinPulse</span>
-            <span>•</span>
-            <span className="inline-flex items-center gap-1">
-              Made with <Heart className="w-3 h-3 text-red-500 fill-red-500" /> in Israel
-            </span>
           </div>
         </div>
       </div>
