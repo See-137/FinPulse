@@ -2,6 +2,7 @@
 // Handles all backend API calls with authentication
 
 import { config } from '../config';
+import { apiLogger } from './logger';
 
 interface ApiResponse<T> {
   data?: T;

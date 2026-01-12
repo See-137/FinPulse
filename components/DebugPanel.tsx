@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Database, RefreshCw, AlertTriangle, CheckCircle2, Copy, Trash2 } from 'lucide-react';
 import { usePortfolioStore } from '../store/portfolioStore';
+import { componentLogger } from '../services/logger';
 
 interface DebugPanelProps {
   isOpen: boolean;
@@ -35,7 +36,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose, current
       setAvailableUserIds(allKeys);
       
     } catch (e) {
-      console.error('Failed to load storage data:', e);
+      componentLogger.error('Failed to load storage data:', e);
     }
   };
 

@@ -13,6 +13,7 @@ import { NOTIFICATION_STORAGE_KEYS, OnboardingStep } from '../types/notification
 import { useLanguage } from '../i18n';
 import { SaaS_PLANS } from '../constants';
 import { PlanType } from '../types';
+import { componentLogger } from '../services/logger';
 
 interface OnboardingFlowProps {
   isOpen: boolean;
@@ -465,7 +466,7 @@ export const useOnboarding = (userCreatedAt?: string, userId?: string) => {
       // who cleared localStorage - auto-complete onboarding
       if (now - createdTime > fiveMinutes) {
         localStorage.setItem(storageKey, 'true');
-        console.log('Returning user detected, skipping onboarding');
+        componentLogger.debug('Returning user detected, skipping onboarding');
         return;
       }
     }

@@ -4,6 +4,7 @@
 
 import { config } from '../config';
 import { api } from './apiService';
+import { authLogger } from './logger';
 
 // Token storage mode - set to 'cookie' for production security
 const TOKEN_STORAGE_MODE: 'localStorage' | 'cookie' = 
@@ -288,7 +289,7 @@ class AuthService {
     const { oauth, domain, clientId } = config.cognito;
     
     if (!domain) {
-      console.error('Cognito domain not configured for OAuth');
+      authLogger.error('Cognito domain not configured for OAuth');
       return;
     }
 
@@ -320,7 +321,7 @@ class AuthService {
     const error = params.get('error');
     const errorDescription = params.get('error_description');
 
-    console.log('[OAuth] parseOAuthCallback:', { 
+    authLogger.debug('[OAuth] parseOAuthCallback:', { 
       hasCode: !!code, 
       state: state?.substring(0, 10) + '...', 
       error, 
@@ -328,30 +329,30 @@ class AuthService {
     });
 
     if (error) {
-      console.log('[OAuth] Error in callback:', error);
+      authLogger.warn('[OAuth] Error in callback:', error);
       return { success: false, error, errorDescription: errorDescription || undefined };
     }
 
     if (!code) {
-      console.log('[OAuth] No code received');
+      authLogger.warn('[OAuth] No code received');
       return { success: false, error: 'no_code', errorDescription: 'No authorization code received' };
     }
 
     // Verify state matches
     const storedState = sessionStorage.getItem('oauth_state');
-    console.log('[OAuth] State check:', { 
+    authLogger.debug('[OAuth] State check:', { 
       receivedState: state?.substring(0, 10) + '...', 
       storedState: storedState?.substring(0, 10) + '...',
       matches: state === storedState
     });
     
     if (state !== storedState) {
-      console.error('[OAuth] State mismatch!');
+      authLogger.error('[OAuth] State mismatch!');
       return { success: false, error: 'state_mismatch', errorDescription: 'OAuth state mismatch - possible CSRF attack' };
     }
 
     sessionStorage.removeItem('oauth_state');
-    console.log('[OAuth] parseOAuthCallback success');
+    authLogger.info('[OAuth] parseOAuthCallback success');
     return { success: true, code, state: state || undefined };
   }
 
@@ -411,8 +412,8 @@ class AuthService {
       return federatedResult;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('OAuth code exchange error:', error);
-      console.error('Token exchange details:', { domain, clientId, redirectUri: oauth.redirectUri, errorMessage });
+      authLogger.error('OAuth code exchange error:', error);
+      authLogger.error('Token exchange details:', { domain, clientId, redirectUri: oauth.redirectUri, errorMessage });
       return { success: false, error: `Failed to exchange authorization code: ${errorMessage}` };
     }
   }
@@ -426,9 +427,9 @@ class AuthService {
     tokenPayload: CognitoUser,
     tokens: AuthTokens
   ): Promise<AuthResult> {
-    console.log('[OAuth] handleFederatedSignIn started', { provider: provider?.name, email: tokenPayload?.email });
+    authLogger.info('[OAuth] handleFederatedSignIn started', { provider: provider?.name, email: tokenPayload?.email });
     try {
-      console.log('[OAuth] Calling API:', `${config.apiUrl}/auth/federated-signin`);
+      authLogger.debug('[OAuth] Calling API:', `${config.apiUrl}/auth/federated-signin`);
       const response = await fetch(`${config.apiUrl}/auth/federated-signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -443,13 +444,13 @@ class AuthService {
         }),
       });
 
-      console.log('[OAuth] API response status:', response.status);
+      authLogger.debug('[OAuth] API response status:', response.status);
       const data = await response.json();
-      console.log('[OAuth] API response data:', data);
+      authLogger.debug('[OAuth] API response data:', data);
 
       // Account collision - needs password verification to link
       if (response.status === 409 && data.requiresLinking) {
-        console.log('[OAuth] Account requires linking');
+        authLogger.info('[OAuth] Account requires linking');
         return {
           success: false,
           requiresLinking: true,
@@ -460,12 +461,12 @@ class AuthService {
       }
 
       if (!response.ok) {
-        console.log('[OAuth] API response not OK');
+        authLogger.warn('[OAuth] API response not OK');
         return { success: false, error: data.error || 'Federated sign-in failed' };
       }
 
       // Success - store session
-      console.log('[OAuth] API success, storing session');
+      authLogger.info('[OAuth] API success, storing session');
       const user: CognitoUser = {
         userId: data.data.user.userId,
         email: tokenPayload.email,
@@ -477,12 +478,12 @@ class AuthService {
       api.setIdToken(tokens.idToken);
       this.scheduleRefresh(tokens.expiresIn, tokens.refreshToken);
 
-      console.log('[OAuth] Session stored, returning success');
+      authLogger.info('[OAuth] Session stored, returning success');
       return { success: true, user, tokens };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('[OAuth] Federated sign-in error:', error);
-      console.error('[OAuth] Error details:', { 
+      authLogger.error('[OAuth] Federated sign-in error:', error);
+      authLogger.error('[OAuth] Error details:', { 
         apiUrl: config.apiUrl, 
         provider: provider?.name, 
         email: tokenPayload?.email,
@@ -538,7 +539,7 @@ class AuthService {
     const idToken = localStorage.getItem('finpulse_id_token');
 
     if (!idToken) {
-      console.warn('[Auth] Cannot fetch identities - user not authenticated');
+      authLogger.warn('[Auth] Cannot fetch identities - user not authenticated');
       return [];
     }
 
@@ -553,7 +554,7 @@ class AuthService {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('[Auth] Failed to get linked identities:', {
+        authLogger.error('[Auth] Failed to get linked identities:', {
           status: response.status,
           error: data.error
         });
