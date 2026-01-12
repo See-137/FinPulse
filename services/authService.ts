@@ -50,6 +50,27 @@ interface OAuthCallbackResult {
   errorDescription?: string;
 }
 
+/**
+ * INTERNAL TEST USER CONFIGURATION
+ * Used for QA, demo, and feature gating validation
+ * Credentials stored in AWS Secrets Manager, NOT in code
+ * Role bypasses paywall restrictions for testing purposes only
+ */
+const INTERNAL_TESTER_CONFIG = {
+  email: 'tester@finpulse.internal',
+  plan: 'SUPERPULSE' as const,
+  role: 'internal_tester' as const,
+  credits: {
+    ai: 9999,
+    maxAi: 9999,
+    assets: 9999,
+    maxAssets: 9999,
+  },
+  // Password stored in AWS Secrets Manager: /finpulse/internal-tester/password
+  // Retrieved via Lambda environment variable INTERNAL_TESTER_PASSWORD at runtime
+  passwordHint: 'Stored in AWS Secrets Manager (non-hardcoded)',
+} as const;
+
 class AuthService {
   private cognitoUrl: string;
   private clientId: string;
@@ -641,6 +662,31 @@ class AuthService {
 
   isAuthenticated(): boolean {
     return this.currentUser !== null;
+  }
+
+  /**
+   * Check if user should bypass paywall restrictions
+   * Only internal_tester role bypasses all paywalls for testing
+   * @param userEmail - Email to check against internal_tester config
+   * @returns true if user is internal_tester and should bypass paywalls
+   */
+  shouldBypassPaywall(userEmail?: string): boolean {
+    const email = userEmail || this.currentUser?.email;
+    if (!email) return false;
+    
+    const isInternalTester = email === INTERNAL_TESTER_CONFIG.email;
+    if (isInternalTester) {
+      authLogger.debug(`Paywall bypass enabled for internal tester: ${email}`);
+    }
+    return isInternalTester;
+  }
+
+  /**
+   * Get internal tester configuration (for testing purposes)
+   * Only accessible within authService - not exported to components
+   */
+  getInternalTesterConfig() {
+    return INTERNAL_TESTER_CONFIG;
   }
 
   // ============== Private Methods ==============
