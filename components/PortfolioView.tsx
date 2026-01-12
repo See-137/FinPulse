@@ -208,6 +208,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     JPM: { price: 245.60, change24h: 0.3 },
     V: { price: 315.40, change24h: 0.6 },
     MA: { price: 520.75, change24h: 0.4 },
+    PLTR: { price: 67.85, change24h: 2.4 },
     // Commodities
     GOLD: { price: 2650, change24h: 0.3 },
     SILVER: { price: 31.50, change24h: 0.8 },
