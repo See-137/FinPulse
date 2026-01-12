@@ -19,13 +19,13 @@ export interface User {
 }
 
 export interface Holding {
-  id: string;
   symbol: string;
   name: string;
   type: AssetType;
   quantity: number;
-  avgBuyPrice: number;
+  avgCost: number;  // Changed from avgBuyPrice
   currentPrice: number;
+  dayPL: number;    // Added - used in portfolio calculations
 }
 
 export interface Influencer {

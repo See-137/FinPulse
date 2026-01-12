@@ -4,16 +4,9 @@
  */
 
 import { config } from '../config';
+import { Holding, AssetType } from '../types';
 
-export interface Holding {
-  symbol: string;
-  name: string;
-  type: 'CRYPTO' | 'STOCK' | 'COMMODITY';
-  quantity: number;
-  avgCost: number;
-  currentPrice?: number;
-  notes?: string;
-}
+export type { Holding };
 
 export interface PortfolioData {
   holdings: Holding[];

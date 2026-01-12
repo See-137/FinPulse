@@ -78,9 +78,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <div className="space-y-4">
                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Plan</h3>
-               <div className={`p-6 rounded-3xl border ${user.plan === 'PRO' ? 'bg-cyan-500/5 border-cyan-500/20' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-white/5'}`}>
+               <div className={`p-6 rounded-3xl border ${user.plan === 'SUPERPULSE' ? 'bg-cyan-500/5 border-cyan-500/20' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-white/5'}`}>
                   <div className="flex justify-between items-start mb-4">
-                     <span className={`text-xs font-black px-2 py-1 rounded-md ${user.plan === 'PRO' ? 'bg-cyan-500 text-black' : 'bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-white'}`}>{user.plan}</span>
+                     <span className={`text-xs font-black px-2 py-1 rounded-md ${user.plan === 'SUPERPULSE' ? 'bg-cyan-500 text-black' : 'bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-white'}`}>{user.plan}</span>
                      <span className="text-2xl font-black">{SaaS_PLANS[user.plan].price}<span className="text-xs text-slate-500">/mo</span></span>
                   </div>
                   <p className="text-xs text-slate-500 font-medium">Your account is currently trialing institutional features.</p>

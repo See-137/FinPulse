@@ -89,7 +89,7 @@ export const influencerService = {
     influencers.forEach(inf => {
       let category = 'Other';
       for (const [cat, focuses] of Object.entries(FOCUS_CATEGORIES)) {
-        if (focuses.includes(inf.focus as any)) {
+        if ((focuses as readonly string[]).includes(inf.focus)) {
           category = cat;
           break;
         }
