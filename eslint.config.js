@@ -55,6 +55,9 @@ export default [
         NodeJS: 'readonly',
         RequestInit: 'readonly',
         HeadersInit: 'readonly',
+        Response: 'readonly',
+        Event: 'readonly',
+        performance: 'readonly',
         // Node.js / Build tools
         __dirname: 'readonly',
         __filename: 'readonly',
