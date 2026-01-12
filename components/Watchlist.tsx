@@ -33,6 +33,7 @@ const POPULAR_ASSETS = [
   { symbol: 'NVDA', name: 'NVIDIA', type: 'STOCK' as AssetType },
   { symbol: 'TSLA', name: 'Tesla', type: 'STOCK' as AssetType },
   { symbol: 'META', name: 'Meta Platforms', type: 'STOCK' as AssetType },
+  { symbol: 'PLTR', name: 'Palantir', type: 'STOCK' as AssetType },
   { symbol: 'GOLD', name: 'Gold', type: 'COMMODITY' as AssetType },
 ];
 
