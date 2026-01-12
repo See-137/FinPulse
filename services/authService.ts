@@ -536,8 +536,9 @@ class AuthService {
    */
   async getLinkedIdentities(): Promise<LinkedIdentity[]> {
     const idToken = localStorage.getItem('finpulse_id_token');
-    
+
     if (!idToken) {
+      console.warn('[Auth] Cannot fetch identities - user not authenticated');
       return [];
     }
 
@@ -552,13 +553,18 @@ class AuthService {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('Failed to get identities:', data.error);
+        console.error('[Auth] Failed to get linked identities:', {
+          status: response.status,
+          error: data.error
+        });
+        // Don't throw - allow UI to handle gracefully with empty array
         return [];
       }
 
       return data.data || [];
     } catch (error) {
-      console.error('Error fetching identities:', error);
+      console.error('[Auth] Network error fetching linked identities:', error);
+      // Don't throw - allow UI to handle gracefully with empty array
       return [];
     }
   }
@@ -672,26 +678,41 @@ class AuthService {
   }
 
   private async setSecureTokens(tokens: AuthTokens): Promise<void> {
+    console.log('[Auth] Setting secure tokens via httpOnly cookies');
     const response = await fetch(`${config.apiUrl}/auth/set-tokens`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ tokens })
     });
-    
+
     if (!response.ok) {
-      throw new Error('Failed to set secure tokens');
+      const data = await response.json().catch(() => ({}));
+      console.error('[Auth] Failed to set secure tokens:', {
+        status: response.status,
+        error: data.error || 'Unknown error'
+      });
+      throw new Error(`Failed to set secure tokens: ${data.error || response.statusText}`);
     }
+    console.log('[Auth] Secure tokens set successfully');
   }
 
   private async clearSecureTokens(): Promise<void> {
     try {
-      await fetch(`${config.apiUrl}/auth/logout`, {
+      console.log('[Auth] Clearing secure tokens');
+      const response = await fetch(`${config.apiUrl}/auth/logout`, {
         method: 'POST',
         credentials: 'include'
       });
+
+      if (!response.ok) {
+        console.warn('[Auth] Clear secure tokens returned non-OK status:', response.status);
+      } else {
+        console.log('[Auth] Secure tokens cleared successfully');
+      }
     } catch (err) {
-      console.error('Failed to clear secure tokens:', err);
+      console.error('[Auth] Network error clearing secure tokens:', err);
+      // Don't throw - allow logout to complete locally
     }
   }
 
@@ -700,36 +721,47 @@ class AuthService {
       const tokensJson = localStorage.getItem('finpulse_auth_tokens');
       const userJson = localStorage.getItem('finpulse_user');
       const idToken = localStorage.getItem('finpulse_id_token');
-      
+
       // Require all three to be present for valid session
       if (tokensJson && userJson && idToken) {
         const tokens: AuthTokens = JSON.parse(tokensJson);
         const user: CognitoUser = JSON.parse(userJson);
-        
+
         // Check if idToken is expired by decoding JWT
         if (this.isTokenExpired(tokens.idToken)) {
-          console.log('Token expired, attempting refresh...');
+          console.log('[Auth] Stored token expired, attempting refresh...');
           // Try to refresh the token
-          this.refreshTokens(tokens.refreshToken).catch(() => {
-            console.log('Token refresh failed, clearing session');
+          this.refreshTokens(tokens.refreshToken).catch((err) => {
+            console.error('[Auth] Token refresh failed during session restore:', err);
+            console.log('[Auth] Clearing invalid session');
             this.signOut();
           });
           return;
         }
-        
+
+        console.log('[Auth] Restoring valid session for user:', user.email);
         this.currentUser = user;
-        api.setAccessToken(tokens.accessToken);
-        
+        api.setIdToken(tokens.idToken); // Use idToken, not accessToken
+
         // Calculate remaining time from JWT exp claim instead of using original expiresIn
         const remainingSeconds = this.getTokenRemainingTime(tokens.idToken);
         if (remainingSeconds > 0) {
+          console.log(`[Auth] Token valid for ${remainingSeconds} seconds, scheduling refresh`);
           this.scheduleRefresh(remainingSeconds, tokens.refreshToken);
         } else {
           // Token about to expire, refresh immediately
-          this.refreshTokens(tokens.refreshToken).catch(() => this.signOut());
+          console.log('[Auth] Token about to expire, refreshing immediately');
+          this.refreshTokens(tokens.refreshToken).catch((err) => {
+            console.error('[Auth] Immediate token refresh failed:', err);
+            this.signOut();
+          });
         }
+      } else {
+        console.log('[Auth] No valid session found in localStorage');
       }
     } catch (error) {
+      console.error('[Auth] Error restoring session:', error);
+      console.log('[Auth] Clearing corrupted session data');
       this.signOut();
     }
   }
@@ -758,6 +790,7 @@ class AuthService {
   }
 
   private async refreshTokens(refreshToken: string): Promise<void> {
+    console.log('[Auth] Attempting to refresh tokens...');
     try {
       const response = await fetch(this.cognitoUrl, {
         method: 'POST',
@@ -777,6 +810,7 @@ class AuthService {
       const data = await response.json();
 
       if (response.ok && data.AuthenticationResult) {
+        console.log('[Auth] Token refresh successful');
         const tokens: AuthTokens = {
           accessToken: data.AuthenticationResult.AccessToken,
           idToken: data.AuthenticationResult.IdToken,
@@ -790,11 +824,19 @@ class AuthService {
         api.setIdToken(tokens.idToken);
         this.scheduleRefresh(tokens.expiresIn, refreshToken);
       } else {
-        // Refresh failed, sign out
-        this.signOut();
+        // Refresh failed - log details and sign out
+        console.warn('[Auth] Token refresh failed:', {
+          status: response.status,
+          error: data.__type || data.message || 'Unknown error',
+          code: data.code
+        });
+        console.log('[Auth] Session expired - signing out user');
+        await this.signOut();
       }
     } catch (error) {
-      this.signOut();
+      console.error('[Auth] Token refresh network error:', error);
+      console.log('[Auth] Network error during token refresh - signing out user');
+      await this.signOut();
     }
   }
 
