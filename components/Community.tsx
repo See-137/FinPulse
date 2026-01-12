@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, ThumbsUp, TrendingUp, Search, Plus, User, Calendar, Send, X, Loader2 } from 'lucide-react';
 import { getPosts, createPost, likePost, type Post } from '../services/communityService';
 import { useLanguage, formatT } from '../i18n';
+import { componentLogger } from '../services/logger';
 
 // Fallback mock data when API is unavailable
 const MOCK_POSTS: Post[] = [
@@ -108,7 +109,7 @@ export const Community: React.FC = () => {
         setPosts(MOCK_POSTS);
       }
     } catch (error) {
-      console.error('Failed to fetch posts:', error);
+      componentLogger.error('Failed to fetch posts:', error);
       setPosts(MOCK_POSTS);
     } finally {
       setLoading(false);
@@ -127,7 +128,7 @@ export const Community: React.FC = () => {
         setIsCreateModalOpen(false);
       }
     } catch (error) {
-      console.error('Failed to create post:', error);
+      componentLogger.error('Failed to create post:', error);
     } finally {
       setSubmitting(false);
     }
@@ -152,7 +153,7 @@ export const Community: React.FC = () => {
         setLikedPosts(newLiked);
       }
     } catch (error) {
-      console.error('Failed to like post:', error);
+      componentLogger.error('Failed to like post:', error);
     }
   };
 

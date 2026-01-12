@@ -5,6 +5,8 @@
  * Provides automatic reconnection and heartbeat
  */
 
+import { wsLogger } from './logger';
+
 export interface LivePrice {
   symbol: string;
   price: number;
@@ -59,7 +61,7 @@ class MarketWebSocketService {
    */
   connect(config: WebSocketConfig): void {
     if (this.isConnecting || this.ws?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected or connecting');
+      wsLogger.debug('WebSocket already connected or connecting');
       return;
     }
 
@@ -74,7 +76,7 @@ class MarketWebSocketService {
       .join('/');
 
     if (!streams) {
-      console.warn('No valid symbols for WebSocket connection');
+      wsLogger.warn('No valid symbols for WebSocket connection');
       this.isConnecting = false;
       return;
     }
@@ -85,7 +87,7 @@ class MarketWebSocketService {
       this.ws = new WebSocket(wsUrl);
       this.setupEventHandlers();
     } catch (error) {
-      console.error('Failed to create WebSocket:', error);
+      wsLogger.error('Failed to create WebSocket:', error);
       this.isConnecting = false;
       this.scheduleReconnect();
     }
@@ -98,7 +100,7 @@ class MarketWebSocketService {
     if (!this.ws) return;
 
     this.ws.onopen = () => {
-      console.log('📡 WebSocket connected to Binance');
+      wsLogger.info('📡 WebSocket connected to Binance');
       this.isConnecting = false;
       this.reconnectAttempts = 0;
       this.config?.onConnectionChange(true);
@@ -110,17 +112,17 @@ class MarketWebSocketService {
         const data = JSON.parse(event.data);
         this.handleMessage(data);
       } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+        wsLogger.error('Failed to parse WebSocket message:', error);
       }
     };
 
     this.ws.onerror = (event) => {
-      console.error('WebSocket error:', event);
+      wsLogger.error('WebSocket error:', event);
       this.config?.onError?.(new Error('WebSocket connection error'));
     };
 
     this.ws.onclose = (event) => {
-      console.log('WebSocket closed:', event.code, event.reason);
+      wsLogger.debug('WebSocket closed:', event.code, event.reason);
       this.isConnecting = false;
       this.config?.onConnectionChange(false);
       this.stopHeartbeat();
@@ -197,7 +199,7 @@ class MarketWebSocketService {
    */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+      wsLogger.error('Max reconnection attempts reached');
       this.config?.onError?.(new Error('Max reconnection attempts reached'));
       return;
     }
@@ -205,7 +207,7 @@ class MarketWebSocketService {
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
     
-    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    wsLogger.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
     setTimeout(() => {
       if (this.config) {

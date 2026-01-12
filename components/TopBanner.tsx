@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ChevronRight, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 import { BannerAnnouncement, NOTIFICATION_STORAGE_KEYS } from '../types/notifications';
 import { PlanType } from '../types';
+import { componentLogger } from '../services/logger';
 
 interface BannerAnnouncementProps {
   userPlan: PlanType;
@@ -87,7 +88,7 @@ export const TopBanner: React.FC<BannerAnnouncementProps> = ({ userPlan, onNavig
           setTimeout(() => setIsVisible(true), 100);
         }
       } catch (error) {
-        console.error('Failed to load banners:', error);
+        componentLogger.error('Failed to load banners:', error);
       }
     };
 

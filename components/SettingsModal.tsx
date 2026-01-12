@@ -5,6 +5,7 @@ import { User, PlanType, Theme } from '../types';
 import { SaaS_PLANS } from '../constants';
 import { auth } from '../services/authService';
 import { redirectToCustomerPortal } from '../services/stripeService';
+import { componentLogger } from '../services/logger';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -37,7 +38,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       await redirectToCustomerPortal(user.id);
     } catch (error) {
-      console.error('Failed to open billing portal:', error);
+      componentLogger.error('Failed to open billing portal:', error);
     }
   };
 

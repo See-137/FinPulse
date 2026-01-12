@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, ChevronDown, Bitcoin, TrendingUp, Gem, Loader2 } from 'lucide-react';
 import { useLanguage } from '../i18n';
+import { componentLogger } from '../services/logger';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
 
@@ -121,7 +122,7 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
 
         setApiResults(cryptoResults);
       } catch (error) {
-        console.error('Asset search error:', error);
+        componentLogger.error('Asset search error:', error);
         setApiResults([]);
       } finally {
         setLoading(false);

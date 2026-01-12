@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Bug, Zap, ChevronRight } from 'lucide-react';
 import { ChangelogEntry, NOTIFICATION_STORAGE_KEYS } from '../types/notifications';
 import { useLanguage } from '../i18n';
+import { componentLogger } from '../services/logger';
 
 interface ChangelogModalProps {
   isOpen: boolean;
@@ -149,7 +150,7 @@ export const useChangelog = () => {
           setShowChangelog(true);
         }
       } catch (error) {
-        console.error('Failed to load changelog:', error);
+        componentLogger.error('Failed to load changelog:', error);
       }
     };
 

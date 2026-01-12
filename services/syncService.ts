@@ -5,6 +5,7 @@
  */
 
 import { config } from '../config';
+import { syncLogger } from './logger';
 
 export interface SyncEvent {
   type: 'holding_add' | 'holding_update' | 'holding_remove' | 'settings_update' | 'watchlist_update';
@@ -115,7 +116,7 @@ class RealTimeSyncService {
     const wsUrl = config.api.syncEndpoint;
     
     if (!wsUrl || wsUrl === 'undefined') {
-      console.log('Sync WebSocket not configured, using polling fallback');
+      syncLogger.info('Sync WebSocket not configured, using polling fallback');
       this.startPollingSync();
       return;
     }
@@ -124,7 +125,7 @@ class RealTimeSyncService {
       this.ws = new WebSocket(`${wsUrl}?token=${accessToken}&device=${this.deviceId}`);
       
       this.ws.onopen = () => {
-        console.log('📡 Sync WebSocket connected');
+        syncLogger.info('📡 Sync WebSocket connected');
         this.reconnectAttempts = 0;
       };
 
@@ -136,7 +137,7 @@ class RealTimeSyncService {
             this.notifyCallbacks(syncEvent);
           }
         } catch (error) {
-          console.error('Failed to parse sync event:', error);
+          syncLogger.error('Failed to parse sync event:', error);
         }
       };
 
@@ -145,10 +146,10 @@ class RealTimeSyncService {
       };
 
       this.ws.onerror = (error) => {
-        console.error('Sync WebSocket error:', error);
+        syncLogger.error('Sync WebSocket error:', error);
       };
     } catch (error) {
-      console.error('Failed to create sync WebSocket:', error);
+      syncLogger.error('Failed to create sync WebSocket:', error);
       this.startPollingSync();
     }
   }
@@ -191,7 +192,7 @@ class RealTimeSyncService {
         localStorage.setItem('finpulse_last_sync', Date.now().toString());
       }
     } catch (error) {
-      console.error('Failed to fetch sync changes:', error);
+      syncLogger.error('Failed to fetch sync changes:', error);
     }
   }
 
@@ -243,7 +244,7 @@ class RealTimeSyncService {
       });
     } catch (error) {
       // Device registration is optional, don't fail
-      console.warn('Could not register device:', error);
+      syncLogger.warn('Could not register device:', error);
     }
   }
 
@@ -356,7 +357,7 @@ class RealTimeSyncService {
         }));
       }
     } catch (error) {
-      console.error('Failed to fetch devices:', error);
+      syncLogger.error('Failed to fetch devices:', error);
     }
     return [];
   }
@@ -374,7 +375,7 @@ class RealTimeSyncService {
       });
       return response.ok;
     } catch (error) {
-      console.error('Failed to revoke device:', error);
+      syncLogger.error('Failed to revoke device:', error);
       return false;
     }
   }
@@ -393,7 +394,7 @@ class RealTimeSyncService {
       });
       return response.ok;
     } catch (error) {
-      console.error('Failed to revoke all devices:', error);
+      syncLogger.error('Failed to revoke all devices:', error);
       return false;
     }
   }
