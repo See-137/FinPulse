@@ -86,22 +86,22 @@ export const translations = {
       searchAssets: 'Search assets...',
     },
     
-    // Community
+    // Global Pulse Feed
     community: {
-      title: 'Global Insight',
-      subtitle: 'Anonymized strategies from the world\'s most disciplined mirrors.',
-      feedTitle: 'Global Pulse Feed',
-      broadcast: 'Broadcast Insight',
-      searchPlaceholder: 'Search posts, tickers, tags...',
-      allPosts: 'All Posts',
+      title: 'Global Pulse Feed',
+      subtitle: 'Anonymized signal insights from disciplined market observers.',
+      feedTitle: 'Global Pulse',
+      broadcast: 'Share Signal',
+      searchPlaceholder: 'Search signals, tickers, tags...',
+      allPosts: 'All Signals',
       discussion: 'Discussion',
       analysis: 'Analysis',
       tradeIdea: 'Trade Idea',
       question: 'Question',
-      noPosts: 'No posts found',
-      leaderboard: 'Global Leaderboard',
-      privateMessage: 'Your mirror is currently private. Public mirroring allows others to observe your performance without revealing absolute values.',
-      enableBroadcast: 'Enable Public Broadcast',
+      noPosts: 'No signals found',
+      leaderboard: 'Leaderboard - Signal Accuracy',
+      privateMessage: 'Your signals are currently private. Sharing signals allows others to observe and learn from your analysis.',
+      enableBroadcast: 'Share Signals Publicly',
     },
     
     // AI Assistant
@@ -316,22 +316,22 @@ export const translations = {
       searchAssets: 'חפש נכסים...',
     },
     
-    // Community
+    // Global Pulse Feed
     community: {
-      title: 'תובנה גלובלית',
-      subtitle: 'אסטרטגיות אנונימיות מהמראות הממושמעות ביותר בעולם.',
-      feedTitle: 'פיד הדופק הגלובלי',
-      broadcast: 'שדר תובנה',
-      searchPlaceholder: 'חפש פוסטים, טיקרים, תגיות...',
-      allPosts: 'כל הפוסטים',
+      title: 'פיד הדופק הגלובלי',
+      subtitle: 'תובנות אותות אנונימיות מצופים שוק משמעותיים.',
+      feedTitle: 'הדופק הגלובלי',
+      broadcast: 'שתף אות',
+      searchPlaceholder: 'חפש אותות, טיקרים, תגיות...',
+      allPosts: 'כל האותות',
       discussion: 'דיון',
       analysis: 'ניתוח',
       tradeIdea: 'רעיון מסחר',
       question: 'שאלה',
-      noPosts: 'לא נמצאו פוסטים',
-      leaderboard: 'טבלת מובילים גלובלית',
-      privateMessage: 'המראה שלך כרגע פרטית. שיקוף ציבורי מאפשר לאחרים לצפות בביצועים שלך מבלי לחשוף ערכים מוחלטים.',
-      enableBroadcast: 'אפשר שידור ציבורי',
+      noPosts: 'לא נמצאו אותות',
+      leaderboard: 'טבלת דירוג - דיוק אות',
+      privateMessage: 'האותות שלך כרגע פרטיים. שיתוף אותות מאפשר לאחרים ללמוד מהניתוח שלך.',
+      enableBroadcast: 'שתף אותות בפומבי',
     },
     
     // AI Assistant
