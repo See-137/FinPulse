@@ -52,24 +52,11 @@ interface OAuthCallbackResult {
 
 /**
  * INTERNAL TEST USER CONFIGURATION
- * Used for QA, demo, and feature gating validation
- * Credentials stored in AWS Secrets Manager, NOT in code
- * Role bypasses paywall restrictions for testing purposes only
+ * Moved to environment variables for security
+ * Backend Lambda will handle tester account detection via Cognito groups
  */
-const INTERNAL_TESTER_CONFIG = {
-  email: 'tester@finpulse.internal',
-  plan: 'SUPERPULSE' as const,
-  role: 'internal_tester' as const,
-  credits: {
-    ai: 9999,
-    maxAi: 9999,
-    assets: 9999,
-    maxAssets: 9999,
-  },
-  // Password stored in AWS Secrets Manager: /finpulse/internal-tester/password
-  // Retrieved via Lambda environment variable INTERNAL_TESTER_PASSWORD at runtime
-  passwordHint: 'Stored in AWS Secrets Manager (non-hardcoded)',
-} as const;
+const INTERNAL_TESTER_EMAIL = import.meta.env.VITE_INTERNAL_TESTER_EMAIL || '';
+// Removed hardcoded tester config - now handled by backend via Cognito groups
 
 class AuthService {
   private cognitoUrl: string;
@@ -308,15 +295,20 @@ class AuthService {
    */
   initiateGoogleSignIn(): void {
     const { oauth, domain, clientId } = config.cognito;
-    
+
     if (!domain) {
       authLogger.error('Cognito domain not configured for OAuth');
       return;
     }
 
-    // Generate state for CSRF protection
+    // Generate state for CSRF protection with timestamp
     const state = this.generateOAuthState();
-    sessionStorage.setItem('oauth_state', state);
+    const stateData = {
+      state,
+      timestamp: Date.now(),
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes expiry
+    };
+    sessionStorage.setItem('oauth_state', JSON.stringify(stateData));
 
     // Build authorization URL
     const authUrl = new URL(`https://${domain}/oauth2/authorize`);
@@ -359,19 +351,43 @@ class AuthService {
       return { success: false, error: 'no_code', errorDescription: 'No authorization code received' };
     }
 
-    // Verify state matches
-    const storedState = sessionStorage.getItem('oauth_state');
-    authLogger.debug('[OAuth] State check:', { 
-      receivedState: state?.substring(0, 10) + '...', 
-      storedState: storedState?.substring(0, 10) + '...',
-      matches: state === storedState
+    // Verify state matches with expiry check
+    const storedStateJson = sessionStorage.getItem('oauth_state');
+    if (!storedStateJson) {
+      authLogger.error('[OAuth] No stored state found');
+      return { success: false, error: 'no_state', errorDescription: 'OAuth state not found - possible replay attack' };
+    }
+
+    let storedStateData;
+    try {
+      storedStateData = JSON.parse(storedStateJson);
+    } catch (e) {
+      // Backwards compatibility: treat as plain string if not JSON
+      storedStateData = { state: storedStateJson, expiresAt: Date.now() + 60000 };
+    }
+
+    authLogger.debug('[OAuth] State check:', {
+      receivedState: state?.substring(0, 10) + '...',
+      storedState: storedStateData.state?.substring(0, 10) + '...',
+      matches: state === storedStateData.state,
+      isExpired: Date.now() > storedStateData.expiresAt
     });
-    
-    if (state !== storedState) {
+
+    // Check expiry (5 min max)
+    if (Date.now() > storedStateData.expiresAt) {
+      authLogger.error('[OAuth] State expired');
+      sessionStorage.removeItem('oauth_state');
+      return { success: false, error: 'state_expired', errorDescription: 'OAuth state expired - please try again' };
+    }
+
+    // Check state match
+    if (state !== storedStateData.state) {
       authLogger.error('[OAuth] State mismatch!');
+      sessionStorage.removeItem('oauth_state');
       return { success: false, error: 'state_mismatch', errorDescription: 'OAuth state mismatch - possible CSRF attack' };
     }
 
+    // Clear state after successful verification
     sessionStorage.removeItem('oauth_state');
     authLogger.info('[OAuth] parseOAuthCallback success');
     return { success: true, code, state: state || undefined };

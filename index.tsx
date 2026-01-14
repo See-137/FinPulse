@@ -22,6 +22,27 @@ if (import.meta.env.VITE_SENTRY_DSN) {
   });
 }
 
+// Global unhandled promise rejection handler
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[CRITICAL] Unhandled promise rejection:', event.reason);
+
+  // Capture in Sentry if configured
+  if (import.meta.env.VITE_SENTRY_DSN) {
+    Sentry.captureException(event.reason, {
+      tags: { type: 'unhandled_rejection' },
+      contexts: {
+        promise: {
+          reason: event.reason?.message || String(event.reason),
+          stack: event.reason?.stack
+        }
+      }
+    });
+  }
+
+  // Prevent default browser error logging
+  event.preventDefault();
+});
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
