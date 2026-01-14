@@ -54,17 +54,17 @@ const CompactSignalCard: React.FC<SignalCardProps> = ({ signal, onClick }) => {
   return (
     <div
       onClick={onClick}
-      className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold ${colors.bg} ${colors.border} hover:opacity-80 transition-opacity cursor-pointer`}
+      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold max-w-full ${colors.bg} ${colors.border} hover:opacity-80 transition-opacity cursor-pointer`}
     >
-      <span className={colors.text}>{signal.direction.charAt(0).toUpperCase() + signal.direction.slice(1)}</span>
+      <span className={`${colors.text} whitespace-nowrap`}>{signal.direction.charAt(0).toUpperCase() + signal.direction.slice(1)}</span>
       <span className="text-slate-400">·</span>
-      <span className="text-white">Confidence {signal.confidenceScore}</span>
+      <span className="text-white whitespace-nowrap">Confidence {signal.confidenceScore}</span>
       <span className="text-slate-400">·</span>
-      <span className="text-slate-300">{components}</span>
+      <span className="text-slate-300 truncate">{components}</span>
       {signal.hasConflict && (
         <>
           <span className="text-slate-400">·</span>
-          <AlertTriangle className="w-3 h-3 text-amber-400" />
+          <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
         </>
       )}
     </div>

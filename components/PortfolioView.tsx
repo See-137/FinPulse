@@ -500,8 +500,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                   <p className="text-slate-500 font-medium text-sm">No assets match your filters.</p>
                 </div>
               ) : (
-                <div className="card-surface rounded-[24px] overflow-hidden border border-slate-200 dark:border-white/5">
-                  <table className="w-full text-left table-fixed">
+                <div className="card-surface rounded-[24px] overflow-x-auto border border-slate-200 dark:border-white/5">
+                  <table className="w-full text-left table-fixed min-w-[900px]">
                       <thead>
                         <tr className="border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
                           {[
@@ -573,14 +573,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                                 {liveChange >= 0 ? '+' : ''}{liveChange.toFixed(1)}%
                               </span>
                             </td>
-                            <td className="px-3 py-3">
-                              {signals[asset.symbol] && (
-                                <SignalCard 
-                                  signal={signals[asset.symbol]} 
-                                  compact={true}
-                                  showComponents={false}
-                                />
-                              )}
+                            <td className="px-3 py-3 overflow-hidden">
+                              <div className="max-w-full overflow-hidden">
+                                {signals[asset.symbol] && (
+                                  <SignalCard
+                                    signal={signals[asset.symbol]}
+                                    compact={true}
+                                    showComponents={false}
+                                  />
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-3">
                               <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
