@@ -60,15 +60,26 @@ class ApiService {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    timeoutMs: number = 30000
   ): Promise<ApiResponse<T>> {
     const headers = this.buildHeaders(options);
+
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      apiLogger.warn(`Request timeout after ${timeoutMs}ms: ${endpoint}`);
+    }, timeoutMs);
 
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         headers,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json().catch(() => null);
 
@@ -81,6 +92,16 @@ class ApiService {
 
       return { data, status: response.status };
     } catch (error) {
+      clearTimeout(timeoutId);
+
+      // Handle abort errors separately
+      if (error instanceof Error && error.name === 'AbortError') {
+        return {
+          error: 'Request timeout - please check your connection',
+          status: 0,
+        };
+      }
+
       return {
         error: error instanceof Error ? error.message : 'Network error',
         status: 0,
