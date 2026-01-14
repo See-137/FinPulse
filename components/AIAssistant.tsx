@@ -211,14 +211,16 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
 
   return (
     <>
-      <button 
+      {/* Position button on bottom-left to avoid NewsSidebar overlap */}
+      <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-[#00e5ff] text-[#0b0e14] rounded-full flex items-center justify-center shadow-xl z-[60] group border-4 border-white/10"
+        className="fixed bottom-6 left-6 w-16 h-16 bg-[#00e5ff] text-[#0b0e14] rounded-full flex items-center justify-center shadow-xl z-[60] group border-4 border-white/10 hover:scale-110 transition-transform"
       >
         {isOpen ? <X className="w-7 h-7" /> : <Sparkles className="w-7 h-7" />}
       </button>
 
-      <div className={`fixed bottom-24 right-4 sm:right-10 w-[calc(100vw-2rem)] sm:w-[420px] max-h-[calc(100dvh-8rem)] h-[600px] card-surface rounded-[40px] flex flex-col shadow-2xl z-50 transition-all duration-500 origin-bottom-right ${isOpen ? 'scale-100 opacity-100' : 'scale-90 opacity-0 pointer-events-none'}`}>
+      {/* Position chat panel on bottom-left to avoid NewsSidebar */}
+      <div className={`fixed bottom-24 left-4 sm:left-10 w-[calc(100vw-2rem)] sm:w-[420px] max-h-[calc(100dvh-8rem)] h-[600px] card-surface rounded-[40px] flex flex-col shadow-2xl z-50 transition-all duration-500 origin-bottom-left ${isOpen ? 'scale-100 opacity-100' : 'scale-90 opacity-0 pointer-events-none'}`}>
         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-cyan-500/10 rounded-2xl flex items-center justify-center text-cyan-400">

@@ -70,40 +70,109 @@ const queryBackendAI = async (query: string, callback: (text: string) => void) =
 // Generate helpful response when AI is unavailable
 const generateFallbackResponse = (query: string): string => {
   const queryLower = query.toLowerCase();
-  
-  if (queryLower.includes('support') || queryLower.includes('resistance')) {
-    return `**Market Observation:** For technical support and resistance levels, I recommend checking TradingView or CoinGecko for real-time order book data. Key levels are determined by historical price action and volume profiles.
 
-**Note:** AI analysis is temporarily unavailable. This is a general guidance response.`;
+  // Crypto price queries
+  if (queryLower.match(/\b(xrp|ripple|btc|bitcoin|eth|ethereum|doge|ada|sol)\b/) &&
+      queryLower.match(/\b(price|cost|value|worth)\b/)) {
+    const coin = queryLower.match(/\b(xrp|ripple|btc|bitcoin|eth|ethereum|doge|ada|sol)\b/)?.[0].toUpperCase();
+    return `**${coin || 'Crypto'} Price Information:**
+
+To check real-time ${coin || 'crypto'} prices, use these reliable sources:
+• **CoinGecko**: https://www.coingecko.com
+• **CoinMarketCap**: https://coinmarketcap.com
+• **TradingView**: https://www.tradingview.com
+• **Binance/Coinbase**: Direct exchange prices
+
+For advanced analysis:
+• View 24h volume, market cap, and price changes
+• Check order book depth for support/resistance
+• Monitor trading pairs (USD, BTC, USDT)
+• Set price alerts for your target levels
+
+**Note:** AI-powered real-time analysis coming soon. Enable it in Settings > AI Copilot.`;
   }
-  
-  if (queryLower.includes('sentiment') || queryLower.includes('feel')) {
+
+  // Technical analysis queries
+  if (queryLower.includes('support') || queryLower.includes('resistance') || queryLower.includes('technical')) {
+    return `**Technical Analysis Resources:**
+
+For professional chart analysis and key levels:
+• **TradingView**: Interactive charts with 100+ indicators
+• **CoinGecko**: Historical price charts & patterns
+• **CryptoQuant**: On-chain metrics & institutional flows
+
+**Key Technical Factors:**
+• Support/Resistance: Historical price zones where buying/selling pressure emerges
+• Volume Profile: Areas of high trading activity
+• Moving Averages: 50-day, 200-day trends
+• RSI/MACD: Momentum indicators
+
+**Note:** AI analysis is temporarily unavailable. These are general guidance resources.`;
+  }
+
+  // Sentiment queries
+  if (queryLower.includes('sentiment') || queryLower.includes('feel') || queryLower.includes('mood')) {
     return `**Market Sentiment Indicators:**
-• Fear & Greed Index: Check alternative.me/crypto/fear-and-greed-index
-• Social sentiment: Check LunarCrush or Santiment
-• On-chain metrics: Check Glassnode or IntoTheBlock
 
-**Note:** AI analysis is temporarily unavailable. This is a general guidance response.`;
+Track real-time market psychology with:
+• **Fear & Greed Index**: alternative.me/crypto/fear-and-greed-index
+• **Social Sentiment**: LunarCrush, Santiment
+• **On-chain Metrics**: Glassnode, IntoTheBlock
+• **Reddit/Twitter**: r/CryptoCurrency, Crypto Twitter
+
+**Sentiment Signals:**
+• Extreme Fear: Potential buying opportunity (contrarian)
+• Extreme Greed: Potential distribution zone
+• Social Volume Spikes: Indicates FOMO or panic
+
+**Note:** AI sentiment analysis coming soon. Enable it in Settings > AI Copilot.`;
   }
-  
+
+  // Bitcoin-specific queries
   if (queryLower.includes('btc') || queryLower.includes('bitcoin')) {
-    return `**Bitcoin Market Context:**
-• Check current price and 24h change on CoinGecko
-• Key metrics: Hash rate, mining difficulty, exchange flows
-• Recent news: Monitor CoinDesk and The Block for institutional activity
+    return `**Bitcoin Market Analysis Resources:**
 
-**Note:** AI analysis is temporarily unavailable. This is a general guidance response.`;
+**Real-time Data:**
+• Current Price: CoinGecko, CoinMarketCap
+• Hash Rate & Difficulty: blockchain.com/charts
+• Exchange Flows: CryptoQuant, Glassnode
+
+**News & Analysis:**
+• Institutional Activity: The Block, CoinDesk
+• Regulatory Updates: Cointelegraph
+• Technical Analysis: TradingView community ideas
+
+**Key Metrics to Monitor:**
+• Hash rate (network security indicator)
+• Exchange reserves (supply availability)
+• Whale movements (large holder activity)
+• Futures funding rates (leverage sentiment)
+
+**Note:** AI analysis is temporarily unavailable. These are verified data sources.`;
   }
-  
+
+  // Default response for general queries
   return `**Market Intelligence:**
-Thank you for your query about "${query.substring(0, 50)}...". 
+I've received your query about: *"${query.substring(0, 60)}${query.length > 60 ? '...' : ''}"*
 
-For real-time analysis, please check:
-• CoinGecko/CoinMarketCap for crypto prices
-• Yahoo Finance for equity data  
-• TradingView for technical analysis
+**Recommended Resources:**
+• **Crypto Prices**: CoinGecko, CoinMarketCap
+• **Stock Data**: Yahoo Finance, Google Finance
+• **Technical Charts**: TradingView (50M+ active users)
+• **News & Analysis**: Bloomberg, Reuters, CoinDesk
 
-**Note:** AI-powered analysis requires additional setup. Contact support to enable the AI copilot feature.`;
+**Portfolio Features:**
+• Use the **Watchlist** tab to track your favorite assets
+• Add holdings to your **Portfolio** for real-time tracking
+• Check the **News** sidebar for market-moving events
+
+**Note:** AI-powered copilot feature coming soon! This will enable:
+• Real-time market analysis with Google Search integration
+• Custom alerts and pattern recognition
+• Portfolio optimization suggestions
+• Sentiment analysis across 1000+ sources
+
+Enable early access in **Settings > AI Copilot** (ProPulse & SuperPulse plans).`;
 };
 
 export const getMarketInsightStream = async (query: string, callback: (text: string) => void) => {
