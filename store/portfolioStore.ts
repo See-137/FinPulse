@@ -17,14 +17,17 @@ interface WatchlistItem {
 interface PortfolioState {
   // Current user ID for data isolation
   currentUserId: string | null;
-  
+
   // User-scoped data maps
   userHoldings: Record<string, Holding[]>;
   userWatchlists: Record<string, WatchlistItem[]>;
-  
+
   // Sync state
   isSyncing: boolean;
   lastSyncError: string | null;
+
+  // Race condition prevention
+  loadPromise: Promise<void> | null;
   
   // UI state (not user-scoped)
   isPrivate: boolean;
@@ -70,6 +73,7 @@ export const usePortfolioStore = create<PortfolioState>()(
       userWatchlists: {},
       isSyncing: false,
       lastSyncError: null,
+      loadPromise: null,
       isPrivate: false,
       search: '',
       filterType: null,
@@ -118,39 +122,54 @@ export const usePortfolioStore = create<PortfolioState>()(
       setSearch: (value) => set({ search: value }),
       setFilterType: (value) => set({ filterType: value }),
       
-      // Load holdings from backend
+      // Load holdings from backend with race condition protection
       loadFromBackend: async () => {
-        const { currentUserId } = get();
+        const state = get();
+        const { currentUserId, loadPromise } = state;
         if (!currentUserId) return;
-        
-        set({ isSyncing: true, lastSyncError: null });
-        
-        try {
-          const portfolio = await portfolioService.getPortfolio();
-          const holdings: Holding[] = portfolio.holdings.map(h => ({
-            symbol: h.symbol,
-            name: h.name,
-            type: h.type,
-            quantity: h.quantity,
-            avgCost: h.avgCost,
-            currentPrice: h.currentPrice || h.avgCost,
-            dayPL: 0,
-          }));
-          
-          set((state) => ({
-            isSyncing: false,
-            userHoldings: {
-              ...state.userHoldings,
-              [currentUserId]: holdings
-            }
-          }));
-          
-          console.log(`Loaded ${holdings.length} holdings from backend`);
-        } catch (error) {
-          console.error('Failed to load from backend:', error);
-          set({ isSyncing: false, lastSyncError: String(error) });
-          // Keep local data if backend fails
+
+        // If already loading, return existing promise (deduplication)
+        if (loadPromise) {
+          console.log('[Portfolio] Load already in progress, reusing promise');
+          return loadPromise;
         }
+
+        // Create new load promise
+        const newLoadPromise = (async () => {
+          set({ isSyncing: true, lastSyncError: null });
+
+          try {
+            const portfolio = await portfolioService.getPortfolio();
+            const holdings: Holding[] = portfolio.holdings.map(h => ({
+              symbol: h.symbol,
+              name: h.name,
+              type: h.type,
+              quantity: h.quantity,
+              avgCost: h.avgCost,
+              currentPrice: h.currentPrice || h.avgCost,
+              dayPL: 0,
+            }));
+
+            set((state) => ({
+              isSyncing: false,
+              loadPromise: null,
+              userHoldings: {
+                ...state.userHoldings,
+                [currentUserId]: holdings
+              }
+            }));
+
+            console.log(`Loaded ${holdings.length} holdings from backend`);
+          } catch (error) {
+            console.error('Failed to load from backend:', error);
+            set({ isSyncing: false, loadPromise: null, lastSyncError: String(error) });
+            // Keep local data if backend fails
+          }
+        })();
+
+        // Store promise in state
+        set({ loadPromise: newLoadPromise });
+        return newLoadPromise;
       },
       
       // Sync all local holdings to backend

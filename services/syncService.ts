@@ -109,12 +109,13 @@ class RealTimeSyncService {
 
   /**
    * Connect to sync WebSocket endpoint
+   * SECURITY FIX: Token passed via subprotocol header instead of URL
    */
   private connectWebSocket(accessToken: string): void {
     // Note: This would connect to your actual sync WebSocket endpoint
     // For now, we use a polling fallback approach
     const wsUrl = config.api.syncEndpoint;
-    
+
     if (!wsUrl || wsUrl === 'undefined') {
       syncLogger.info('Sync WebSocket not configured, using polling fallback');
       this.startPollingSync();
@@ -122,8 +123,14 @@ class RealTimeSyncService {
     }
 
     try {
-      this.ws = new WebSocket(`${wsUrl}?token=${accessToken}&device=${this.deviceId}`);
-      
+      // SECURITY FIX: Pass token via WebSocket subprotocol instead of URL query parameter
+      // This prevents token from appearing in browser history and network logs
+      // Backend must read from Sec-WebSocket-Protocol header
+      this.ws = new WebSocket(`${wsUrl}?device=${this.deviceId}`, [
+        'finpulse.auth',
+        `Bearer.${accessToken}`
+      ]);
+
       this.ws.onopen = () => {
         syncLogger.info('📡 Sync WebSocket connected');
         this.reconnectAttempts = 0;
