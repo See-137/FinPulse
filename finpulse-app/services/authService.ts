@@ -56,7 +56,12 @@ interface OAuthCallbackResult {
  * Backend Lambda will handle tester account detection via Cognito groups
  */
 const INTERNAL_TESTER_EMAIL = import.meta.env.VITE_INTERNAL_TESTER_EMAIL || '';
-// Removed hardcoded tester config - now handled by backend via Cognito groups
+
+// Internal tester config for paywall bypass (email from env var)
+const INTERNAL_TESTER_CONFIG = {
+  email: INTERNAL_TESTER_EMAIL,
+  role: 'internal_tester' as const,
+};
 
 class AuthService {
   private cognitoUrl: string;
