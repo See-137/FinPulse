@@ -384,10 +384,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
           <div className="flex items-center gap-2 mb-3">
             <ShieldCheck className="w-4 h-4 text-[#00e5ff]" />
             <span className="text-[9px] font-black uppercase tracking-[0.25em] text-[#00e5ff]">
-              {user.plan} Mirror Node
+              {user.plan} Pulse Node
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter dark:text-white text-slate-900">Holdings Mirror</h1>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter dark:text-white text-slate-900">Holdings Pulse</h1>
           <div className="mt-2 flex items-center gap-4">
              <div className="flex flex-col">
                 <span className="text-[8px] font-black text-slate-500 uppercase">Usage</span>
@@ -500,18 +500,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                   <p className="text-slate-500 font-medium text-sm">No assets match your filters.</p>
                 </div>
               ) : (
-                <div className="card-surface rounded-[24px] overflow-x-auto border border-slate-200 dark:border-white/5">
-                  <table className="w-full text-left table-fixed min-w-[900px]">
+                <div className="card-surface rounded-[24px] overflow-hidden border border-slate-200 dark:border-white/5">
+                  <table className="w-full text-left table-fixed">
                       <thead>
                         <tr className="border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
                           {[
-                            { label: 'Asset', key: 'name', width: 'w-[18%]' },
-                            { label: 'Avg Cost', key: 'avgCost', width: 'w-[12%]' },
-                            { label: 'Price', key: 'marketPrice', width: 'w-[14%]' },
-                            { label: 'Qty', key: 'quantity', width: 'w-[10%]' },
-                            { label: 'Value', key: 'value', width: 'w-[12%]' },
-                            { label: '24h', key: 'dayPL', width: 'w-[8%]' },
-                            { label: 'Signal', key: 'signal', width: 'w-[26%]' }
+                            { label: 'Asset', key: 'name', width: 'w-[17%]' },
+                            { label: 'Avg Cost', key: 'avgCost', width: 'w-[11%]' },
+                            { label: 'Price', key: 'marketPrice', width: 'w-[11%]' },
+                            { label: 'Qty', key: 'quantity', width: 'w-[8%]' },
+                            { label: 'Value', key: 'value', width: 'w-[11%]' },
+                            { label: '24h', key: 'dayPL', width: 'w-[7%]' },
+                            { label: 'Signal', key: 'signal', width: 'w-[20%]' }
                           ].map((header) => (
                             <th 
                               key={header.key}
@@ -725,7 +725,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
       {isAddModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
            <div className="card-surface w-full max-w-lg rounded-[40px] p-8 animate-in zoom-in-95 duration-200 dark:text-white text-slate-900 shadow-2xl">
-             <h2 className="text-3xl font-black mb-2">{editingAsset ? 'Edit Mirror' : 'Mirror Asset'}</h2>
+             <h2 className="text-3xl font-black mb-2">{editingAsset ? 'Edit Asset' : 'Add Asset'}</h2>
              <p className="text-slate-500 text-sm mb-8">Node Capacity: {user.credits.maxAssets - holdings.length} slots remaining.</p>
              <form onSubmit={handleAddOrUpdateAsset} className="space-y-4">
                 <div className="grid grid-cols-3 gap-2 mb-4">

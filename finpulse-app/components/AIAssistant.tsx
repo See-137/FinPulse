@@ -239,7 +239,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
               <div className="w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-cyan-500/20">
                 <Sparkles className="w-8 h-8 text-cyan-400" />
               </div>
-              <p className="text-slate-400 text-sm font-bold mb-2">How can I assist your Mirror Node today?</p>
+              <p className="text-slate-400 text-sm font-bold mb-2">How can I assist your Pulse Node today?</p>
               <p className="text-slate-500 text-xs">Ask about markets, crypto, stocks, or economic trends</p>
             </div>
           )}

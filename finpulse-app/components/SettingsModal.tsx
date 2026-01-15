@@ -49,7 +49,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       <div className="card-surface w-full max-w-3xl rounded-[48px] p-10 overflow-hidden relative shadow-2xl animate-in fade-in zoom-in duration-300 dark:text-white text-slate-900">
         <button onClick={onClose} className="absolute right-8 top-8 p-3 text-slate-500 hover:text-[#00e5ff] bg-slate-100 dark:bg-white/5 rounded-full transition-colors"><X className="w-6 h-6"/></button>
         
-        <h2 className="text-4xl font-black mb-2">Mirror Settings</h2>
+        <h2 className="text-4xl font-black mb-2">Pulse Settings</h2>
         <p className="text-slate-500 mb-10">Manage node configuration and intelligence tier.</p>
 
         <div className="grid md:grid-cols-2 gap-10">
@@ -89,18 +89,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <div className="space-y-4">
-               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mirror Usage</h3>
+               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pulse Usage</h3>
                <div className="space-y-4">
                   <div className="space-y-1">
                      <div className="flex justify-between text-[10px] font-black uppercase text-slate-500">
-                        <span>AI Mirror Credits</span>
+                        <span>AI Pulse Credits</span>
                         <span>{user.credits.ai} / {user.credits.maxAi}</span>
                      </div>
                      <div className="h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-cyan-500" style={{ width: `${(user.credits.ai / user.credits.maxAi) * 100}%` }} /></div>
                   </div>
                   <div className="space-y-1">
                      <div className="flex justify-between text-[10px] font-black uppercase text-slate-500">
-                        <span>Mirror Slots</span>
+                        <span>Pulse Slots</span>
                         <span>{user.credits.assets} / {user.credits.maxAssets}</span>
                      </div>
                      <div className="h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: `${(user.credits.assets / user.credits.maxAssets) * 100}%` }} /></div>

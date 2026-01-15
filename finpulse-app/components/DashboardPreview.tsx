@@ -66,7 +66,7 @@ export const DashboardPreview: React.FC = () => {
       {/* Holdings Preview Mockup */}
       <div className="p-8 pt-2 flex-1 min-h-0 overflow-hidden">
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Key Mirror Holdings</h4>
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Key Pulse Holdings</h4>
           <span className="text-[10px] font-black text-cyan-400 hover:underline cursor-pointer">View All Assets</span>
         </div>
         <div className="space-y-3">
@@ -102,7 +102,7 @@ export const DashboardPreview: React.FC = () => {
         </div>
         <div className="p-4 flex flex-col items-center">
           <Wallet className="w-4 h-4 text-cyan-400 mb-1" />
-          <p className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">Mirror Active</p>
+          <p className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">Pulse Active</p>
         </div>
         <div className="p-4 flex flex-col items-center">
           <Shield className="w-4 h-4 text-slate-500 mb-1" />

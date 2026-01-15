@@ -155,7 +155,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       case 'confirm': return `We sent a code to ${email}`;
       case 'forgot': return 'Enter your email to reset';
       case 'reset': return 'Enter the code and new password';
-      default: return 'Access your private financial mirror';
+      default: return 'Access your private financial pulse';
     }
   };
 

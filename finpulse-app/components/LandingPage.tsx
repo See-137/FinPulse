@@ -63,7 +63,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
             <div className="flex-1 flex flex-col justify-center max-w-md mx-auto lg:mx-0">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-6 shrink-0 w-fit">
                 <Shield className="w-3 h-3" />
-                Institutional Wealth Mirror
+                Institutional Wealth Pulse
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter leading-[1] sm:leading-[0.95] mb-6 text-white" style={{ fontSize: 'clamp(2.5rem, 10vw, 4rem)' }}>
@@ -74,13 +74,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
             </h1>
 
             <p className="text-slate-400 text-base sm:text-lg mb-8 lg:mb-10 leading-relaxed font-medium">
-                Mirror your global assets in a precision, read-only environment. No custody risks. No brokerage links. Just the bottom line.
+                Track your global assets in a precision, read-only environment. No custody risks. No brokerage links. Just the bottom line.
             </p>
 
             <div className="card-surface p-6 sm:p-8 rounded-[24px] sm:rounded-[32px] border-white/5 shadow-2xl bg-[#151921]/50 backdrop-blur-xl mb-12">
                 <div className="flex items-center justify-between mb-6 sm:mb-8">
                 <div>
-                    <h3 className="text-white font-black text-lg sm:text-xl mb-1">{isSignUp ? 'Establish Mirror Node' : 'Connect Session'}</h3>
+                    <h3 className="text-white font-black text-lg sm:text-xl mb-1">{isSignUp ? 'Establish Pulse Node' : 'Connect Session'}</h3>
                     <p className="text-slate-500 text-[10px] sm:text-xs">{isSignUp ? 'Start your high-fidelity tracking' : 'Resume institutional monitoring'}</p>
                 </div>
                 </div>
@@ -88,7 +88,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                 {isSignUp && (
                     <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Mirror Identity</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Pulse Identity</label>
                     <div className="relative">
                         <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input 
@@ -155,14 +155,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                     <button 
                     type="submit"
                     disabled={isLoading}
-                    aria-label={isSignUp ? 'Establish mirror account' : 'Connect to existing session'}
+                    aria-label={isSignUp ? 'Establish pulse account' : 'Connect to existing session'}
                     className="w-full py-3.5 sm:py-4 bg-white text-[#0b0e14] font-black uppercase tracking-widest rounded-xl sm:rounded-2xl hover:bg-[#00e5ff] transition-all flex items-center justify-center shadow-lg gap-2 mt-4 text-[11px] sm:text-xs"
                     >
                     {isLoading ? (
                         <div className="w-5 h-5 border-2 border-[#0b0e14]/20 border-t-[#0b0e14] rounded-full animate-spin"></div>
                     ) : (
                         <>
-                        {isSignUp ? 'Establish Mirror' : 'Connect Session'}
+                        {isSignUp ? 'Establish Pulse' : 'Connect Session'}
                         <ArrowRight className="w-4 h-4" />
                         </>
                     )}
@@ -194,7 +194,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
 
                 <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/5 text-center">
                 <p className="text-slate-500 text-[10px] sm:text-xs font-medium">
-                    {isSignUp ? 'Already have a mirror?' : "First time here?"}{' '}
+                    {isSignUp ? 'Already have a pulse?' : "First time here?"}{' '}
                     <button 
                     onClick={() => setIsSignUp(!isSignUp)}
                     aria-label={isSignUp ? 'Switch to sign in' : 'Switch to sign up'}
@@ -257,7 +257,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 <TrendingUp className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[10px] font-black uppercase text-slate-500 leading-none mb-1">Mirror Gain</p>
+                <p className="text-[10px] font-black uppercase text-slate-500 leading-none mb-1">Pulse Gain</p>
                 <p className="text-sm font-black text-emerald-400 leading-none">+$28,450.00</p>
               </div>
             </div>
@@ -269,7 +269,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 <Zap className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[10px] font-black uppercase text-slate-500 leading-none mb-1">Mirror Health</p>
+                <p className="text-[10px] font-black uppercase text-slate-500 leading-none mb-1">Pulse Health</p>
                 <p className="text-sm font-black text-blue-400 leading-none">99.9% Latency</p>
               </div>
             </div>

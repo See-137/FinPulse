@@ -12,7 +12,7 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     tracesSampleRate: import.meta.env.MODE === 'production' ? 0.1 : 1.0,
     debug: import.meta.env.MODE !== 'production',
     integrations: [
-      new Sentry.Replay({
+      Sentry.replayIntegration({
         maskAllText: true,
         blockAllMedia: true,
       }),

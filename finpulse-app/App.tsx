@@ -20,7 +20,6 @@ const LandingPageShowcase = lazy(() => import('./components/LandingPageShowcase'
 const WelcomePage = lazy(() => import('./components/WelcomePage').then(m => ({ default: m.WelcomePage })));
 const AdminPortal = lazy(() => import('./components/AdminPortal').then(m => ({ default: m.AdminPortal })));
 const PricingModal = lazy(() => import('./components/PricingModal').then(m => ({ default: m.PricingModal })));
-const DebugPanel = lazy(() => import('./components/DebugPanel').then(m => ({ default: m.DebugPanel })));
 const ChangelogModal = lazy(() => import('./components/ChangelogModal').then(m => ({ default: m.ChangelogModal })));
 const OnboardingFlow = lazy(() => import('./components/OnboardingFlow').then(m => ({ default: m.OnboardingFlow })));
 const MilestoneModal = lazy(() => import('./components/MilestoneModal').then(m => ({ default: m.MilestoneModal })));
@@ -36,7 +35,7 @@ import { useChangelog } from './components/ChangelogModal';
 import { useOnboarding } from './components/OnboardingFlow';
 import { milestoneService } from './services/milestoneService';
 import { Milestone } from './types/notifications';
-import { Shield, LayoutGrid, Users, Menu, X, Terminal, Star, Globe, Check, Database } from 'lucide-react';
+import { Shield, LayoutGrid, Users, Menu, X, Terminal, Star, Globe, Check } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
 import { auth, type CognitoUser } from './services/authService';
 import { LanguageProvider, useLanguage, type Language } from './i18n';
@@ -105,7 +104,6 @@ const AppContent: React.FC = () => {
   const [isNewsSidebarOpen, setIsNewsSidebarOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
-  const [isDebugOpen, setIsDebugOpen] = useState(false);
   
   // Track user creation date for onboarding logic
   const [userCreatedAt, setUserCreatedAt] = useState<string | undefined>(undefined);
@@ -194,44 +192,55 @@ const AppContent: React.FC = () => {
     localStorage.removeItem('finpulse_cognito_user');
   };
 
-  // Restore session from Cognito (proper auth flow)
+  // Auth initialization state
+  const [isAuthInitializing, setIsAuthInitializing] = useState(true);
+
+  // Restore session from Cognito (proper auth flow with async token refresh)
   useEffect(() => {
     const restoreAuth = async () => {
-      const cognitoUser = auth.getCurrentUser();
-      if (!cognitoUser) {
-        return; // No session to restore
-      }
+      setIsAuthInitializing(true);
       
-      const idToken = localStorage.getItem('finpulse_id_token');
-      if (!idToken) {
-        // Partial session state - clean it up
-        clearAuthData();
-        return;
-      }
-      
-      // Check if token is expired before making API call
-      if (isTokenExpired(idToken)) {
-        clearAuthData();
-        return;
-      }
-      
-      api.setIdToken(idToken);
-      
-      // Create User object from Cognito credentials + backend data
       try {
+        // Use new async initializeAuth that properly waits for token refresh
+        const cognitoUser = await auth.initializeAuth();
+        
+        if (!cognitoUser) {
+          console.log('[App] No valid session to restore');
+          setIsAuthInitializing(false);
+          return; // No session to restore - stay on landing
+        }
+        
+        const idToken = localStorage.getItem('finpulse_id_token');
+        if (!idToken) {
+          // Partial session state - clean it up
+          console.log('[App] Partial session state, cleaning up');
+          clearAuthData();
+          setIsAuthInitializing(false);
+          return;
+        }
+        
+        // Token is already validated and refreshed by initializeAuth
+        api.setIdToken(idToken);
+        
+        // Create User object from Cognito credentials + backend data
         const result = await fetchUserProfile(cognitoUser.userId);
         if (result) {
+          console.log('[App] Session restored for user:', result.user.email);
           setUser(result.user);
           setUserCreatedAt(result.createdAt);
           setCurrentUser(result.user.id);
           setView('dashboard');
         } else {
           // Profile fetch returned null (401/error handled inside)
+          console.log('[App] Profile fetch failed, clearing auth');
           clearAuthData();
         }
       } catch (error) {
         // Auth error - clear and stay on landing
+        console.error('[App] Auth restoration error:', error);
         clearAuthData();
+      } finally {
+        setIsAuthInitializing(false);
       }
     };
     restoreAuth();
@@ -530,6 +539,18 @@ const AppContent: React.FC = () => {
     </Suspense>
   );
 
+  // Show loading spinner while restoring auth session
+  if (isAuthInitializing) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#0b0e14]">
+        <div className="text-center">
+          <div className="w-12 h-12 border-2 border-[#00e5ff]/20 border-t-[#00e5ff] rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white text-sm">Restoring session...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'landing') {
     // Default to Showcase unless explicitly disabled
     const showcaseDisabled = (import.meta as any)?.env?.VITE_LANDING_SHOWCASE === 'false';
@@ -644,9 +665,6 @@ const AppContent: React.FC = () => {
             </div>
 
             <NotificationBell userPlan={user?.plan || 'FREE'} onNavigate={handleNavigate} />
-            <button onClick={() => setIsDebugOpen(true)} aria-label="Open debug panel" className="p-2 text-slate-500 hover:text-amber-400 transition-all" title="Debug Panel - Asset Recovery">
-              <Database className="w-5 h-5" aria-hidden="true" />
-            </button>
             <button onClick={() => setIsAdminOpen(true)} aria-label="Open admin portal" className="p-2 text-slate-500 hover:text-[#00e5ff] transition-all">
               <Terminal className="w-5 h-5" aria-hidden="true" />
             </button>
@@ -726,14 +744,6 @@ const AppContent: React.FC = () => {
         />
       </Suspense>
 
-      <Suspense fallback={null}>
-        <DebugPanel
-          isOpen={isDebugOpen}
-          onClose={() => setIsDebugOpen(false)}
-          currentUserId={user?.id || null}
-        />
-      </Suspense>
-
       {user && (
         <Suspense fallback={null}>
           <PricingModal
@@ -745,9 +755,11 @@ const AppContent: React.FC = () => {
         </Suspense>
       )}
 
-      <Suspense fallback={null}>
-        <AIAssistant user={user!} onUpdateUsage={(credits) => setUser(u => u ? {...u, credits: {...u.credits, ai: credits}} : null)} />
-      </Suspense>
+      {user && (
+        <Suspense fallback={null}>
+          <AIAssistant user={user} onUpdateUsage={(credits) => setUser(u => u ? {...u, credits: {...u.credits, ai: credits}} : null)} />
+        </Suspense>
+      )}
 
       {/* Notification & Onboarding Overlays */}
       {showChangelog && currentChangelog && (

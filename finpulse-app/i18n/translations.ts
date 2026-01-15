@@ -9,7 +9,7 @@ export const translations = {
   en: {
     // Navigation
     nav: {
-      mirror: 'Mirror',
+      mirror: 'Live Pulse',
       watchlist: 'Watchlist',
       community: 'Community',
       settings: 'Settings',
@@ -36,9 +36,9 @@ export const translations = {
       logout: 'Logout',
     },
     
-    // Portfolio/Mirror
+    // Portfolio/Pulse
     portfolio: {
-      title: 'Your Mirror',
+      title: 'Your Pulse',
       subtitle: 'Real-time tracking of your digital wealth',
       addAsset: 'Add Asset',
       totalValue: 'Total Value',
@@ -75,7 +75,7 @@ export const translations = {
       empty: 'Your Watchlist is Empty',
       emptyDesc: 'Add assets to your watchlist to track their prices without adding them to your portfolio.',
       addFirst: 'Add Your First Asset',
-      addToMirror: 'Add to Mirror',
+      addToMirror: 'Add to Pulse',
       priceAlert: 'Price Alert',
       setAlert: 'Set Alert',
       removeAlert: 'Remove Alert',
@@ -168,7 +168,7 @@ export const translations = {
     // Pricing Modal
     pricing: {
       title: 'Choose Your Plan',
-      subtitle: 'Unlock powerful features to maximize your mirror',
+      subtitle: 'Unlock powerful features to maximize your pulse',
       popular: 'Most Popular',
       currentPlan: 'Current Plan',
       month: 'month',
@@ -206,7 +206,7 @@ export const translations = {
       next: 'Next',
       getStarted: 'Get Started',
       welcomeDesc: 'Track your crypto, stocks, and commodities in one beautiful dashboard with real-time prices.',
-      yourMirror: 'Your Mirror',
+      yourMirror: 'Your Pulse',
       dashboardDesc: 'Track all your assets with real-time prices, performance metrics, and AI-powered insights.',
       searchAssets: 'Search for any asset...',
       addAssetDesc: 'Choose from 35+ popular assets or search thousands more from our database.',
@@ -239,7 +239,7 @@ export const translations = {
   he: {
     // Navigation
     nav: {
-      mirror: 'מראה',
+      mirror: 'פעימה חיה',
       watchlist: 'רשימת מעקב',
       community: 'קהילה',
       settings: 'הגדרות',
@@ -266,9 +266,9 @@ export const translations = {
       logout: 'התנתק',
     },
     
-    // Portfolio/Mirror
+    // Portfolio/Pulse
     portfolio: {
-      title: 'המראה שלך',
+      title: 'הפעימה שלך',
       subtitle: 'מעקב בזמן אמת אחר העושר הדיגיטלי שלך',
       addAsset: 'הוסף נכס',
       totalValue: 'שווי כולל',
@@ -305,7 +305,7 @@ export const translations = {
       empty: 'רשימת המעקב שלך ריקה',
       emptyDesc: 'הוסף נכסים לרשימת המעקב כדי לעקוב אחר המחירים שלהם מבלי להוסיף אותם לתיק.',
       addFirst: 'הוסף את הנכס הראשון שלך',
-      addToMirror: 'הוסף למראה',
+      addToMirror: 'הוסף לפעימה',
       priceAlert: 'התראת מחיר',
       setAlert: 'קבע התראה',
       removeAlert: 'הסר התראה',
@@ -398,7 +398,7 @@ export const translations = {
     // Pricing Modal
     pricing: {
       title: 'בחר את התוכנית שלך',
-      subtitle: 'פתח תכונות חזקות כדי למקסם את המראה שלך',
+      subtitle: 'פתח תכונות חזקות כדי למקסם את הפעימה שלך',
       popular: 'הכי פופולרי',
       currentPlan: 'תוכנית נוכחית',
       month: 'חודש',
@@ -436,7 +436,7 @@ export const translations = {
       next: 'הבא',
       getStarted: 'בואו נתחיל',
       welcomeDesc: 'עקוב אחר הקריפטו, המניות והסחורות שלך בדשבורד יפה אחד עם מחירים בזמן אמת.',
-      yourMirror: 'המראה שלך',
+      yourMirror: 'הפעימה שלך',
       dashboardDesc: 'עקוב אחר כל הנכסים שלך עם מחירים בזמן אמת, מדדי ביצועים ותובנות מונעות AI.',
       searchAssets: 'חפש כל נכס...',
       addAssetDesc: 'בחר מ-35+ נכסים פופולריים או חפש אלפים נוספים ממסד הנתונים שלנו.',
