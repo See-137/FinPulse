@@ -45,6 +45,7 @@ export default [
         FormData: 'readonly',
         WebSocket: 'readonly',
         // TypeScript DOM types
+        AbortController: 'readonly',
         HTMLElement: 'readonly',
         HTMLDivElement: 'readonly',
         HTMLInputElement: 'readonly',
