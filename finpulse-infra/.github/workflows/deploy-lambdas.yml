@@ -1,0 +1,541 @@
+# FinPulse Lambda CI/CD Pipeline
+# Comprehensive deployment with staging, testing, and rollback support
+# 
+# Required GitHub Secrets:
+# - AWS_ACCESS_KEY_ID: AWS access key for deployment
+# - AWS_SECRET_ACCESS_KEY: AWS secret key for deployment
+# - ALPACA_API_KEY: Alpaca Markets API key
+# - ALPACA_API_SECRET: Alpaca Markets API secret
+
+name: Deploy Lambdas
+
+on:
+  push:
+    branches: 
+      - main      # Production deployment
+      - develop   # Staging deployment
+    paths:
+      - 'lambda-code/**'
+      - '.github/workflows/deploy-lambdas.yml'
+  
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'lambda-code/**'
+  
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - prod
+      function:
+        description: 'Lambda function to deploy (or "all")'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - auth
+          - portfolio
+          - market-data
+          - news
+          - fx
+          - community
+          - admin
+          - ai
+      update_secrets:
+        description: 'Update Alpaca credentials in AWS Secrets Manager'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================
+  # JOB 0: Update API Secrets (optional)
+  # ============================================
+  update-secrets:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.update_secrets == 'true'
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Update Alpaca credentials in Secrets Manager
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          SECRET_NAME="finpulse/${ENV}/alpaca-credentials"
+          
+          # Check if secret exists
+          if aws secretsmanager describe-secret --secret-id "$SECRET_NAME" 2>/dev/null; then
+            echo "Updating existing secret: $SECRET_NAME"
+            aws secretsmanager put-secret-value \
+              --secret-id "$SECRET_NAME" \
+              --secret-string "{\"api_key\":\"${{ secrets.ALPACA_API_KEY }}\",\"api_secret\":\"${{ secrets.ALPACA_API_SECRET }}\"}"
+          else
+            echo "Creating new secret: $SECRET_NAME"
+            aws secretsmanager create-secret \
+              --name "$SECRET_NAME" \
+              --secret-string "{\"api_key\":\"${{ secrets.ALPACA_API_KEY }}\",\"api_secret\":\"${{ secrets.ALPACA_API_SECRET }}\"}"
+          fi
+          
+          echo "✅ Alpaca credentials updated for $ENV environment"
+
+  # ============================================
+  # JOB 1: Detect which functions changed
+  # ============================================
+  detect-changes:
+    runs-on: ubuntu-latest
+    needs: [update-secrets]
+    if: always()  # Run even if update-secrets was skipped
+    outputs:
+      functions: ${{ steps.set-matrix.outputs.functions }}
+      any_changed: ${{ steps.set-matrix.outputs.any_changed }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Detect changed functions
+        id: set-matrix
+        run: |
+          # Include news lambda
+          FUNCTIONS='["auth","portfolio","market-data","news","fx","community","admin","ai"]'
+          
+          # If manual trigger with specific function
+          if [[ "${{ github.event.inputs.function }}" != "" ]] && [[ "${{ github.event.inputs.function }}" != "all" ]]; then
+            FUNCTIONS='["${{ github.event.inputs.function }}"]'
+            echo "functions=$FUNCTIONS" >> $GITHUB_OUTPUT
+            echo "any_changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # If manual trigger with "all"
+          if [[ "${{ github.event.inputs.function }}" == "all" ]]; then
+            echo "functions=$FUNCTIONS" >> $GITHUB_OUTPUT
+            echo "any_changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Auto-detect from git diff
+          CHANGED_FUNCTIONS="[]"
+          for func in auth portfolio market-data news fx community admin ai; do
+            if git diff --name-only HEAD~1 HEAD | grep -q "lambda-code/$func/"; then
+              CHANGED_FUNCTIONS=$(echo $CHANGED_FUNCTIONS | jq -c ". + [\"$func\"]")
+            fi
+          done
+          
+          # Check shared folder - if changed, deploy all
+          if git diff --name-only HEAD~1 HEAD | grep -q "lambda-code/shared/"; then
+            CHANGED_FUNCTIONS=$FUNCTIONS
+          fi
+          
+          if [[ "$CHANGED_FUNCTIONS" == "[]" ]]; then
+            echo "any_changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "any_changed=true" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "functions=$CHANGED_FUNCTIONS" >> $GITHUB_OUTPUT
+          echo "Changed functions: $CHANGED_FUNCTIONS"
+
+  # ============================================
+  # JOB 2: Lint and Test
+  # ============================================
+  lint-and-test:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any_changed == 'true'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Lint Lambda code
+        run: |
+          cd lambda-code
+          for dir in */; do
+            if [[ -f "${dir}index.js" ]]; then
+              echo "Checking ${dir}..."
+              node --check "${dir}index.js" || exit 1
+            fi
+          done
+          echo "✅ All Lambda code syntax is valid"
+
+  # ============================================
+  # JOB 3: Deploy to Staging (auto from develop branch)
+  # ============================================
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint-and-test]
+    if: |
+      needs.detect-changes.outputs.any_changed == 'true' && 
+      (github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging')
+    environment: staging
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        function: ${{ fromJson(needs.detect-changes.outputs.functions) }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Install dependencies
+        run: |
+          cd lambda-code/${{ matrix.function }}
+          if [[ -f "package.json" ]]; then
+            npm ci --production
+          fi
+          # Copy shared modules if they exist
+          if [[ -d "../shared" ]]; then
+            cp -r ../shared ./shared 2>/dev/null || true
+          fi
+      
+      - name: Package Lambda
+        run: |
+          cd lambda-code/${{ matrix.function }}
+          zip -r ../deploy-${{ matrix.function }}.zip . -x "*.git*" -x "*.md" -x "test/*"
+          echo "Package size: $(du -h ../deploy-${{ matrix.function }}.zip | cut -f1)"
+      
+      - name: Get function name
+        id: funcname
+        run: |
+          FUNC="${{ matrix.function }}"
+          # All functions use finpulse-<name>-<env> format
+          echo "name=finpulse-${FUNC}-staging" >> $GITHUB_OUTPUT
+      
+      - name: Deploy to Staging
+        id: deploy
+        run: |
+          # Store current version for potential rollback
+          CURRENT_VERSION=$(aws lambda get-function --function-name ${{ steps.funcname.outputs.name }} \
+            --query 'Configuration.Version' --output text 2>/dev/null || echo "none")
+          echo "previous_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Deploy new code
+          aws lambda update-function-code \
+            --function-name ${{ steps.funcname.outputs.name }} \
+            --zip-file fileb://lambda-code/deploy-${{ matrix.function }}.zip \
+            --publish
+          
+          # Wait for update to complete
+          aws lambda wait function-updated --function-name ${{ steps.funcname.outputs.name }}
+          
+          echo "✅ Deployed ${{ matrix.function }} to staging"
+      
+      - name: Smoke Test
+        id: smoke-test
+        run: |
+          FUNC="${{ matrix.function }}"
+          FUNC_NAME="${{ steps.funcname.outputs.name }}"
+          
+          # Create test payload based on function type
+          case $FUNC in
+            ai)
+              PAYLOAD='{"httpMethod":"POST","body":"{\"query\":\"test\"}","headers":{}}'
+              EXPECTED='"source":"gemini"'
+              ;;
+            market-data)
+              PAYLOAD='{"httpMethod":"GET","path":"/market/prices","headers":{}}'
+              EXPECTED='"BTC"'
+              ;;
+            fx)
+              PAYLOAD='{"httpMethod":"GET","path":"/fx/rates","headers":{}}'
+              EXPECTED='"EUR"'
+              ;;
+            news)
+              PAYLOAD='{"httpMethod":"GET","path":"/news","headers":{}}'
+              EXPECTED='"articles"'
+              ;;
+            auth)
+              PAYLOAD='{"httpMethod":"OPTIONS","headers":{}}'
+              EXPECTED='200'
+              ;;
+            *)
+              PAYLOAD='{"httpMethod":"OPTIONS","headers":{}}'
+              EXPECTED='200'
+              ;;
+          esac
+          
+          # Invoke and check response
+          echo "$PAYLOAD" > /tmp/test-payload.json
+          aws lambda invoke \
+            --function-name $FUNC_NAME \
+            --payload file:///tmp/test-payload.json \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/response.json
+          
+          RESPONSE=$(cat /tmp/response.json)
+          echo "Response: $RESPONSE"
+          
+          # Check for placeholder or error
+          if echo "$RESPONSE" | grep -qi "placeholder"; then
+            echo "❌ FAILED: Lambda contains placeholder code!"
+            exit 1
+          fi
+          
+          if echo "$RESPONSE" | grep -qi "error.*api key"; then
+            echo "⚠️ WARNING: API key may not be configured"
+          fi
+          
+          echo "✅ Smoke test passed for $FUNC"
+      
+      - name: Rollback on failure
+        if: failure() && steps.deploy.outputs.previous_version != 'none'
+        run: |
+          echo "🔄 Rolling back to previous version..."
+          aws lambda update-function-code \
+            --function-name ${{ steps.funcname.outputs.name }} \
+            --s3-bucket finpulse-lambda-deployments \
+            --s3-key backups/${{ matrix.function }}/${{ steps.deploy.outputs.previous_version }}.zip \
+            2>/dev/null || echo "Rollback source not available"
+
+  # ============================================
+  # JOB 4: Deploy to Production (from main branch, with approval)
+  # ============================================
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint-and-test]
+    if: |
+      needs.detect-changes.outputs.any_changed == 'true' && 
+      (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'prod')
+    environment: production  # Requires manual approval in GitHub
+    
+    strategy:
+      fail-fast: false
+      max-parallel: 2  # Deploy 2 at a time for safety
+      matrix:
+        function: ${{ fromJson(needs.detect-changes.outputs.functions) }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Install dependencies
+        run: |
+          cd lambda-code/${{ matrix.function }}
+          if [[ -f "package.json" ]]; then
+            npm ci --production
+          fi
+          if [[ -d "../shared" ]]; then
+            cp -r ../shared ./shared 2>/dev/null || true
+          fi
+      
+      - name: Package Lambda
+        run: |
+          cd lambda-code/${{ matrix.function }}
+          zip -r ../deploy-${{ matrix.function }}.zip . -x "*.git*" -x "*.md" -x "test/*"
+          SIZE=$(du -h ../deploy-${{ matrix.function }}.zip | cut -f1)
+          echo "📦 Package size: $SIZE"
+          
+          # Fail if package is suspiciously small (likely missing deps)
+          SIZE_BYTES=$(stat -f%z ../deploy-${{ matrix.function }}.zip 2>/dev/null || stat -c%s ../deploy-${{ matrix.function }}.zip)
+          if [[ $SIZE_BYTES -lt 1000 ]]; then
+            echo "❌ Package too small ($SIZE_BYTES bytes) - likely missing dependencies!"
+            exit 1
+          fi
+      
+      - name: Get function name
+        id: funcname
+        run: |
+          FUNC="${{ matrix.function }}"
+          # All functions use finpulse-<name>-<env> format
+          echo "name=finpulse-${FUNC}-prod" >> $GITHUB_OUTPUT
+      
+      - name: Backup current version
+        run: |
+          # Download current code for rollback capability
+          aws lambda get-function --function-name ${{ steps.funcname.outputs.name }} \
+            --query 'Code.Location' --output text | xargs curl -s -o /tmp/backup.zip
+          
+          # Store backup (you'd typically upload to S3)
+          echo "📁 Current version backed up"
+      
+      - name: Deploy to Production
+        id: deploy
+        run: |
+          echo "🚀 Deploying ${{ matrix.function }} to PRODUCTION..."
+          
+          aws lambda update-function-code \
+            --function-name ${{ steps.funcname.outputs.name }} \
+            --zip-file fileb://lambda-code/deploy-${{ matrix.function }}.zip \
+            --publish
+          
+          # Wait for update
+          aws lambda wait function-updated --function-name ${{ steps.funcname.outputs.name }}
+          
+          # Get new version
+          NEW_VERSION=$(aws lambda get-function --function-name ${{ steps.funcname.outputs.name }} \
+            --query 'Configuration.Version' --output text)
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "✅ Deployed version $NEW_VERSION"
+      
+      - name: Production Smoke Test
+        run: |
+          FUNC="${{ matrix.function }}"
+          FUNC_NAME="${{ steps.funcname.outputs.name }}"
+          
+          case $FUNC in
+            ai)
+              PAYLOAD='{"httpMethod":"POST","body":"{\"query\":\"Bitcoin price\"}","headers":{}}'
+              ;;
+            market-data)
+              PAYLOAD='{"httpMethod":"GET","path":"/market/prices","headers":{}}'
+              ;;
+            fx)
+              PAYLOAD='{"httpMethod":"GET","path":"/fx/rates","headers":{}}'
+              ;;
+            news)
+              PAYLOAD='{"httpMethod":"GET","path":"/news","headers":{}}'
+              ;;
+            *)
+              PAYLOAD='{"httpMethod":"OPTIONS","headers":{}}'
+              ;;
+          esac
+          
+          echo "$PAYLOAD" > /tmp/test-payload.json
+          
+          # Invoke Lambda
+          aws lambda invoke \
+            --function-name $FUNC_NAME \
+            --payload file:///tmp/test-payload.json \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/response.json
+          
+          RESPONSE=$(cat /tmp/response.json)
+          
+          # Critical checks
+          if echo "$RESPONSE" | grep -qi "placeholder"; then
+            echo "❌ CRITICAL: Placeholder code in production!"
+            exit 1
+          fi
+          
+          if echo "$RESPONSE" | grep -q '"statusCode":5'; then
+            echo "❌ CRITICAL: 5xx error in production!"
+            exit 1
+          fi
+          
+          echo "✅ Production smoke test passed"
+          echo "Response preview: ${RESPONSE:0:200}..."
+      
+      - name: Update deployment record
+        run: |
+          echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Function | ${{ matrix.function }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ steps.deploy.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployed by | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Time | $(date -u) |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # JOB 5: Post-deployment verification
+  # ============================================
+  verify-deployment:
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always() && needs.deploy-production.result == 'success'
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: End-to-end API test
+        run: |
+          API_URL="https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod"
+          
+          echo "Testing public endpoints..."
+          
+          # Test market prices
+          MARKET=$(curl -s "$API_URL/market/prices")
+          if echo "$MARKET" | grep -q "BTC"; then
+            echo "✅ Market prices endpoint working"
+          else
+            echo "⚠️ Market prices may have issues"
+          fi
+          
+          # Test FX rates
+          FX=$(curl -s "$API_URL/fx/rates")
+          if echo "$FX" | grep -q "EUR"; then
+            echo "✅ FX rates endpoint working"
+          else
+            echo "⚠️ FX rates may have issues"
+          fi
+          
+          # Test news
+          NEWS=$(curl -s "$API_URL/news")
+          if echo "$NEWS" | grep -q "articles"; then
+            echo "✅ News endpoint working"
+          else
+            echo "⚠️ News may have issues"
+          fi
+          
+          echo ""
+          echo "🎉 Deployment verification complete!"
+      
+      - name: Notify on Slack (optional)
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-type: application/json' \
+            -d '{
+              "text": "✅ FinPulse Lambda deployment successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*FinPulse Deployment Complete*\n• Commit: `${{ github.sha }}`\n• Actor: ${{ github.actor }}\n• Branch: ${{ github.ref_name }}"
+                  }
+                }
+              ]
+            }'

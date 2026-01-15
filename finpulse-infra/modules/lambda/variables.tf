@@ -1,0 +1,80 @@
+# Lambda Module Variables
+
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment (dev, staging, prod)"
+  type        = string
+}
+
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+}
+
+variable "lambda_architecture" {
+  description = "Lambda architecture (arm64 or x86_64)"
+  type        = string
+  default     = "arm64"
+}
+
+variable "log_retention_days" {
+  description = "CloudWatch log retention in days"
+  type        = number
+  default     = 7
+}
+
+# VPC Configuration
+variable "private_subnet_ids" {
+  description = "Private subnet IDs for Lambda VPC config"
+  type        = list(string)
+}
+
+variable "lambda_security_group_id" {
+  description = "Security group ID for Lambda"
+  type        = string
+}
+
+# Dependencies
+variable "cognito_user_pool_id" {
+  description = "Cognito User Pool ID"
+  type        = string
+}
+
+variable "redis_endpoint" {
+  description = "Redis endpoint"
+  type        = string
+}
+
+variable "secret_arns" {
+  description = "Map of secret ARNs"
+  type        = map(string)
+}
+
+# Feature flags
+variable "enable_ai_service" {
+  description = "Enable AI service Lambda"
+  type        = bool
+  default     = false
+}
+
+variable "enable_news_service" {
+  description = "Enable News service Lambda"
+  type        = bool
+  default     = true
+}
+
+variable "enable_community_service" {
+  description = "Enable Community service Lambda"
+  type        = bool
+  default     = true
+}
+
+variable "tags" {
+  description = "Tags to apply to resources"
+  type        = map(string)
+  default     = {}
+}
