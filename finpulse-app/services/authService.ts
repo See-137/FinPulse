@@ -63,21 +63,63 @@ const INTERNAL_TESTER_CONFIG = {
   role: 'internal_tester' as const,
 };
 
+// Auth state change callback type
+type AuthStateCallback = (user: CognitoUser | null) => void;
+
 class AuthService {
   private cognitoUrl: string;
   private clientId: string;
   private currentUser: CognitoUser | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
   private useSecureCookies: boolean;
+  private authStateCallbacks: Set<AuthStateCallback> = new Set();
+  private isRestoringSession: boolean = false;
+  private sessionRestorePromise: Promise<CognitoUser | null> | null = null;
 
   constructor() {
     this.cognitoUrl = `https://cognito-idp.${config.cognito.region}.amazonaws.com`;
     this.clientId = config.cognito.clientId;
     this.useSecureCookies = TOKEN_STORAGE_MODE === 'cookie';
-    this.restoreSession();
+    // Don't restore session in constructor - let App.tsx call it explicitly
+    // to avoid race conditions
   }
 
   // ============== Public Methods ==============
+
+  /**
+   * Subscribe to auth state changes
+   * Returns unsubscribe function
+   */
+  onAuthStateChange(callback: AuthStateCallback): () => void {
+    this.authStateCallbacks.add(callback);
+    return () => this.authStateCallbacks.delete(callback);
+  }
+
+  /**
+   * Notify all subscribers of auth state change
+   */
+  private notifyAuthStateChange(user: CognitoUser | null): void {
+    this.authStateCallbacks.forEach(cb => cb(user));
+  }
+
+  /**
+   * Initialize auth service and restore session if available
+   * Returns a promise that resolves when session restoration is complete
+   */
+  async initializeAuth(): Promise<CognitoUser | null> {
+    if (this.sessionRestorePromise) {
+      return this.sessionRestorePromise;
+    }
+    this.sessionRestorePromise = this.restoreSessionAsync();
+    return this.sessionRestorePromise;
+  }
+
+  /**
+   * Check if session restoration is in progress
+   */
+  isInitializing(): boolean {
+    return this.isRestoringSession;
+  }
 
   async signUp(email: string, password: string, name: string): Promise<AuthResult> {
     try {
@@ -205,11 +247,18 @@ class AuthService {
     localStorage.removeItem('finpulse_user');
     localStorage.removeItem('finpulse_id_token');
     api.setAccessToken(null);
+    api.setIdToken(null);
     
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
       this.refreshTimer = null;
     }
+    
+    // Reset session restore state
+    this.sessionRestorePromise = null;
+    
+    // Notify subscribers of logout
+    this.notifyAuthStateChange(null);
   }
 
   async forgotPassword(email: string): Promise<AuthResult> {
@@ -784,53 +833,83 @@ class AuthService {
     }
   }
 
-  private restoreSession(): void {
+  /**
+   * Async session restoration with proper token refresh handling
+   * Returns the restored user or null if no valid session
+   */
+  private async restoreSessionAsync(): Promise<CognitoUser | null> {
+    if (this.isRestoringSession) {
+      console.log('[Auth] Session restoration already in progress');
+      return this.sessionRestorePromise;
+    }
+    
+    this.isRestoringSession = true;
+    
     try {
       const tokensJson = localStorage.getItem('finpulse_auth_tokens');
       const userJson = localStorage.getItem('finpulse_user');
       const idToken = localStorage.getItem('finpulse_id_token');
 
       // Require all three to be present for valid session
-      if (tokensJson && userJson && idToken) {
-        const tokens: AuthTokens = JSON.parse(tokensJson);
-        const user: CognitoUser = JSON.parse(userJson);
-
-        // Check if idToken is expired by decoding JWT
-        if (this.isTokenExpired(tokens.idToken)) {
-          console.log('[Auth] Stored token expired, attempting refresh...');
-          // Try to refresh the token
-          this.refreshTokens(tokens.refreshToken).catch((err) => {
-            console.error('[Auth] Token refresh failed during session restore:', err);
-            console.log('[Auth] Clearing invalid session');
-            this.signOut();
-          });
-          return;
-        }
-
-        console.log('[Auth] Restoring valid session for user:', user.email);
-        this.currentUser = user;
-        api.setIdToken(tokens.idToken); // Use idToken, not accessToken
-
-        // Calculate remaining time from JWT exp claim instead of using original expiresIn
-        const remainingSeconds = this.getTokenRemainingTime(tokens.idToken);
-        if (remainingSeconds > 0) {
-          console.log(`[Auth] Token valid for ${remainingSeconds} seconds, scheduling refresh`);
-          this.scheduleRefresh(remainingSeconds, tokens.refreshToken);
-        } else {
-          // Token about to expire, refresh immediately
-          console.log('[Auth] Token about to expire, refreshing immediately');
-          this.refreshTokens(tokens.refreshToken).catch((err) => {
-            console.error('[Auth] Immediate token refresh failed:', err);
-            this.signOut();
-          });
-        }
-      } else {
+      if (!tokensJson || !userJson || !idToken) {
         console.log('[Auth] No valid session found in localStorage');
+        this.isRestoringSession = false;
+        return null;
       }
+
+      const tokens: AuthTokens = JSON.parse(tokensJson);
+      const user: CognitoUser = JSON.parse(userJson);
+
+      // Check if idToken is expired by decoding JWT
+      if (this.isTokenExpired(tokens.idToken)) {
+        console.log('[Auth] Stored token expired, attempting refresh...');
+        try {
+          // Await the token refresh - this is the key fix!
+          await this.refreshTokens(tokens.refreshToken);
+          console.log('[Auth] Token refresh successful during session restore');
+          this.isRestoringSession = false;
+          this.notifyAuthStateChange(this.currentUser);
+          return this.currentUser;
+        } catch (err) {
+          console.error('[Auth] Token refresh failed during session restore:', err);
+          console.log('[Auth] Clearing invalid session');
+          await this.signOut();
+          this.isRestoringSession = false;
+          return null;
+        }
+      }
+
+      console.log('[Auth] Restoring valid session for user:', user.email);
+      this.currentUser = user;
+      api.setIdToken(tokens.idToken); // Use idToken, not accessToken
+
+      // Calculate remaining time from JWT exp claim instead of using original expiresIn
+      const remainingSeconds = this.getTokenRemainingTime(tokens.idToken);
+      if (remainingSeconds > 0) {
+        console.log(`[Auth] Token valid for ${remainingSeconds} seconds, scheduling refresh`);
+        this.scheduleRefresh(remainingSeconds, tokens.refreshToken);
+      } else {
+        // Token about to expire, refresh immediately
+        console.log('[Auth] Token about to expire, refreshing immediately');
+        try {
+          await this.refreshTokens(tokens.refreshToken);
+        } catch (err) {
+          console.error('[Auth] Immediate token refresh failed:', err);
+          await this.signOut();
+          this.isRestoringSession = false;
+          return null;
+        }
+      }
+      
+      this.isRestoringSession = false;
+      this.notifyAuthStateChange(this.currentUser);
+      return this.currentUser;
     } catch (error) {
       console.error('[Auth] Error restoring session:', error);
       console.log('[Auth] Clearing corrupted session data');
-      this.signOut();
+      await this.signOut();
+      this.isRestoringSession = false;
+      return null;
     }
   }
 

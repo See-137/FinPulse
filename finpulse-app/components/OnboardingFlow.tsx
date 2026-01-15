@@ -32,7 +32,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: 'dashboard',
-    title: 'Your Portfolio Mirror',
+    title: 'Your Portfolio Pulse',
     description: 'See all your assets in one place with real-time prices and performance tracking.'
   },
   {

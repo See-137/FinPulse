@@ -44,7 +44,7 @@ const DashboardPreview = () => (
 const HoldingsPreview = () => (
   <div className="p-6 space-y-4">
     <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-black text-white">Holdings Mirror</h3>
+      <h3 className="text-lg font-black text-white">Holdings Pulse</h3>
       <span className="text-[10px] bg-[#00e5ff]/10 text-[#00e5ff] px-2 py-1 rounded-full font-bold">3 Assets</span>
     </div>
     <div className="space-y-3">
@@ -125,7 +125,7 @@ const SHOWCASE_ITEMS = [
   },
   {
     id: 'holdings',
-    title: 'Holdings Mirror',
+    title: 'Holdings Pulse',
     desc: 'Precision asset tracking with multi-currency support.',
     icon: Wallet,
     preview: HoldingsPreview
@@ -312,7 +312,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
 
   const getFormTitle = () => {
     switch (authMode) {
-      case 'signup': return 'Establish Mirror Node';
+      case 'signup': return 'Establish Pulse Node';
       case 'signin': return 'Connect Session';
       case 'confirm': return 'Verify Email';
       case 'forgot': return 'Reset Password';
@@ -342,7 +342,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
             <div className="flex-1 flex flex-col justify-center max-w-md mx-auto lg:mx-0">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-6 shrink-0 w-fit">
                 <Shield className="w-3 h-3" />
-                Institutional Wealth Mirror
+                Institutional Wealth Pulse
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter leading-[1] sm:leading-[0.95] mb-6 text-white" style={{ fontSize: 'clamp(2.5rem, 10vw, 4rem)' }}>
@@ -380,7 +380,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                 {/* Name Field (signup only) */}
                 {authMode === 'signup' && (
                     <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Mirror Identity</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Pulse Identity</label>
                     <div className="relative">
                         <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input 

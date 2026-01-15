@@ -25,7 +25,7 @@ const MOCK_POSTS: Post[] = [
     postId: '2',
     authorId: 'user2',
     authorName: 'CryptoWhale_01',
-    content: 'Mirroring an additional 2.5 $BTC today. The volatility is providing a perfect accumulation zone before the monthly close. #crypto #bitcoin',
+    content: 'Tracking an additional 2.5 $BTC today. The volatility is providing a perfect accumulation zone before the monthly close. #crypto #bitcoin',
     type: 'trade_idea',
     likes: 89,
     likedBy: [],
@@ -40,7 +40,7 @@ const MOCK_POSTS: Post[] = [
     postId: '3',
     authorId: 'user3',
     authorName: 'GoldStandard',
-    content: 'Rotating 15% of equity mirror into physical gold certificates. The hedge against currency devaluation remains paramount. #gold #hedge',
+    content: 'Rotating 15% of equity portfolio into physical gold certificates. The hedge against currency devaluation remains paramount. #gold #hedge',
     type: 'discussion',
     likes: 215,
     likedBy: [],
@@ -305,7 +305,7 @@ export const Community: React.FC = () => {
             <div className="space-y-6">
               {[
                 { name: 'Institutional_A', gain: '+45.2%', class: 'Crypto' },
-                { name: 'EquityMirror_99', gain: '+12.8%', class: 'Stocks' },
+                { name: 'EquityPulse_99', gain: '+12.8%', class: 'Stocks' },
                 { name: 'GlobalSafe', gain: '+4.5%', class: 'Commodities' }
               ].map((leader, i) => (
                 <div key={i} className="flex items-center justify-between group cursor-pointer">

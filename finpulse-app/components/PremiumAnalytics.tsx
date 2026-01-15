@@ -46,7 +46,7 @@ const generateHistoricalData = (holdings: Holding[], days: number = 30) => {
 // Calculate portfolio metrics
 const calculateMetrics = (holdings: Holding[], historicalData: any[]) => {
   const totalValue = holdings.reduce((sum, h) => sum + (h.currentPrice * h.quantity), 0);
-  const totalCost = holdings.reduce((sum, h) => sum + (h.avgBuyPrice * h.quantity), 0);
+  const totalCost = holdings.reduce((sum, h) => sum + ((h.avgCost || 0) * h.quantity), 0);
   const totalPnL = totalValue - totalCost;
   const pnlPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
   
