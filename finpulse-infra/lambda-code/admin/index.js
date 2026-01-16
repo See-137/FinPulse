@@ -69,8 +69,8 @@ async function getStats() {
   const tables = [
     `finpulse-users-${ENVIRONMENT}`,
     `finpulse-portfolios-${ENVIRONMENT}`,
-    `finpulse-community_posts-${ENVIRONMENT}`,
-    `finpulse-ai_queries-${ENVIRONMENT}`
+    `finpulse-community-posts-${ENVIRONMENT}`,
+    `finpulse-ai-queries-${ENVIRONMENT}`
   ];
 
   const stats = {};
@@ -151,7 +151,7 @@ async function getAIUsage(days = 7) {
     startDate.setDate(startDate.getDate() - days);
 
     const result = await docClient.send(new ScanCommand({
-      TableName: `finpulse-ai_queries-${ENVIRONMENT}`,
+      TableName: `finpulse-ai-queries-${ENVIRONMENT}`,
       FilterExpression: '#ts >= :startDate',
       ExpressionAttributeNames: { '#ts': 'timestamp' },
       ExpressionAttributeValues: { ':startDate': startDate.toISOString() }
