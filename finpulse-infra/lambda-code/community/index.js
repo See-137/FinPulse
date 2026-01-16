@@ -24,7 +24,7 @@ try {
 const dynamoClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
-const POSTS_TABLE = `finpulse-community_posts-${process.env.ENVIRONMENT}`;
+const POSTS_TABLE = `finpulse-community-posts-${process.env.ENVIRONMENT}`;
 const USERS_TABLE = `finpulse-users-${process.env.ENVIRONMENT}`;
 
 /**
