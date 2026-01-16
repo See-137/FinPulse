@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FinPulse News Service v2.0
  * Multi-provider news with fallback chain: GNews -> NewsAPI -> Static Fallback
  * Includes response caching to minimize API calls

@@ -19,12 +19,16 @@ const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 
 // Alpaca service (single source of truth)
-// Use relative path for local dev, flat path for Lambda deployment
+// Try multiple paths for Lambda deployment compatibility
 let alpacaService;
 try {
   alpacaService = require('./alpaca-service');
 } catch (e) {
-  alpacaService = require('../shared/alpaca-service');
+  try {
+    alpacaService = require('./shared/alpaca-service');
+  } catch (e2) {
+    alpacaService = require('../shared/alpaca-service');
+  }
 }
 
 // Multi-tier cache manager
@@ -34,19 +38,28 @@ try {
   console.log('Cache manager loaded successfully');
 } catch (e) {
   try {
-    cacheManager = require('../shared/cache-manager');
-    console.log('Cache manager loaded from shared');
+    cacheManager = require('./shared/cache-manager');
+    console.log('Cache manager loaded from ./shared');
   } catch (e2) {
-    console.log('Cache manager not available:', e2.message);
+    try {
+      cacheManager = require('../shared/cache-manager');
+      console.log('Cache manager loaded from ../shared');
+    } catch (e3) {
+      console.log('Cache manager not available:', e3.message);
+    }
   }
 }
 
 // Redis cache utility (fallback)
 let redisCache = null;
 try {
-  redisCache = require('../shared/redis-cache');
+  redisCache = require('./shared/redis-cache');
 } catch (e) {
-  console.log('Redis cache not available');
+  try {
+    redisCache = require('../shared/redis-cache');
+  } catch (e2) {
+    console.log('Redis cache not available');
+  }
 }
 
 // Initialize DynamoDB
