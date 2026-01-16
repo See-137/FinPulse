@@ -774,16 +774,15 @@ class AuthService {
   private storeSession(tokens: AuthTokens, user: CognitoUser): void {
     this.currentUser = user;
     
+    // Always store session locally for session restoration
+    // This is needed because restoreSessionAsync() checks localStorage
+    this.storeSessionLocally(tokens, user);
+    
     if (this.useSecureCookies) {
-      // Store tokens via httpOnly cookies (server-side)
+      // Also store tokens via httpOnly cookies (server-side) for enhanced security
       this.setSecureTokens(tokens).catch(err => {
-        console.error('Failed to set secure cookies, falling back to localStorage:', err);
-        this.storeSessionLocally(tokens, user);
+        console.error('Failed to set secure cookies (local storage already set):', err);
       });
-      // Still store user info locally (non-sensitive)
-      localStorage.setItem('finpulse_user', JSON.stringify(user));
-    } else {
-      this.storeSessionLocally(tokens, user);
     }
   }
 
