@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FinPulse FX Service v2.0
  * Static exchange rates (updated periodically)
  * 
@@ -104,7 +104,7 @@ exports.handler = async (event) => {
   
   const headers = {
     'Content-Type': 'application/json',
-    process.env.ALLOWED_ORIGIN || 'https://finpulse.me',
+    'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://finpulse.me',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     'Access-Control-Allow-Methods': 'GET,OPTIONS'
   };
