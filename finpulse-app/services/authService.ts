@@ -860,8 +860,13 @@ class AuthService {
       const tokens: AuthTokens = JSON.parse(tokensJson);
       const user: CognitoUser = JSON.parse(userJson);
 
+      console.log('[Auth] Found stored session for:', user.email);
+
       // Check if idToken is expired by decoding JWT
-      if (this.isTokenExpired(tokens.idToken)) {
+      const isExpired = this.isTokenExpired(tokens.idToken);
+      console.log('[Auth] Token expired:', isExpired);
+      
+      if (isExpired) {
         console.log('[Auth] Stored token expired, attempting refresh...');
         try {
           // Await the token refresh - this is the key fix!
@@ -971,19 +976,18 @@ class AuthService {
         api.setIdToken(tokens.idToken);
         this.scheduleRefresh(tokens.expiresIn, refreshToken);
       } else {
-        // Refresh failed - log details and sign out
-        console.warn('[Auth] Token refresh failed:', {
+        // Refresh failed - log details and throw error (caller will handle signOut)
+        const errorInfo = {
           status: response.status,
           error: data.__type || data.message || 'Unknown error',
           code: data.code
-        });
-        console.log('[Auth] Session expired - signing out user');
-        await this.signOut();
+        };
+        console.warn('[Auth] Token refresh failed:', errorInfo);
+        throw new Error(`Token refresh failed: ${errorInfo.error}`);
       }
     } catch (error) {
-      console.error('[Auth] Token refresh network error:', error);
-      console.log('[Auth] Network error during token refresh - signing out user');
-      await this.signOut();
+      console.error('[Auth] Token refresh error:', error);
+      throw error; // Re-throw so caller can handle
     }
   }
 

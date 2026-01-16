@@ -388,16 +388,26 @@ const AppContent: React.FC = () => {
   const fetchUserProfile = async (userId: string): Promise<{ user: User; createdAt?: string } | null> => {
     try {
       const idToken = localStorage.getItem('finpulse_id_token');
-      if (!idToken) return null;
+      if (!idToken) {
+        console.log('[App] fetchUserProfile: No idToken in localStorage');
+        return null;
+      }
 
       const apiUrl = import.meta.env.VITE_API_URL || 'https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod';
+      console.log('[App] fetchUserProfile: Calling', `${apiUrl}/auth/me`);
       const response = await fetch(`${apiUrl}/auth/me`, {
         headers: { 'Authorization': `Bearer ${idToken}` },
       });
       
-      if (!response.ok) return null;
+      if (!response.ok) {
+        console.error('[App] fetchUserProfile: API returned', response.status, response.statusText);
+        const errorBody = await response.text().catch(() => 'Could not read error body');
+        console.error('[App] fetchUserProfile: Error body:', errorBody);
+        return null;
+      }
       
       const data = await response.json();
+      console.log('[App] fetchUserProfile: Got user data', data);
       const backendUser = data.data || data;
       
       // Map backend plan to frontend plan type
@@ -409,6 +419,7 @@ const AppContent: React.FC = () => {
         email: backendUser.email,
         name: backendUser.name,
         plan: frontendPlan,
+        userRole: backendUser.userRole || 'user',
         credits: {
           ai: backendUser.credits?.ai || 0,
           maxAi: backendUser.credits?.maxAi || SaaS_PLANS[frontendPlan].maxAiQueries,
@@ -590,24 +601,24 @@ const AppContent: React.FC = () => {
         <MarketTicker currency={currency} />
         <TopBanner userPlan={user?.plan || 'FREE'} onNavigate={handleNavigate} />
         
-        <nav className="h-20 flex-shrink-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#0b0e14]/50 backdrop-blur-md z-20 transition-colors">
-          <div className="flex items-center gap-4 sm:gap-8 overflow-hidden">
+        <nav className="h-20 flex-shrink-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#0b0e14]/50 backdrop-blur-md z-20 transition-colors gap-2">
+          <div className="flex items-center gap-4 sm:gap-8 overflow-hidden min-w-0">
             <Logo className="h-6 sm:h-8 shrink-0" />
             
-            <div className="hidden md:flex items-center bg-slate-100 dark:bg-[#151921] p-1 rounded-2xl border border-slate-200 dark:border-white/5 shrink-0 transition-colors">
-               <button onClick={() => setActiveTab('portfolio')} aria-label="View portfolio" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'portfolio' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
+            <div className="hidden lg:flex items-center bg-slate-100 dark:bg-[#151921] p-1 rounded-2xl border border-slate-200 dark:border-white/5 transition-colors">
+               <button onClick={() => setActiveTab('portfolio')} aria-label="View portfolio" className={`px-3 xl:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5 xl:gap-2 transition-all whitespace-nowrap ${activeTab === 'portfolio' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
                  <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> {t('nav.mirror')}
                </button>
-               <button onClick={() => setActiveTab('watchlist')} aria-label="View watchlist" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'watchlist' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
+               <button onClick={() => setActiveTab('watchlist')} aria-label="View watchlist" className={`px-3 xl:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5 xl:gap-2 transition-all whitespace-nowrap ${activeTab === 'watchlist' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
                  <Star className="w-3.5 h-3.5" aria-hidden="true" /> {t('nav.watchlist')}
                </button>
-               <button onClick={() => setActiveTab('community')} aria-label="View community" className={`px-4 sm:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${activeTab === 'community' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
+               <button onClick={() => setActiveTab('community')} aria-label="View community" className={`px-3 xl:px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5 xl:gap-2 transition-all whitespace-nowrap ${activeTab === 'community' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20' : 'text-slate-500'}`}>
                  <Users className="w-3.5 h-3.5" aria-hidden="true" /> {t('nav.community')}
                </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 shrink-0">
             {/* Language Toggle */}
             <div className="flex bg-slate-100 dark:bg-[#151921] rounded-xl p-1 border border-slate-200 dark:border-white/10">
                <button 
@@ -665,9 +676,12 @@ const AppContent: React.FC = () => {
             </div>
 
             <NotificationBell userPlan={user?.plan || 'FREE'} onNavigate={handleNavigate} />
-            <button onClick={() => setIsAdminOpen(true)} aria-label="Open admin portal" className="p-2 text-slate-500 hover:text-[#00e5ff] transition-all">
-              <Terminal className="w-5 h-5" aria-hidden="true" />
-            </button>
+            {/* Admin portal only visible to admin users */}
+            {user?.userRole === 'admin' && (
+              <button onClick={() => setIsAdminOpen(true)} aria-label="Open admin portal" className="p-2 text-slate-500 hover:text-[#00e5ff] transition-all">
+                <Terminal className="w-5 h-5" aria-hidden="true" />
+              </button>
+            )}
             <button aria-label={`Current plan: ${user?.plan} Node`} className={`px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${user?.plan !== 'FREE' ? 'border-cyan-500/50 text-cyan-400' : 'border-slate-200 dark:border-white/10 text-slate-500'}`}>
               {user?.plan} {t('nav.node')}
             </button>

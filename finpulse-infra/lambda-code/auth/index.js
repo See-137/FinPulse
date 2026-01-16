@@ -171,6 +171,13 @@ function getUserFromEvent(event) {
  * Get or create user profile in DynamoDB
  */
 async function getOrCreateUser(cognitoUser) {
+  // Define internal tester emails upfront for both new and existing user checks
+  const INTERNAL_TESTER_EMAILS = [
+    'tester@finpulse.internal',
+    'realsee137@gmail.com',
+    process.env.INTERNAL_TESTER_EMAIL
+  ].filter(Boolean);
+  
   const result = await docClient.send(new GetCommand({
     TableName: USERS_TABLE,
     Key: { userId: cognitoUser.userId }
@@ -179,8 +186,13 @@ async function getOrCreateUser(cognitoUser) {
   if (result.Item) {
     const existingUser = result.Item;
     
+    // Check if this is an internal tester who needs upgrade
+    const isInternalTester = INTERNAL_TESTER_EMAILS.includes(existingUser.email);
+    const needsTesterUpgrade = isInternalTester && existingUser.plan !== 'SUPERPULSE';
+    
     // Check if user needs to be updated (bad name or email from previous bug)
     const needsUpdate = 
+      needsTesterUpgrade ||
       (existingUser.email === 'unknown@finpulse.me' && cognitoUser.email) ||
       (existingUser.name === existingUser.userId && cognitoUser.name) ||
       (existingUser.name && existingUser.name.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i));
@@ -188,14 +200,25 @@ async function getOrCreateUser(cognitoUser) {
     if (needsUpdate) {
       // Derive proper name from email
       const derivedName = cognitoUser.email 
-        ? cognitoUser.email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        ? cognitoUser.email.split('@')[0].replace(/[._-]/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase())
         : existingUser.name;
       
       const updatedUser = {
         ...existingUser,
         email: cognitoUser.email || existingUser.email,
         name: cognitoUser.name || derivedName || existingUser.name,
-        lastLogin: new Date().toISOString()
+        lastLogin: new Date().toISOString(),
+        // Upgrade internal testers to SUPERPULSE
+        ...(needsTesterUpgrade && {
+          plan: 'SUPERPULSE',
+          userRole: 'internal_tester',
+          credits: {
+            ai: existingUser.credits?.ai || 0,
+            maxAi: 9999,
+            assets: existingUser.credits?.assets || 0,
+            maxAssets: 9999
+          }
+        })
       };
       
       await docClient.send(new PutCommand({
@@ -203,6 +226,7 @@ async function getOrCreateUser(cognitoUser) {
         Item: updatedUser
       }));
       
+      console.log(`[Auth] Updated user ${existingUser.userId}: testerUpgrade=${needsTesterUpgrade}`);
       return updatedUser;
     }
     
@@ -213,8 +237,8 @@ async function getOrCreateUser(cognitoUser) {
   // Handle case where email might be null (access token instead of ID token)
   const emailName = cognitoUser.email ? cognitoUser.email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
   
-  // Check if this is the internal tester account
-  const isInternalTester = cognitoUser.email === 'tester@finpulse.internal';
+  // Check if this is an internal tester account (reuses INTERNAL_TESTER_EMAILS from above)
+  const isInternalTester = INTERNAL_TESTER_EMAILS.includes(cognitoUser.email);
   
   const newUser = {
     userId: cognitoUser.userId,
