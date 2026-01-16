@@ -168,6 +168,11 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Debug log to confirm component is rendering
+  useEffect(() => {
+    console.log('[AIAssistant] Component mounted for user:', user?.email);
+  }, [user?.email]);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {

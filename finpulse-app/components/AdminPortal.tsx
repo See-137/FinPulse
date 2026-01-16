@@ -39,7 +39,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose, user,
         <div className="flex justify-between items-center mb-8">
            <div className="flex items-center gap-3">
               <ShieldAlert className="w-6 h-6 text-rose-500" />
-              <h2 className="text-xl font-black uppercase text-white">SaaS Debug Terminal</h2>
+              <h2 className="text-xl font-black uppercase text-white">Admin Portal</h2>
            </div>
            <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full"><X className="w-5 h-5"/></button>
         </div>
@@ -70,7 +70,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose, user,
                 <RefreshCw className="w-4 h-4" /> Reset Daily AI Credits
               </button>
               <button onClick={onClose} className="w-full py-4 text-slate-500 font-black uppercase tracking-widest text-[10px]">
-                Exit Debug Mode
+                Close
               </button>
            </div>
         </div>
