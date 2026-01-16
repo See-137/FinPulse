@@ -56,9 +56,10 @@ Format responses with clear sections using markdown. Be concise but thorough.`;
 exports.handler = async (event) => {
   const headers = {
     'Content-Type': 'application/json',
-    process.env.ALLOWED_ORIGIN || 'https://finpulse.me',
+    'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://finpulse.me',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
+    'Access-Control-Allow-Methods': 'POST,OPTIONS',
+    'Access-Control-Allow-Credentials': 'true'
   };
 
   // Handle CORS preflight
