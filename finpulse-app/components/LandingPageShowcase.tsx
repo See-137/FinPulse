@@ -149,7 +149,7 @@ const SHOWCASE_ITEMS = [
 ];
 
 export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogin, initialError }) => {
-  const [authMode, setAuthMode] = useState<AuthMode>('signin');
+  const [authMode, setAuthMode] = useState<AuthMode>('signup');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -367,8 +367,8 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
 
   const getFormTitle = () => {
     switch (authMode) {
-      case 'signup': return 'Establish Pulse Node';
-      case 'signin': return 'Connect Session';
+      case 'signup': return 'Start Your Pulse';
+      case 'signin': return 'Check Your Pulse';
       case 'confirm': return 'Verify Email';
       case 'forgot': return 'Reset Password';
       case 'reset': return 'New Password';
@@ -377,8 +377,8 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
 
   const getFormSubtitle = () => {
     switch (authMode) {
-      case 'signup': return 'Start your high-fidelity tracking';
-      case 'signin': return 'Access your portfolio dashboard';
+      case 'signup': return 'Track all your assets in one place - free';
+      case 'signin': return 'Welcome back to your portfolio dashboard';
       case 'confirm': return 'Enter the code sent to your email';
       case 'forgot': return 'Enter your email to receive reset code';
       case 'reset': return 'Enter code and new password';
@@ -623,8 +623,8 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                         </div>
                     ) : (
                         <>
-                        {authMode === 'signup' && 'Create Free Account'}
-                        {authMode === 'signin' && 'Sign In'}
+                        {authMode === 'signup' && 'Start Tracking Free'}
+                        {authMode === 'signin' && 'Check My Pulse'}
                         {authMode === 'confirm' && 'Verify Email'}
                         {authMode === 'forgot' && 'Send Reset Code'}
                         {authMode === 'reset' && 'Reset Password'}
@@ -681,35 +681,47 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                   </div>
                 )}
 
-                {/* Navigation Links */}
-                <div className="mt-4 text-center space-y-2">
+                {/* Mode Toggle - Prominent */}
+                <div className="mt-6 text-center space-y-3">
                    {authMode === 'signin' && (
                      <>
-                       <button onClick={() => { setAuthMode('signup'); clearMessages(); }} className="text-[#00e5ff] text-[10px] font-black uppercase tracking-widest hover:underline block w-full">
-                         New User? Create Account
-                       </button>
-                       <button onClick={() => { setAuthMode('forgot'); clearMessages(); }} className="text-slate-500 text-[10px] font-medium hover:text-slate-300 block w-full">
+                       <div className="flex items-center gap-2 justify-center">
+                         <span className="text-slate-500 text-sm">New to FinPulse?</span>
+                         <button
+                           onClick={() => { setAuthMode('signup'); clearMessages(); }}
+                           className="text-[#00e5ff] text-sm font-bold hover:underline transition-all hover:scale-105"
+                         >
+                           Start Tracking Free →
+                         </button>
+                       </div>
+                       <button onClick={() => { setAuthMode('forgot'); clearMessages(); }} className="text-slate-500 text-xs font-medium hover:text-slate-300 block w-full">
                          Forgot password?
                        </button>
                      </>
                    )}
                    {authMode === 'signup' && (
-                     <button onClick={() => { setAuthMode('signin'); clearMessages(); }} className="text-[#00e5ff] text-[10px] font-black uppercase tracking-widest hover:underline">
-                       Already have an account? Sign In
-                     </button>
+                     <div className="flex items-center gap-2 justify-center">
+                       <span className="text-slate-500 text-sm">Already tracking?</span>
+                       <button
+                         onClick={() => { setAuthMode('signin'); clearMessages(); }}
+                         className="text-[#00e5ff] text-sm font-bold hover:underline transition-all hover:scale-105"
+                       >
+                         Check Your Pulse →
+                       </button>
+                     </div>
                    )}
                    {authMode === 'confirm' && (
                      <>
-                       <button onClick={handleResendCode} disabled={isLoading} className="text-[#00e5ff] text-[10px] font-black uppercase tracking-widest hover:underline block w-full">
+                       <button onClick={handleResendCode} disabled={isLoading} className="text-[#00e5ff] text-sm font-bold hover:underline block w-full">
                          Resend Code
                        </button>
-                       <button onClick={() => { setAuthMode('signin'); clearMessages(); }} className="text-slate-500 text-[10px] font-medium hover:text-slate-300 block w-full">
+                       <button onClick={() => { setAuthMode('signin'); clearMessages(); }} className="text-slate-500 text-xs font-medium hover:text-slate-300 block w-full">
                          Back to Sign In
                        </button>
                      </>
                    )}
                    {(authMode === 'forgot' || authMode === 'reset') && (
-                     <button onClick={() => { setAuthMode('signin'); clearMessages(); }} className="text-slate-500 text-[10px] font-medium hover:text-slate-300">
+                     <button onClick={() => { setAuthMode('signin'); clearMessages(); }} className="text-slate-500 text-xs font-medium hover:text-slate-300">
                        Back to Sign In
                      </button>
                    )}
