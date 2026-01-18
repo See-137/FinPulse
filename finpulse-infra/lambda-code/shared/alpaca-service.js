@@ -486,6 +486,8 @@ const KNOWN_CRYPTO = new Set([
   'LDO', 'RPL', 'FXS', 'ALGO', 'HBAR', 'VET', 'FIL', 'THETA', 'EOS', 'XTZ',
   'FLOW', 'SAND', 'MANA', 'AXS', 'GALA', 'IMX', 'BCH', 'ETC', 'TON', 'TRX',
   'KAS', 'GRT', 'RUNE', 'STX', 'NOT', 'ORDI',
+  // Additional crypto
+  'ICP', 'LAVA', 'DN',
 ]);
 
 /**
