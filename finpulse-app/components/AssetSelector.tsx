@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, ChevronDown, Bitcoin, TrendingUp, Gem, Loader2 } from 'lucide-react';
 import { useLanguage } from '../i18n';
 import { componentLogger } from '../services/logger';
+import { config } from '../config';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
 
@@ -115,44 +116,66 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
       try {
         // Search CoinGecko for crypto (free, no key required)
         if (searchingForCrypto) {
-          const cryptoResponse = await fetch(
-            `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(search)}`
-          );
-          const cryptoData = await cryptoResponse.json();
-          
-          const cryptoResults: Asset[] = (cryptoData.coins || [])
-            .slice(0, 10)
-            .map((coin: any) => ({
-              symbol: coin.symbol.toUpperCase(),
-              name: coin.name,
-              type: 'CRYPTO' as AssetType,
-            }));
+          try {
+            const cryptoResponse = await fetch(
+              `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(search)}`
+            );
+            const cryptoData = await cryptoResponse.json();
+            
+            const cryptoResults: Asset[] = (cryptoData.coins || [])
+              .slice(0, 10)
+              .map((coin: any) => ({
+                symbol: coin.symbol.toUpperCase(),
+                name: coin.name,
+                type: 'CRYPTO' as AssetType,
+              }));
 
-          results.push(...cryptoResults);
-        }
-
-        // For stocks: Allow any valid ticker symbol (user can type custom tickers)
-        // Stock symbols are typically 1-5 uppercase letters
-        if (searchingForStock) {
-          const upperSearch = search.toUpperCase().trim();
-          const isValidTicker = /^[A-Z]{1,5}$/.test(upperSearch);
-          
-          // Check if this stock already exists in popular assets
-          const existsInPopular = POPULAR_ASSETS.some(
-            a => a.type === 'STOCK' && a.symbol === upperSearch
-          );
-          
-          // Add as custom stock entry if it's a valid ticker and not in popular list
-          if (isValidTicker && !existsInPopular && !excludeSymbols.includes(upperSearch)) {
-            results.push({
-              symbol: upperSearch,
-              name: `${upperSearch} Stock`,
-              type: 'STOCK' as AssetType,
-            });
+            results.push(...cryptoResults);
+          } catch (cryptoError) {
+            componentLogger.warn('CoinGecko search failed:', cryptoError);
           }
         }
 
-        // For commodities: Similar approach
+        // Search stocks via Alpaca (real stock data)
+        if (searchingForStock) {
+          try {
+            const stockResponse = await fetch(
+              `${config.apiUrl}/market/search?q=${encodeURIComponent(search)}&type=stock&limit=15`
+            );
+            const stockData = await stockResponse.json();
+            
+            if (stockData.success && Array.isArray(stockData.data)) {
+              const stockResults: Asset[] = stockData.data
+                .filter((stock: any) => !excludeSymbols.includes(stock.symbol))
+                .map((stock: any) => ({
+                  symbol: stock.symbol,
+                  name: stock.name,
+                  type: 'STOCK' as AssetType,
+                }));
+              
+              results.push(...stockResults);
+            }
+          } catch (stockError) {
+            componentLogger.warn('Stock search failed:', stockError);
+            // Fallback: allow manual ticker entry if API fails
+            const upperSearch = search.toUpperCase().trim();
+            const isValidTicker = /^[A-Z]{1,5}$/.test(upperSearch);
+            if (isValidTicker && !excludeSymbols.includes(upperSearch)) {
+              const existsInPopular = POPULAR_ASSETS.some(
+                a => a.type === 'STOCK' && a.symbol === upperSearch
+              );
+              if (!existsInPopular) {
+                results.push({
+                  symbol: upperSearch,
+                  name: `${upperSearch} Stock`,
+                  type: 'STOCK' as AssetType,
+                });
+              }
+            }
+          }
+        }
+
+        // For commodities: Allow manual entry (no API available)
         if (searchingForCommodity) {
           const upperSearch = search.toUpperCase().trim();
           const isValidSymbol = /^[A-Z]{2,10}$/.test(upperSearch);
@@ -333,7 +356,7 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
               {(!filterTypes || filterTypes.includes('CRYPTO')) 
                 ? `${t('assetSelector.searchPoweredBy')} CoinGecko`
                 : filterTypes.includes('STOCK')
-                ? t('assetSelector.typeStockTicker', 'Type any stock ticker symbol')
+                ? `${t('assetSelector.searchPoweredBy')} Alpaca`
                 : t('assetSelector.typeCommoditySymbol', 'Type any commodity symbol')}
             </div>
           )}
