@@ -1,11 +1,12 @@
 
-import React from 'react';
-import { X, CreditCard, Sparkles, Check, ChevronRight, Moon, Sun, Monitor, Palette, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, CreditCard, Sparkles, Check, ChevronRight, Moon, Sun, Monitor, Palette, LogOut, Download, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { User, PlanType, Theme } from '../types';
 import { SaaS_PLANS } from '../constants';
 import { auth } from '../services/authService';
 import { redirectToCustomerPortal } from '../services/stripeService';
 import { componentLogger } from '../services/logger';
+import { config } from '../config';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -28,6 +29,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onThemeChange,
   onLogout
 }) => {
+  const [isExporting, setIsExporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
   const handleLogout = async () => {
     await auth.signOut();
     onLogout();
@@ -39,6 +45,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       await redirectToCustomerPortal(user.id);
     } catch (error) {
       componentLogger.error('Failed to open billing portal:', error);
+    }
+  };
+
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const token = localStorage.getItem('finpulse_id_token');
+      const response = await fetch(`${config.apiUrl}/auth/export-data`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) throw new Error('Export failed');
+      
+      const data = await response.json();
+      const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `finpulse-data-${user.email}-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      componentLogger.error('Failed to export data:', error);
+      alert('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') return;
+    
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('finpulse_id_token');
+      const response = await fetch(`${config.apiUrl}/auth/account`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) throw new Error('Delete failed');
+      
+      // Sign out and redirect
+      await auth.signOut();
+      onLogout();
+      onClose();
+      alert('Your account has been deleted. Thank you for using FinPulse.');
+    } catch (error) {
+      componentLogger.error('Failed to delete account:', error);
+      alert('Failed to delete account. Please contact support.');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -137,6 +196,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                    <CreditCard className="w-4 h-4" /> Billing Portal
                 </button>
                 <button 
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                  className="flex items-center gap-3 text-slate-500 hover:text-emerald-400 text-xs font-black uppercase tracking-widest disabled:opacity-50"
+                >
+                   {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Export My Data
+                </button>
+                <button 
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-3 text-slate-500 hover:text-red-400 text-xs font-black uppercase tracking-widest"
+                >
+                   <Trash2 className="w-4 h-4" /> Delete Account
+                </button>
+                <button 
                   onClick={handleLogout}
                   className="flex items-center gap-3 text-slate-500 hover:text-red-400 text-xs font-black uppercase tracking-widest w-full"
                 >
@@ -145,6 +217,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
              </div>
           </div>
         </div>
+
+        {/* Delete Account Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+            <div className="bg-white dark:bg-[#151921] p-8 rounded-3xl max-w-md w-full shadow-2xl border border-red-500/20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
+                </div>
+                <h3 className="text-xl font-black text-red-500">Delete Account</h3>
+              </div>
+              
+              <p className="text-sm text-slate-500 mb-4">
+                This action is <span className="text-red-400 font-bold">permanent and irreversible</span>. 
+                All your data including portfolios, watchlists, and AI history will be deleted.
+              </p>
+              
+              <p className="text-sm text-slate-500 mb-4">
+                A copy of your data will be downloaded before deletion.
+              </p>
+              
+              <div className="mb-6">
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest block mb-2">
+                  Type DELETE to confirm
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="DELETE"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-mono focus:border-red-500 focus:outline-none"
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
+                  className="flex-1 py-3 text-slate-500 font-bold text-sm hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+                  className="flex-1 py-3 bg-red-500 text-white font-bold text-sm rounded-xl hover:bg-red-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  Delete Forever
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
