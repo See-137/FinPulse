@@ -20,6 +20,19 @@ try {
   };
 }
 
+// Redis cache for distributed rate limiting
+let redisCache;
+try {
+  redisCache = require('./shared/redis-cache');
+  console.log('Redis cache loaded for distributed rate limiting');
+} catch {
+  // Fallback if redis-cache module not available
+  redisCache = {
+    checkRateLimit: async () => ({ allowed: true, remaining: 100, resetIn: 60 })
+  };
+  console.log('Redis cache not available, using fallback');
+}
+
 // Initialize clients
 const dynamoClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
@@ -384,16 +397,16 @@ exports.handler = async (event) => {
 
     // POST /community/posts - Create post
     if (path.endsWith('/posts') && method === 'POST') {
-      // Rate limit check
-      const rateLimit = validation.checkRateLimit(user.userId, 'create_post', 10, 60000);
+      // Rate limit check using Redis for distributed limiting
+      const rateLimit = await redisCache.checkRateLimit(`${user.userId}:create_post`, 10, 60);
       if (!rateLimit.allowed) {
         return {
           statusCode: 429,
-          headers: { ...corsHeaders, 'Retry-After': String(rateLimit.retryAfter) },
+          headers: { ...corsHeaders, 'Retry-After': String(rateLimit.resetIn) },
           body: JSON.stringify({ 
             success: false, 
             error: 'Rate limit exceeded. Please try again later.',
-            retryAfter: rateLimit.retryAfter
+            retryAfter: rateLimit.resetIn
           })
         };
       }
@@ -437,16 +450,16 @@ exports.handler = async (event) => {
     if (path.includes('/comments') && method === 'POST') {
       const postId = pathParams.postId || path.split('/')[path.split('/').indexOf('posts') + 1];
 
-      // Rate limit check
-      const rateLimit = validation.checkRateLimit(user.userId, 'add_comment', 30, 60000);
+      // Rate limit check using Redis for distributed limiting
+      const rateLimit = await redisCache.checkRateLimit(`${user.userId}:add_comment`, 30, 60);
       if (!rateLimit.allowed) {
         return {
           statusCode: 429,
-          headers: { ...corsHeaders, 'Retry-After': String(rateLimit.retryAfter) },
+          headers: { ...corsHeaders, 'Retry-After': String(rateLimit.resetIn) },
           body: JSON.stringify({ 
             success: false, 
             error: 'Rate limit exceeded. Please try again later.',
-            retryAfter: rateLimit.retryAfter
+            retryAfter: rateLimit.resetIn
           })
         };
       }

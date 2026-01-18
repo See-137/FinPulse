@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Eye, Plus, Search, Trash2, Bell, BellOff, TrendingUp, TrendingDown,
   Bitcoin, Activity, Gem, Star, ArrowRight, X, Loader2, Wifi, WifiOff
