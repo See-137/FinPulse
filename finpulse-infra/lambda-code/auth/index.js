@@ -126,7 +126,7 @@ function decodeJwt(token) {
 }
 
 /**
- * Extract user from Cognito JWT
+ * Extract user from Cognito JWT (supports cookies, Authorization header, and API Gateway authorizer)
  */
 function getUserFromEvent(event) {
   // First try API Gateway authorizer claims (when using COGNITO_USER_POOLS)
@@ -140,8 +140,28 @@ function getUserFromEvent(event) {
     };
   }
   
-  // Fallback: Decode JWT from Authorization header
-  // (Used when auth endpoint has authorization = "NONE")
+  // Second: Try httpOnly cookies (preferred for security)
+  const cookieHeader = event.headers?.Cookie || event.headers?.cookie;
+  if (cookieHeader) {
+    const cookies = parseCookies(cookieHeader);
+    const idToken = cookies.finpulse_id_token;
+    if (idToken) {
+      const claims = decodeJwt(idToken);
+      if (claims && claims.sub) {
+        const email = claims.email || null;
+        const derivedName = email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
+        return {
+          userId: claims.sub,
+          email: email,
+          name: claims.name || derivedName || claims['cognito:username'] || claims.username,
+          emailVerified: claims.email_verified === 'true' || claims.email_verified === true
+        };
+      }
+    }
+  }
+  
+  // Third fallback: Decode JWT from Authorization header
+  // (Used when auth endpoint has authorization = "NONE" or for backward compatibility)
   const authHeader = event.headers?.Authorization || event.headers?.authorization;
   if (authHeader) {
     const claims = decodeJwt(authHeader);
