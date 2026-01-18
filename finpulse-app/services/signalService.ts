@@ -250,33 +250,99 @@ export function getAverageAccuracy(
 }
 
 /**
- * Create sample signals for testing/demo purposes
+ * Deterministic hash for consistent signals per symbol
  */
-export function createMockSignals(symbol: string): { whale: WhaleSignal; trade: TradeSignal; sentiment: SentimentSignal } {
+function hashSymbol(symbol: string): number {
+  let hash = 0;
+  for (let i = 0; i < symbol.length; i++) {
+    const char = symbol.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * Create varied signals for demo/display purposes
+ * Generates consistent but diverse signals based on symbol hash
+ * @param symbol Asset symbol
+ * @param priceChange24h Optional 24h price change percentage to influence signal direction
+ */
+export function createMockSignals(symbol: string, priceChange24h?: number): { whale: WhaleSignal; trade: TradeSignal; sentiment: SentimentSignal } {
   const now = Date.now();
+  const hash = hashSymbol(symbol);
+  
+  // Use hash to generate consistent pseudo-random values per symbol
+  const whaleBase = (hash % 40) + 45; // 45-84
+  const tradeBase = ((hash >> 4) % 40) + 40; // 40-79
+  const sentimentBase = ((hash >> 8) % 35) + 35; // 35-69
+  
+  // Determine directions based on hash and optional price change
+  const directions: SignalDirection[] = ['bullish', 'bearish', 'neutral'];
+  
+  let whaleDirection: SignalDirection;
+  let tradeDirection: SignalDirection;
+  let sentimentDirection: SignalDirection;
+  
+  if (priceChange24h !== undefined) {
+    // If price is up significantly, lean bullish
+    // If price is down significantly, lean bearish
+    const trend = priceChange24h > 2 ? 'bullish' : priceChange24h < -2 ? 'bearish' : 'neutral';
+    whaleDirection = priceChange24h > 3 ? 'bullish' : priceChange24h < -3 ? 'bearish' : directions[hash % 3];
+    tradeDirection = trend;
+    sentimentDirection = priceChange24h > 5 ? 'bullish' : priceChange24h < -5 ? 'bearish' : directions[(hash >> 2) % 3];
+  } else {
+    // Use hash for deterministic but varied signals
+    whaleDirection = directions[hash % 3];
+    tradeDirection = directions[(hash >> 2) % 3];
+    sentimentDirection = directions[(hash >> 4) % 3];
+  }
+  
+  // Activity types based on direction
+  const bullishActivities = ['accumulation', 'strong_accumulation', 'buying_pressure'];
+  const bearishActivities = ['distribution', 'selling_pressure', 'whale_exit'];
+  const neutralActivities = ['consolidation', 'mixed_signals', 'low_activity'];
+  
+  const activityMap = {
+    bullish: bullishActivities[hash % bullishActivities.length],
+    bearish: bearishActivities[hash % bearishActivities.length],
+    neutral: neutralActivities[hash % neutralActivities.length]
+  };
+  
+  // Technical patterns based on direction
+  const bullishPatterns = ['breakout', 'golden_cross', 'ascending_triangle', 'double_bottom'];
+  const bearishPatterns = ['breakdown', 'death_cross', 'descending_triangle', 'head_shoulders'];
+  const neutralPatterns = ['consolidation', 'range_bound', 'sideways', 'indecision'];
+  
+  const patternMap = {
+    bullish: bullishPatterns[hash % bullishPatterns.length],
+    bearish: bearishPatterns[hash % bearishPatterns.length],
+    neutral: neutralPatterns[hash % neutralPatterns.length]
+  };
+
   return {
     whale: {
       symbol,
-      direction: 'bullish',
-      score: 75,
-      activity: 'accumulation',
-      volumeIndicator: 125.5,
+      direction: whaleDirection,
+      score: whaleDirection === 'bullish' ? whaleBase + 10 : whaleDirection === 'bearish' ? 100 - whaleBase : whaleBase,
+      activity: activityMap[whaleDirection],
+      volumeIndicator: 80 + (hash % 100),
       timestamp: now,
     },
     trade: {
       symbol,
-      direction: 'bullish',
-      score: 70,
-      technicalPattern: 'breakout',
-      influencer: 'Technical Analyst',
+      direction: tradeDirection,
+      score: tradeDirection === 'bullish' ? tradeBase + 15 : tradeDirection === 'bearish' ? 100 - tradeBase : tradeBase,
+      technicalPattern: patternMap[tradeDirection],
+      influencer: 'Market Analysis',
       timestamp: now,
     },
     sentiment: {
       symbol,
-      direction: 'neutral',
-      score: 55,
+      direction: sentimentDirection,
+      score: sentimentDirection === 'bullish' ? sentimentBase + 20 : sentimentDirection === 'bearish' ? 100 - sentimentBase : sentimentBase,
       source: 'social',
-      momentum: 20,
+      momentum: sentimentDirection === 'bullish' ? 25 + (hash % 30) : sentimentDirection === 'bearish' ? -(hash % 30) : (hash % 20) - 10,
       timestamp: now,
     },
   };
