@@ -25,6 +25,7 @@ const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION 
 const ALPACA_CONFIG = {
   // REST API endpoints
   REST_BASE: 'https://data.alpaca.markets',
+  TRADING_BASE: 'https://api.alpaca.markets', // For assets/account endpoints
   
   // WebSocket endpoints (Algo Trader Plus includes real-time)
   WS_STOCK_IEX: 'wss://stream.data.alpaca.markets/v2/iex',
@@ -121,7 +122,7 @@ async function getCredentials() {
 // =============================================================================
 
 /**
- * Make authenticated REST request to Alpaca
+ * Make authenticated REST request to Alpaca Data API
  * @param {string} endpoint - API endpoint (e.g., '/v2/stocks/AAPL/quotes/latest')
  * @param {object} options - Fetch options
  * @returns {Promise<object>}
@@ -159,6 +160,50 @@ async function alpacaFetch(endpoint, options = {}) {
     clearTimeout(timeout);
     if (error.name === 'AbortError') {
       throw new Error('Alpaca API request timed out');
+    }
+    throw error;
+  }
+}
+
+/**
+ * Make authenticated REST request to Alpaca Trading API (for assets, account, etc.)
+ * @param {string} endpoint - API endpoint (e.g., '/v2/assets')
+ * @param {object} options - Fetch options
+ * @returns {Promise<object>}
+ */
+async function alpacaTradingFetch(endpoint, options = {}) {
+  const credentials = await getCredentials();
+  
+  const url = `${ALPACA_CONFIG.TRADING_BASE}${endpoint}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ALPACA_CONFIG.REST_TIMEOUT);
+  
+  try {
+    console.log(`[Alpaca Trading] GET ${endpoint}`);
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'APCA-API-KEY-ID': credentials.apiKey,
+        'APCA-API-SECRET-KEY': credentials.apiSecret,
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+    });
+    
+    clearTimeout(timeout);
+    
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`[Alpaca Trading] API Error ${response.status}: ${errorBody}`);
+      throw new Error(`Alpaca Trading API error: ${response.status} - ${errorBody}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error.name === 'AbortError') {
+      throw new Error('Alpaca Trading API request timed out');
     }
     throw error;
   }
@@ -241,6 +286,60 @@ async function getStockQuotes(symbols) {
 async function getStockQuote(symbol) {
   const quotes = await getStockQuotes([symbol]);
   return quotes[symbol.toUpperCase()] || null;
+}
+
+// Cache for assets list (to avoid fetching 10K+ assets on every search)
+let cachedAssets = null;
+let assetsCacheTime = 0;
+const ASSETS_CACHE_TTL = 3600000; // 1 hour
+
+/**
+ * Search for stocks - validates symbols via Alpaca Data API
+ * Since we don't have Trading API access, we validate by attempting to fetch quotes
+ * @param {string} query - Search query (symbol)
+ * @param {number} limit - Max results to return
+ * @returns {Promise<Array>} - Array of matching assets
+ */
+async function searchStocks(query, limit = 15) {
+  if (!query || query.length < 1) {
+    return [];
+  }
+  
+  const upperQuery = query.toUpperCase().trim();
+  
+  // Validate it looks like a stock symbol (1-5 uppercase letters/numbers/dots)
+  if (!VALID_STOCK_SYMBOL.test(upperQuery)) {
+    console.log(`[Alpaca] Invalid stock symbol format: "${query}"`);
+    return [];
+  }
+  
+  try {
+    // Try to fetch a snapshot for this symbol to validate it exists
+    console.log(`[Alpaca] Validating stock symbol: ${upperQuery}`);
+    const data = await alpacaFetch(`/v2/stocks/${encodeURIComponent(upperQuery)}/snapshot?feed=iex`);
+    
+    // If we get data back, the symbol is valid
+    if (data && data.latestTrade) {
+      console.log(`[Alpaca] Valid stock found: ${upperQuery}`);
+      return [{
+        symbol: upperQuery,
+        name: `${upperQuery}`, // We don't have the full name from this endpoint
+        exchange: data.latestTrade.x || 'US',
+        type: 'STOCK',
+        price: data.latestTrade.p, // Include current price as bonus
+      }];
+    }
+    
+    return [];
+  } catch (error) {
+    // 404 means symbol not found, other errors are actual errors
+    if (error.message.includes('404') || error.message.includes('not found')) {
+      console.log(`[Alpaca] Stock symbol not found: ${upperQuery}`);
+      return [];
+    }
+    console.error('[Alpaca] Stock search error:', error.message);
+    return [];
+  }
 }
 
 // =============================================================================
@@ -525,6 +624,7 @@ module.exports = {
   getStockQuotes,
   getStockQuote,
   getStockBars,
+  searchStocks,
   
   // REST API - Crypto
   getCryptoQuotes,

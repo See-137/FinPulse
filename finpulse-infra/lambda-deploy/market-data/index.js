@@ -19,12 +19,16 @@ const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 
 // Alpaca service (single source of truth)
-// Use relative path for local dev, flat path for Lambda deployment
+// Try multiple paths for Lambda deployment compatibility
 let alpacaService;
 try {
   alpacaService = require('./alpaca-service');
 } catch (e) {
-  alpacaService = require('../shared/alpaca-service');
+  try {
+    alpacaService = require('./shared/alpaca-service');
+  } catch (e2) {
+    alpacaService = require('../shared/alpaca-service');
+  }
 }
 
 // Multi-tier cache manager
@@ -34,19 +38,28 @@ try {
   console.log('Cache manager loaded successfully');
 } catch (e) {
   try {
-    cacheManager = require('../shared/cache-manager');
-    console.log('Cache manager loaded from shared');
+    cacheManager = require('./shared/cache-manager');
+    console.log('Cache manager loaded from ./shared');
   } catch (e2) {
-    console.log('Cache manager not available:', e2.message);
+    try {
+      cacheManager = require('../shared/cache-manager');
+      console.log('Cache manager loaded from ../shared');
+    } catch (e3) {
+      console.log('Cache manager not available:', e3.message);
+    }
   }
 }
 
 // Redis cache utility (fallback)
 let redisCache = null;
 try {
-  redisCache = require('../shared/redis-cache');
+  redisCache = require('./shared/redis-cache');
 } catch (e) {
-  console.log('Redis cache not available');
+  try {
+    redisCache = require('../shared/redis-cache');
+  } catch (e2) {
+    console.log('Redis cache not available');
+  }
 }
 
 // Initialize DynamoDB
@@ -257,9 +270,10 @@ async function storePrices(prices, type) {
 
 const corsHeaders = {
   'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://finpulse.me',
   'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Credentials': 'true'
 };
 
 /**
@@ -397,6 +411,45 @@ exports.handler = async (event) => {
       };
     }
 
+    // GET /market/search - Search for stocks by symbol or name
+    if (path.includes('/search') && method === 'GET') {
+      const query = queryParams.q || queryParams.query || '';
+      const type = queryParams.type || 'stock';
+      const limit = Math.min(parseInt(queryParams.limit) || 15, 50);
+
+      if (!query || query.length < 1) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ success: false, error: 'Query parameter "q" is required' })
+        };
+      }
+
+      let results = [];
+
+      if (type === 'stock') {
+        // Search stocks via Alpaca Assets API
+        results = await alpacaService.searchStocks(query, limit);
+      } else if (type === 'crypto') {
+        // For crypto, we still use CoinGecko (handled on frontend) or could add here
+        // For now, return empty - frontend handles crypto search via CoinGecko
+        results = [];
+      }
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          data: results,
+          query,
+          type,
+          provider: type === 'stock' ? 'alpaca' : 'coingecko',
+          timestamp: new Date().toISOString(),
+        })
+      };
+    }
+
     // Default: return available endpoints
     return {
       statusCode: 200,
@@ -418,6 +471,7 @@ exports.handler = async (event) => {
           'GET /market/prices?type=stock&symbols=AAPL,GOOGL - Get stocks only',
           'GET /market/history?symbol=AAPL&timeframe=1Day&limit=30 - Historical bars',
           'GET /market/history?symbol=BTC&source=stored&hours=24 - Stored history',
+          'GET /market/search?q=BMNR&type=stock - Search stocks by symbol/name',
           'GET /market/stats - Service statistics'
         ]
       })

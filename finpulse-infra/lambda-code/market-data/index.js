@@ -411,6 +411,45 @@ exports.handler = async (event) => {
       };
     }
 
+    // GET /market/search - Search for stocks by symbol or name
+    if (path.includes('/search') && method === 'GET') {
+      const query = queryParams.q || queryParams.query || '';
+      const type = queryParams.type || 'stock';
+      const limit = Math.min(parseInt(queryParams.limit) || 15, 50);
+
+      if (!query || query.length < 1) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ success: false, error: 'Query parameter "q" is required' })
+        };
+      }
+
+      let results = [];
+
+      if (type === 'stock') {
+        // Search stocks via Alpaca Assets API
+        results = await alpacaService.searchStocks(query, limit);
+      } else if (type === 'crypto') {
+        // For crypto, we still use CoinGecko (handled on frontend) or could add here
+        // For now, return empty - frontend handles crypto search via CoinGecko
+        results = [];
+      }
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          data: results,
+          query,
+          type,
+          provider: type === 'stock' ? 'alpaca' : 'coingecko',
+          timestamp: new Date().toISOString(),
+        })
+      };
+    }
+
     // Default: return available endpoints
     return {
       statusCode: 200,
@@ -432,6 +471,7 @@ exports.handler = async (event) => {
           'GET /market/prices?type=stock&symbols=AAPL,GOOGL - Get stocks only',
           'GET /market/history?symbol=AAPL&timeframe=1Day&limit=30 - Historical bars',
           'GET /market/history?symbol=BTC&source=stored&hours=24 - Stored history',
+          'GET /market/search?q=BMNR&type=stock - Search stocks by symbol/name',
           'GET /market/stats - Service statistics'
         ]
       })
