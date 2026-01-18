@@ -210,8 +210,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
     const holdings = getHoldings();
     const portfolioContext = holdings.length > 0 ? holdings.map(h => ({
       symbol: h.symbol,
-      shares: h.shares,
-      avgPrice: h.avgPrice,
+      name: h.name,
+      quantity: h.quantity,
+      avgCost: h.avgCost,
       currentPrice: h.currentPrice,
       type: h.type
     })) : undefined;
