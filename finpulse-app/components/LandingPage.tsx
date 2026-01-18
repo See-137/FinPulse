@@ -63,13 +63,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
             <div className="flex-1 flex flex-col justify-center max-w-md mx-auto lg:mx-0">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-6 shrink-0 w-fit">
                 <Shield className="w-3 h-3" />
-                Institutional Wealth Pulse
+                Personal Wealth Tracker
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter leading-[1] sm:leading-[0.95] mb-6 text-white" style={{ fontSize: 'clamp(2.5rem, 10vw, 4rem)' }}>
-                Wealth in <br />
+                All Assets. <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00e5ff] to-blue-500">
-                High Definition.
+                One Pulse.
                 </span>
             </h1>
 
@@ -81,7 +81,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 <div className="flex items-center justify-between mb-6 sm:mb-8">
                 <div>
                     <h3 className="text-white font-black text-lg sm:text-xl mb-1">{isSignUp ? 'Establish Pulse Node' : 'Connect Session'}</h3>
-                    <p className="text-slate-500 text-[10px] sm:text-xs">{isSignUp ? 'Start your high-fidelity tracking' : 'Resume institutional monitoring'}</p>
+                    <p className="text-slate-500 text-[10px] sm:text-xs">{isSignUp ? 'Start your high-fidelity tracking' : 'Access your portfolio dashboard'}</p>
                 </div>
                 </div>
 
@@ -105,10 +105,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
 
                 <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Secure Email</label>
-                    <input 
+                    <input
                     required
-                    type="email" 
-                    placeholder="investor@institutional.com"
+                    type="email"
+                    placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-[#0b0e14] border border-white/10 rounded-xl sm:rounded-2xl px-5 py-3.5 text-sm text-white focus:ring-1 focus:ring-[#00e5ff] outline-none transition-all"
@@ -220,14 +220,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                     <Cpu className="w-4 h-4" />
                 </div>
                 <h4 className="text-xs font-black text-white uppercase tracking-wider">AI Copilot</h4>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Institutional-grade trend analysis on demand.</p>
+                <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Professional trend analysis at your fingertips.</p>
                 </div>
             </div>
             </div>
 
             <div className="mt-auto pt-8 flex items-center justify-between shrink-0 border-t border-white/5 pb-8 sm:pb-0">
             <p className="text-slate-600 text-[9px] sm:text-[10px] font-black uppercase tracking-widest">
-                © 2025 FinPulse Institutional
+                © 2025 FinPulse
             </p>
             <div className="flex gap-4">
                 <Lock className="w-3 h-3 text-slate-700" />
