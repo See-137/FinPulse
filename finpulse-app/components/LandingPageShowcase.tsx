@@ -95,7 +95,7 @@ const CopilotPreview = () => (
   <div className="p-6 space-y-4">
     <div className="flex items-center gap-2 mb-4">
       <MessageSquareText className="w-5 h-5 text-[#00e5ff]"/>
-      <h3 className="text-lg font-black text-white">Institutional Copilot</h3>
+      <h3 className="text-lg font-black text-white">AI Market Assistant</h3>
     </div>
     <div className="space-y-3">
       <div className="bg-[#00e5ff]/10 rounded-2xl rounded-tr-sm p-3 ml-8">
@@ -141,8 +141,8 @@ const SHOWCASE_ITEMS = [
   },
   {
     id: 'copilot',
-    title: 'Institutional Copilot',
-    desc: 'Context-aware AI chat for deep market queries.',
+    title: 'AI Market Assistant',
+    desc: 'Smart AI chat for your market questions.',
     icon: MessageSquareText,
     preview: CopilotPreview
   }
@@ -203,7 +203,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
       if (!isHovering) {
         setActiveIndex((prev) => (prev + 1) % SHOWCASE_ITEMS.length);
       }
-    }, 8000);
+    }, 3000); // 3 seconds - faster rotation
   };
 
   // Initialize and clean up rotation
@@ -378,7 +378,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
   const getFormSubtitle = () => {
     switch (authMode) {
       case 'signup': return 'Start your high-fidelity tracking';
-      case 'signin': return 'Resume institutional monitoring';
+      case 'signin': return 'Access your portfolio dashboard';
       case 'confirm': return 'Enter the code sent to your email';
       case 'forgot': return 'Enter your email to receive reset code';
       case 'reset': return 'Enter code and new password';
@@ -397,13 +397,13 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
             <div className="flex-1 flex flex-col justify-center max-w-md mx-auto lg:mx-0">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-6 shrink-0 w-fit">
                 <Shield className="w-3 h-3" />
-                Institutional Wealth Pulse
+                Personal Wealth Tracker
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter leading-[1] sm:leading-[0.95] mb-6 text-white" style={{ fontSize: 'clamp(2.5rem, 10vw, 4rem)' }}>
-                Wealth in <br />
+                All Assets. <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00e5ff] to-blue-500">
-                High Definition.
+                One Pulse.
                 </span>
             </h1>
 
@@ -459,7 +459,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                         <input
                         required
                         type="email"
-                        placeholder="investor@institutional.com"
+                        placeholder="you@example.com"
                         value={email}
                         onChange={(e) => {
                           setEmail(e.target.value);
@@ -744,7 +744,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
 
             <div className="mt-auto pt-8 flex items-center justify-between shrink-0 border-t border-white/5 pb-8 sm:pb-0">
             <p className="text-slate-600 text-[9px] sm:text-[10px] font-black uppercase tracking-widest">
-                © 2025 FinPulse Institutional
+                © 2025 FinPulse
             </p>
             <div className="flex gap-4">
                 <Lock className="w-3 h-3 text-slate-700" />
@@ -800,33 +800,50 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(0,229,255,0.08),transparent_70%)] pointer-events-none"></div>
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
 
-        <div className="relative w-full max-w-xl px-12">
-           {SHOWCASE_ITEMS.map((item, index) => (
-             <div 
-                key={item.id}
-                className={`absolute inset-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out flex items-center justify-center ${
-                  activeIndex === index 
-                    ? 'opacity-100 scale-100 rotate-0 z-20' 
-                    : 'opacity-0 scale-95 rotate-2 z-10 pointer-events-none'
-                }`}
-             >
-                <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-[#00e5ff]/20 border border-white/10 bg-[#151921] w-full max-w-md">
-                   {/* Window Chrome */}
-                   <div className="h-8 bg-[#0b0e14] border-b border-white/5 flex items-center px-4 gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60"></div>
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60"></div>
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60"></div>
-                      <span className="ml-4 text-[10px] text-slate-500 font-medium">{item.title}</span>
-                   </div>
-                   {/* Dynamic Preview Content */}
-                   <div className="min-h-[400px]">
-                      <item.preview />
-                   </div>
-                   {/* Overlay Gradient for polish */}
-                   <div className="absolute inset-0 bg-gradient-to-tr from-[#00e5ff]/5 to-transparent pointer-events-none"></div>
-                </div>
-             </div>
-           ))}
+        <div className="relative w-full max-w-2xl px-12">
+           {SHOWCASE_ITEMS.map((item, index) => {
+             // Card-deck stacking effect - subtle peek
+             const total = SHOWCASE_ITEMS.length;
+             const position = (index - activeIndex + total) % total;
+             let cardClasses = '';
+
+             if (position === 0) {
+               // Active card - fully visible, centered
+               cardClasses = 'opacity-100 scale-100 translate-x-0 translate-y-0 z-30';
+             } else if (position === 1) {
+               // Next card - subtle peek behind, minimal offset
+               cardClasses = 'opacity-20 scale-[0.98] translate-x-4 translate-y-2 z-20';
+             } else if (position === total - 1) {
+               // Previous card - barely visible behind
+               cardClasses = 'opacity-10 scale-[0.96] -translate-x-4 translate-y-2 z-10';
+             } else {
+               // Other cards - hidden
+               cardClasses = 'opacity-0 scale-95 translate-y-4 z-0 pointer-events-none';
+             }
+
+             return (
+               <div
+                  key={item.id}
+                  className={`absolute inset-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out flex items-center justify-center ${cardClasses}`}
+               >
+                  <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-[#00e5ff]/20 border border-white/10 bg-[#151921] w-full max-w-2xl">
+                     {/* Window Chrome */}
+                     <div className="h-8 bg-[#0b0e14] border-b border-white/5 flex items-center px-4 gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60"></div>
+                        <span className="ml-4 text-[10px] text-slate-500 font-medium">{item.title}</span>
+                     </div>
+                     {/* Dynamic Preview Content */}
+                     <div className="min-h-[500px]">
+                        <item.preview />
+                     </div>
+                     {/* Overlay Gradient for polish */}
+                     <div className="absolute inset-0 bg-gradient-to-tr from-[#00e5ff]/5 to-transparent pointer-events-none"></div>
+                  </div>
+               </div>
+             );
+           })}
         </div>
       </div>
 
