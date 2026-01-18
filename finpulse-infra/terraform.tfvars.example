@@ -55,8 +55,23 @@ api_latency_threshold   = 3000  # Alert if p95 latency > 3s
 # aws secretsmanager create-secret --name finpulse/prod/alpaca-credentials \
 #   --secret-string '{"api_key":"YOUR_KEY","api_secret":"YOUR_SECRET"}'
 #
+# LemonSqueezy (payments) - required for paid plans:
+# aws secretsmanager create-secret --name finpulse/prod/lemonsqueezy \
+#   --secret-string '{"api_key":"YOUR_API_KEY","webhook_secret":"YOUR_WEBHOOK_SECRET"}'
+#
 # Or via environment variables for local dev:
 # export ALPACA_API_KEY="your-key"
 # export ALPACA_API_SECRET="your-secret"
 # export TF_VAR_newsapi_key="your-key"  # Optional for news feature
 # export TF_VAR_gemini_api_key=""  # Optional for AI feature
+# export TF_VAR_lemonsqueezy_api_key="your-key"  # For payments
+# export TF_VAR_lemonsqueezy_webhook_secret="your-secret"
+
+# =============================================================================
+# LemonSqueezy Settings (pre-configured)
+# =============================================================================
+
+# These are public IDs, safe to commit
+lemonsqueezy_store_id           = "275175"
+lemonsqueezy_variant_propulse   = "1229771"
+lemonsqueezy_variant_superpulse = "1229849"

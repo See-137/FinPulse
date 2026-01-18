@@ -135,14 +135,39 @@ variable "api_latency_threshold" {
   default     = 3000
 }
 # =============================================================================
-# Stripe Settings
+# LemonSqueezy Settings (replaces Stripe - Israeli merchants not supported)
 # =============================================================================
 
-variable "stripe_secret_key_test" {
-  description = "Stripe TEST secret key (for staging environment)"
+variable "lemonsqueezy_api_key" {
+  description = "LemonSqueezy API key for payment processing"
   type        = string
   sensitive   = true
   default     = ""
+}
+
+variable "lemonsqueezy_store_id" {
+  description = "LemonSqueezy Store ID"
+  type        = string
+  default     = "275175"
+}
+
+variable "lemonsqueezy_webhook_secret" {
+  description = "LemonSqueezy webhook signing secret"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "lemonsqueezy_variant_propulse" {
+  description = "LemonSqueezy Variant ID for ProPulse plan"
+  type        = string
+  default     = "1229771"
+}
+
+variable "lemonsqueezy_variant_superpulse" {
+  description = "LemonSqueezy Variant ID for SuperPulse plan"
+  type        = string
+  default     = "1229849"
 }
 
 # =============================================================================
