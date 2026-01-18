@@ -148,8 +148,25 @@ const SHOWCASE_ITEMS = [
   }
 ];
 
+// Helper to get initial auth mode - checks localStorage for returning users
+const getInitialAuthMode = (): AuthMode => {
+  // Only check localStorage in browser context
+  if (typeof window === 'undefined') return 'signup';
+  
+  try {
+    const savedMode = localStorage.getItem('finpulse-auth-mode-preference');
+    // Only restore signin preference (returning users), always show signup for new visitors
+    if (savedMode === 'signin') {
+      return 'signin';
+    }
+  } catch {
+    // localStorage might be unavailable (private browsing, etc.)
+  }
+  return 'signup'; // Default for new users
+};
+
 export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogin, initialError }) => {
-  const [authMode, setAuthMode] = useState<AuthMode>('signup');
+  const [authMode, setAuthMode] = useState<AuthMode>(getInitialAuthMode);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -168,13 +185,29 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
   const [emailTouched, setEmailTouched] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   
+  // Helper to handle user-initiated mode changes (saves preference)
+  const handleUserModeSwitch = (newMode: AuthMode) => {
+    setAuthMode(newMode);
+    clearMessages();
+    
+    // Only persist signin/signup preference (not confirm, forgot, reset flows)
+    if (newMode === 'signin' || newMode === 'signup') {
+      try {
+        localStorage.setItem('finpulse-auth-mode-preference', newMode);
+      } catch {
+        // Silently fail if localStorage unavailable
+      }
+    }
+  };
+  
   // Sync initialError from parent (OAuth callback errors)
+  // Note: This is a programmatic switch, NOT user-initiated, so don't save to localStorage
   useEffect(() => {
     if (initialError) {
       setError(initialError);
       // If it's an account linking error, make sure we're on signin mode
       if (initialError.toLowerCase().includes('sign in with your password')) {
-        setAuthMode('signin');
+        setAuthMode('signin'); // Don't save - this is system-initiated
       }
     }
   }, [initialError]);
@@ -688,7 +721,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                        <div className="flex items-center gap-2 justify-center">
                          <span className="text-slate-500 text-sm">New to FinPulse?</span>
                          <button
-                           onClick={() => { setAuthMode('signup'); clearMessages(); }}
+                           onClick={() => handleUserModeSwitch('signup')}
                            className="text-[#00e5ff] text-sm font-bold hover:underline transition-all hover:scale-105"
                          >
                            Start Tracking Free →
@@ -703,7 +736,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                      <div className="flex items-center gap-2 justify-center">
                        <span className="text-slate-500 text-sm">Already tracking?</span>
                        <button
-                         onClick={() => { setAuthMode('signin'); clearMessages(); }}
+                         onClick={() => handleUserModeSwitch('signin')}
                          className="text-[#00e5ff] text-sm font-bold hover:underline transition-all hover:scale-105"
                        >
                          Check Your Pulse →
