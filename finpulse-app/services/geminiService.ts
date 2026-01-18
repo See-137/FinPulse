@@ -38,8 +38,17 @@ const handleApiError = async (error: any) => {
   return "An unexpected error occurred during market analysis.";
 };
 
+// Portfolio holding type for AI context
+interface PortfolioHolding {
+  symbol: string;
+  shares: number;
+  avgPrice?: number;
+  currentPrice?: number;
+  type?: string;
+}
+
 // Backend-based AI query (for deployed version)
-const queryBackendAI = async (query: string, callback: (text: string) => void) => {
+const queryBackendAI = async (query: string, callback: (text: string) => void, portfolio?: PortfolioHolding[]) => {
   try {
     const token = localStorage.getItem('finpulse_id_token');
     const response = await fetch(`${config.apiUrl}/ai/query`, {
@@ -48,7 +57,8 @@ const queryBackendAI = async (query: string, callback: (text: string) => void) =
         'Content-Type': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` })
       },
-      body: JSON.stringify({ query })
+      credentials: 'include',
+      body: JSON.stringify({ query, portfolio })
     });
     
     if (!response.ok) {
@@ -175,13 +185,13 @@ I've received your query about: *"${query.substring(0, 60)}${query.length > 60 ?
 Enable early access in **Settings > AI Copilot** (ProPulse & SuperPulse plans).`;
 };
 
-export const getMarketInsightStream = async (query: string, callback: (text: string) => void) => {
+export const getMarketInsightStream = async (query: string, callback: (text: string) => void, portfolio?: PortfolioHolding[]) => {
   // Check if we're in AI Studio environment
   const ai = getAI();
   
   if (!ai) {
     // Use backend API or fallback
-    return queryBackendAI(query, callback);
+    return queryBackendAI(query, callback, portfolio);
   }
   
   try {

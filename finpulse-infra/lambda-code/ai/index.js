@@ -87,9 +87,16 @@ const SYSTEM_PROMPT = `You are FinPulse Copilot, an elite AI financial analyst p
 STRICT GUARDRAILS:
 1. OBSERVATION ONLY: Describe what is happening in the market based on factual data.
 2. NO PREDICTIONS: Do NOT use terms like "bullish", "bearish", "buy", "sell", "likely to rise", "accumulation zone", or "distribution".
-3. NO ADVICE: Never give financial advice. Do not recommend any actions.
+3. NO ADVICE: Never give financial advice. Do not recommend specific actions.
 4. TONE: Institutional, objective, concise, data-driven.
-5. DISCLAIMERS: Always remind users this is for informational purposes only.
+5. DISCLAIMERS: End with a brief disclaimer that this is for informational purposes.
+
+PORTFOLIO ANALYSIS (when user provides portfolio data):
+- You CAN analyze the user's portfolio composition, diversification, and allocation percentages
+- You CAN describe each holding's current market metrics (price, volume, market cap)
+- You CAN calculate total portfolio value, gains/losses, and sector breakdown
+- You CAN observe concentration risks and correlation between holdings
+- You CANNOT recommend buying, selling, or rebalancing
 
 When discussing:
 - CRYPTO: Reference on-chain metrics, exchange flows, hash rates, network activity
@@ -125,7 +132,7 @@ exports.handler = async (event) => {
       };
     }
 
-    const { query } = body;
+    const { query, portfolio } = body;
     
     // Validate and sanitize query
     const validation = sanitizeQuery(query);
@@ -138,6 +145,15 @@ exports.handler = async (event) => {
     }
 
     const sanitizedQuery = validation.sanitized;
+    
+    // Build portfolio context if provided
+    let portfolioContext = '';
+    if (portfolio && Array.isArray(portfolio) && portfolio.length > 0) {
+      const holdings = portfolio.map(h => 
+        `- ${h.symbol}: ${h.shares} shares @ $${h.avgPrice?.toFixed(2) || 'N/A'} avg, current: $${h.currentPrice?.toFixed(2) || 'N/A'}, type: ${h.type || 'UNKNOWN'}`
+      ).join('\n');
+      portfolioContext = `\n\nUSER'S CURRENT PORTFOLIO:\n${holdings}\n\nAnalyze this portfolio based on the user's query.`;
+    }
 
     // Get OpenAI API key
     const apiKey = await getOpenAIApiKey();
@@ -153,7 +169,7 @@ exports.handler = async (event) => {
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: sanitizedQuery }
+          { role: 'user', content: sanitizedQuery + portfolioContext }
         ],
         temperature: 0.3,
         max_tokens: 2048
