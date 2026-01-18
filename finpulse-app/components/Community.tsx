@@ -77,6 +77,9 @@ function getCategoryFromType(type: string): string {
   }
 }
 
+// LocalStorage key for liked posts persistence
+const LIKED_POSTS_KEY = 'finpulse_liked_posts';
+
 export const Community: React.FC = () => {
   const { t } = useLanguage();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -87,7 +90,28 @@ export const Community: React.FC = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostType, setNewPostType] = useState('discussion');
   const [submitting, setSubmitting] = useState(false);
-  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [usingMockData, setUsingMockData] = useState(false);
+  
+  // Comment state
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [submittingComment, setSubmittingComment] = useState<string | null>(null);
+  
+  // Persist liked posts to localStorage
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(LIKED_POSTS_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Save liked posts to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem(LIKED_POSTS_KEY, JSON.stringify([...likedPosts]));
+  }, [likedPosts]);
 
   // Fetch posts on mount
   useEffect(() => {
@@ -96,6 +120,7 @@ export const Community: React.FC = () => {
 
   const fetchPosts = async () => {
     setLoading(true);
+    setApiError(null);
     try {
       const response = await getPosts({ 
         limit: 20, 
@@ -104,13 +129,17 @@ export const Community: React.FC = () => {
       
       if (response.success && response.data.length > 0) {
         setPosts(response.data);
+        setUsingMockData(false);
       } else {
         // Use mock data if no posts returned
         setPosts(MOCK_POSTS);
+        setUsingMockData(true);
       }
     } catch (error) {
       componentLogger.error('Failed to fetch posts:', error);
+      setApiError('Unable to connect to community server. Showing sample posts.');
       setPosts(MOCK_POSTS);
+      setUsingMockData(true);
     } finally {
       setLoading(false);
     }
@@ -118,6 +147,29 @@ export const Community: React.FC = () => {
 
   const handleCreatePost = async () => {
     if (!newPostContent.trim()) return;
+    
+    if (usingMockData) {
+      // Create local mock post when API is unavailable
+      const mockPost: Post = {
+        postId: `local-${Date.now()}`,
+        authorId: 'current-user',
+        authorName: 'You',
+        content: newPostContent,
+        type: newPostType as Post['type'],
+        likes: 0,
+        likedBy: [],
+        commentCount: 0,
+        comments: [],
+        tags: (newPostContent.match(/#(\w+)/g) || []).map(t => t.substring(1).toLowerCase()),
+        tickers: (newPostContent.match(/\$([A-Z]{1,5})/g) || []).map(t => t.substring(1)),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      setPosts([mockPost, ...posts]);
+      setNewPostContent('');
+      setIsCreateModalOpen(false);
+      return;
+    }
     
     setSubmitting(true);
     try {
@@ -129,12 +181,36 @@ export const Community: React.FC = () => {
       }
     } catch (error) {
       componentLogger.error('Failed to create post:', error);
+      setApiError('Failed to create post. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleLike = async (postId: string) => {
+    // Optimistic update
+    const newLiked = new Set(likedPosts);
+    const isCurrentlyLiked = likedPosts.has(postId);
+    
+    if (isCurrentlyLiked) {
+      newLiked.delete(postId);
+    } else {
+      newLiked.add(postId);
+    }
+    setLikedPosts(newLiked);
+    
+    // Update post likes count optimistically
+    setPosts(posts.map(p => 
+      p.postId === postId 
+        ? { ...p, likes: p.likes + (isCurrentlyLiked ? -1 : 1) }
+        : p
+    ));
+    
+    // Skip API call for mock posts
+    if (usingMockData || postId.startsWith('local-')) {
+      return;
+    }
+    
     try {
       const result = await likePost(postId);
       if (result) {
@@ -144,7 +220,6 @@ export const Community: React.FC = () => {
             : p
         ));
         
-        const newLiked = new Set(likedPosts);
         if (result.liked) {
           newLiked.add(postId);
         } else {
@@ -154,6 +229,66 @@ export const Community: React.FC = () => {
       }
     } catch (error) {
       componentLogger.error('Failed to like post:', error);
+      // Revert on failure
+      if (isCurrentlyLiked) {
+        newLiked.add(postId);
+      } else {
+        newLiked.delete(postId);
+      }
+      setLikedPosts(newLiked);
+    }
+  };
+
+  const toggleComments = (postId: string) => {
+    const newExpanded = new Set(expandedComments);
+    if (newExpanded.has(postId)) {
+      newExpanded.delete(postId);
+    } else {
+      newExpanded.add(postId);
+    }
+    setExpandedComments(newExpanded);
+  };
+
+  const handleAddComment = async (postId: string) => {
+    const content = commentInputs[postId]?.trim();
+    if (!content) return;
+    
+    setSubmittingComment(postId);
+    
+    // For mock/local posts, add comment locally
+    if (usingMockData || postId.startsWith('local-')) {
+      const newComment = {
+        id: `comment-${Date.now()}`,
+        authorId: 'current-user',
+        authorName: 'You',
+        content,
+        createdAt: new Date().toISOString()
+      };
+      setPosts(posts.map(p => 
+        p.postId === postId 
+          ? { ...p, comments: [...p.comments, newComment], commentCount: p.commentCount + 1 }
+          : p
+      ));
+      setCommentInputs({ ...commentInputs, [postId]: '' });
+      setSubmittingComment(null);
+      return;
+    }
+    
+    try {
+      const { addComment } = await import('../services/communityService');
+      const newComment = await addComment(postId, content);
+      if (newComment) {
+        setPosts(posts.map(p => 
+          p.postId === postId 
+            ? { ...p, comments: [...p.comments, newComment], commentCount: p.commentCount + 1 }
+            : p
+        ));
+        setCommentInputs({ ...commentInputs, [postId]: '' });
+      }
+    } catch (error) {
+      componentLogger.error('Failed to add comment:', error);
+    } finally {
+      setSubmittingComment(null);
     }
   };
 
@@ -168,8 +303,23 @@ export const Community: React.FC = () => {
       post.tickers.some(ticker => ticker.toLowerCase().includes(query))
     );
   });
+  
   return (
     <div className="space-y-10 pb-24">
+      {/* API Error Banner */}
+      {apiError && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+          <span className="text-sm text-amber-300">{apiError}</span>
+          <button 
+            onClick={() => { setApiError(null); fetchPosts(); }}
+            className="ml-auto text-xs font-bold text-amber-400 hover:text-amber-300"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div>
@@ -281,11 +431,62 @@ export const Community: React.FC = () => {
                   }`} />
                   <span className="text-xs font-black">{post.likes}</span>
                 </button>
-                <button className="flex items-center gap-2 text-slate-500 hover:text-[#00e5ff] transition-colors group/action">
+                <button 
+                  onClick={() => toggleComments(post.postId)}
+                  className={`flex items-center gap-2 transition-colors group/action ${
+                    expandedComments.has(post.postId) ? 'text-[#00e5ff]' : 'text-slate-500 hover:text-[#00e5ff]'
+                  }`}
+                >
                   <MessageSquare className="w-4 h-4 group-hover/action:scale-110 transition-transform" />
                   <span className="text-xs font-black">{post.commentCount}</span>
                 </button>
               </div>
+
+              {/* Comments Section */}
+              {expandedComments.has(post.postId) && (
+                <div className="mt-6 pt-6 border-t border-white/5 space-y-4">
+                  {/* Existing Comments */}
+                  {post.comments.length > 0 ? (
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {post.comments.map((comment) => (
+                        <div key={comment.id} className="p-3 bg-white/5 rounded-xl">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-black text-[#00e5ff]">{comment.authorName}</span>
+                            <span className="text-[9px] text-slate-500">{formatTimeAgo(comment.createdAt)}</span>
+                          </div>
+                          <p className="text-xs text-slate-300">{comment.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 text-center py-2">No comments yet. Be the first!</p>
+                  )}
+                  
+                  {/* Add Comment Input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={commentInputs[post.postId] || ''}
+                      onChange={(e) => setCommentInputs({ ...commentInputs, [post.postId]: e.target.value })}
+                      placeholder="Add a comment..."
+                      className="flex-1 bg-[#0b0e14] border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder:text-slate-500 outline-none focus:border-[#00e5ff]/50"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddComment(post.postId);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => handleAddComment(post.postId)}
+                      disabled={!commentInputs[post.postId]?.trim() || submittingComment === post.postId}
+                      className="px-4 py-2 bg-[#00e5ff] text-[#0b0e14] rounded-xl text-xs font-bold hover:bg-white transition-colors disabled:opacity-30"
+                    >
+                      {submittingComment === post.postId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 

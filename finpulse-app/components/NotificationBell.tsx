@@ -68,6 +68,12 @@ const formatTimeAgo = (timestamp: string): string => {
   const now = new Date();
   const date = new Date(timestamp);
   const diffMs = now.getTime() - date.getTime();
+  
+  // Guard against future-dated notifications (negative time diff)
+  if (diffMs < 0) {
+    return date.toLocaleDateString();
+  }
+  
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);

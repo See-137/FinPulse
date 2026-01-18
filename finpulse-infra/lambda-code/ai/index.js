@@ -6,6 +6,51 @@ const secretsClient = new SecretsManagerClient({ region: 'us-east-1' });
 // Cache for API key
 let cachedApiKey = null;
 
+// Input validation constants
+const MAX_QUERY_LENGTH = 2000;
+const MIN_QUERY_LENGTH = 2;
+
+/**
+ * Sanitize and validate user query to prevent prompt injection
+ * @param {string} query - Raw user query
+ * @returns {{ valid: boolean, sanitized?: string, error?: string }}
+ */
+function sanitizeQuery(query) {
+  if (!query || typeof query !== 'string') {
+    return { valid: false, error: 'Query must be a non-empty string' };
+  }
+
+  // Length validation
+  const trimmed = query.trim();
+  if (trimmed.length < MIN_QUERY_LENGTH) {
+    return { valid: false, error: `Query must be at least ${MIN_QUERY_LENGTH} characters` };
+  }
+  if (trimmed.length > MAX_QUERY_LENGTH) {
+    return { valid: false, error: `Query must not exceed ${MAX_QUERY_LENGTH} characters` };
+  }
+
+  // Remove potential prompt injection patterns
+  let sanitized = trimmed
+    .replace(/\0/g, '') // Null bytes
+    .replace(/ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|context|prompts?)/gi, '[filtered]')
+    .replace(/system\s*:\s*/gi, '[filtered] ')
+    .replace(/you\s+are\s+now\s+/gi, '[filtered] ')
+    .replace(/forget\s+(everything|all|your)/gi, '[filtered] ')
+    .replace(/disregard\s+(all|your|the)/gi, '[filtered] ')
+    .replace(/new\s+instructions?\s*:/gi, '[filtered] ')
+    .replace(/override\s+(system|instructions?)/gi, '[filtered] ')
+    .replace(/<\|.*?\|>/g, '') // Remove potential system tokens
+    .replace(/\[INST\]|\[\/INST\]/gi, ''); // Remove instruction markers
+
+  // Check for excessive special characters (potential injection)
+  const specialCharRatio = (sanitized.match(/[^a-zA-Z0-9\s.,?!$%@#&*()-]/g) || []).length / sanitized.length;
+  if (specialCharRatio > 0.3) {
+    return { valid: false, error: 'Query contains too many special characters' };
+  }
+
+  return { valid: true, sanitized };
+}
+
 const getOpenAIApiKey = async () => {
   if (cachedApiKey) return cachedApiKey;
   
@@ -82,13 +127,17 @@ exports.handler = async (event) => {
 
     const { query } = body;
     
-    if (!query || typeof query !== 'string') {
+    // Validate and sanitize query
+    const validation = sanitizeQuery(query);
+    if (!validation.valid) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Query is required' })
+        body: JSON.stringify({ error: validation.error })
       };
     }
+
+    const sanitizedQuery = validation.sanitized;
 
     // Get OpenAI API key
     const apiKey = await getOpenAIApiKey();
@@ -104,7 +153,7 @@ exports.handler = async (event) => {
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: query }
+          { role: 'user', content: sanitizedQuery }
         ],
         temperature: 0.3,
         max_tokens: 2048

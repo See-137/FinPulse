@@ -8,6 +8,7 @@ import { Footer } from './components/Footer';
 import { NotificationBell } from './components/NotificationBell';
 import { TopBanner } from './components/TopBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SyncStatusIndicator } from './components/SyncStatusIndicator';
 
 // Lazy-loaded components (code splitting)
 const NewsSidebar = lazy(() => import('./components/NewsSidebar').then(m => ({ default: m.NewsSidebar })));
@@ -682,6 +683,8 @@ const AppContent: React.FC = () => {
                 <Terminal className="w-5 h-5" aria-hidden="true" />
               </button>
             )}
+            {/* Sync Status Indicator */}
+            <SyncStatusIndicator />
             <button aria-label={`Current plan: ${user?.plan} Node`} className={`px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${user?.plan !== 'FREE' ? 'border-cyan-500/50 text-cyan-400' : 'border-slate-200 dark:border-white/10 text-slate-500'}`}>
               {user?.plan} {t('nav.node')}
             </button>
@@ -698,28 +701,30 @@ const AppContent: React.FC = () => {
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
           <div className="max-w-[1200px] mx-auto w-full">
-            <Suspense fallback={<LoadingSpinner size="lg" />}>
-              {activeTab === 'portfolio' ? (
-                <PortfolioView 
-                  user={user!} 
-                  onUpdateUser={setUser} 
-                  currency={currency} 
-                  onCurrencyChange={setCurrency}
-                  onUpgradeClick={() => setIsPricingOpen(true)}
-                />
-              ) : activeTab === 'watchlist' ? (
-                <Watchlist 
-                  currency={currency}
-                  onAddToPortfolio={(symbol, name, type) => {
-                    // Switch to portfolio tab with pre-filled data
-                    setActiveTab('portfolio');
-                    // The add modal will be handled by PortfolioView
-                  }}
-                />
-              ) : (
-                <Community />
-              )}
-            </Suspense>
+            <ErrorBoundary fallback={<div className="p-8 text-center text-red-400">Failed to load view. <button onClick={() => window.location.reload()} className="underline">Reload</button></div>}>
+              <Suspense fallback={<LoadingSpinner size="lg" />}>
+                {activeTab === 'portfolio' ? (
+                  <PortfolioView 
+                    user={user!} 
+                    onUpdateUser={setUser} 
+                    currency={currency} 
+                    onCurrencyChange={setCurrency}
+                    onUpgradeClick={() => setIsPricingOpen(true)}
+                  />
+                ) : activeTab === 'watchlist' ? (
+                  <Watchlist 
+                    currency={currency}
+                    onAddToPortfolio={(symbol, name, type) => {
+                      // Switch to portfolio tab with pre-filled data
+                      setActiveTab('portfolio');
+                      // The add modal will be handled by PortfolioView
+                    }}
+                  />
+                ) : (
+                  <Community />
+                )}
+              </Suspense>
+            </ErrorBoundary>
           </div>
           <Footer onNavigate={handleNavigate} />
         </div>
@@ -727,9 +732,11 @@ const AppContent: React.FC = () => {
 
       <div className={`fixed inset-y-0 right-0 z-50 lg:relative lg:block transition-transform duration-500 transform ${isNewsSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
         <div className="h-full relative w-[85vw] sm:w-[380px] lg:w-[380px]">
-           <Suspense fallback={<LoadingSpinner />}>
-             <NewsSidebar userPlan={user?.plan || 'FREE'} user={user} onUpgradeClick={() => setIsPricingOpen(true)} />
-           </Suspense>
+           <ErrorBoundary fallback={<div className="p-4 text-center text-slate-400">News unavailable</div>}>
+             <Suspense fallback={<LoadingSpinner />}>
+               <NewsSidebar userPlan={user?.plan || 'FREE'} user={user} onUpgradeClick={() => setIsPricingOpen(true)} />
+             </Suspense>
+           </ErrorBoundary>
            <button onClick={() => setIsNewsSidebarOpen(false)} aria-label="Close news sidebar" className="absolute top-6 left-[-3rem] lg:hidden p-3 text-white bg-[#00e5ff] rounded-full">
              <X className="w-5 h-5 text-[#0b0e14]" aria-hidden="true" />
            </button>

@@ -5,6 +5,9 @@
 
 import { config } from '../config';
 import { Holding, AssetType } from '../types';
+import { createLogger } from './logger';
+
+const portfolioLogger = createLogger('Portfolio');
 
 export type { Holding };
 
@@ -74,7 +77,7 @@ export const portfolioService = {
       }
       throw new Error(result.error || 'Failed to get portfolio');
     } catch (error) {
-      console.error('Failed to fetch portfolio:', error);
+      portfolioLogger.error('Failed to fetch portfolio:', error as Error);
       throw error;
     }
   },
@@ -111,7 +114,7 @@ export const portfolioService = {
       }
       throw new Error(result.error || 'Failed to add holding');
     } catch (error) {
-      console.error('Failed to add holding:', error);
+      portfolioLogger.error('Failed to add holding:', error as Error);
       throw error;
     }
   },
@@ -145,7 +148,7 @@ export const portfolioService = {
       }
       throw new Error(result.error || 'Failed to update holding');
     } catch (error) {
-      console.error('Failed to update holding:', error);
+      portfolioLogger.error('Failed to update holding:', error as Error);
       throw error;
     }
   },
@@ -163,7 +166,7 @@ export const portfolioService = {
         throw new Error(result.error || 'Failed to remove holding');
       }
     } catch (error) {
-      console.error('Failed to remove holding:', error);
+      portfolioLogger.error('Failed to remove holding:', error as Error);
       throw error;
     }
   },
@@ -172,14 +175,14 @@ export const portfolioService = {
    * Sync local holdings to backend (for migration)
    */
   async syncLocalToBackend(holdings: Holding[]): Promise<void> {
-    console.log(`Syncing ${holdings.length} holdings to backend...`);
+    portfolioLogger.info(`Syncing ${holdings.length} holdings to backend...`);
     
     for (const holding of holdings) {
       try {
         await this.addHolding(holding);
-        console.log(`Synced: ${holding.symbol}`);
+        portfolioLogger.debug(`Synced: ${holding.symbol}`);
       } catch (error) {
-        console.error(`Failed to sync ${holding.symbol}:`, error);
+        portfolioLogger.error(`Failed to sync ${holding.symbol}:`, error as Error);
       }
     }
   },
