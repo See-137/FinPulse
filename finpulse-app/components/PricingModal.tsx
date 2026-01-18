@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { User, PlanType } from '../types';
 import { SaaS_PLANS } from '../constants';
-import { redirectToCheckout, redirectToCustomerPortal } from '../services/stripeService';
+import { redirectToCheckout, redirectToCustomerPortal } from '../services/lemonSqueezyService';
 import { useLanguage } from '../i18n';
 import { PricingCard } from './PricingCard';
 

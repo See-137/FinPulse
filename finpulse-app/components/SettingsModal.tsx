@@ -4,7 +4,7 @@ import { X, CreditCard, Sparkles, Check, ChevronRight, Moon, Sun, Monitor, Palet
 import { User, PlanType, Theme } from '../types';
 import { SaaS_PLANS } from '../constants';
 import { auth } from '../services/authService';
-import { redirectToCustomerPortal } from '../services/stripeService';
+import { redirectToCustomerPortal } from '../services/lemonSqueezyService';
 import { componentLogger } from '../services/logger';
 import { config } from '../config';
 
