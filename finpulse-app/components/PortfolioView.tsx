@@ -380,6 +380,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     GOLD: { price: 2650, change24h: 0.3 },
     SILVER: { price: 31.50, change24h: 0.8 },
     OIL: { price: 72.50, change24h: -1.2 },
+    NATGAS: { price: 3.45, change24h: -2.1 },
   };
 
   // Helper to get real-time market price for an asset
@@ -512,13 +513,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     return sortableItems;
   }, [filteredHoldings, sortConfig, marketPrices, wsPrices]);
 
-  // Generate signals for each holding
+  // Generate signals for each holding (influenced by 24h price change for realism)
   const signals = useMemo<Record<string, CombinedSignal>>(() => {
     const signalMap: Record<string, CombinedSignal> = {};
     
     sortedHoldings.forEach(holding => {
-      // Generate mock signals for this symbol
-      const mockSignals = signalService.createMockSignals(holding.symbol);
+      // Get 24h change to influence signal direction
+      const change24h = getChange24h(holding.symbol, holding.dayPL);
+      
+      // Generate mock signals for this symbol with price context
+      const mockSignals = signalService.createMockSignals(holding.symbol, change24h);
       
       // Combine the signals
       const combined = signalService.combineSignals(
@@ -532,7 +536,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     });
     
     return signalMap;
-  }, [sortedHoldings]);
+  }, [sortedHoldings, marketPrices, wsPrices]);
 
   const renderSortIcon = (key: string) => {
     if (sortConfig?.key !== key) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
@@ -552,7 +556,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
               {user.plan} Pulse Node
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter dark:text-white text-slate-900">Holdings Pulse</h1>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter dark:text-white text-slate-900">Pulsfolio</h1>
           <div className="mt-2 flex items-center gap-4">
              <div className="flex flex-col">
                 <span className="text-[8px] font-black text-slate-500 uppercase">Usage</span>

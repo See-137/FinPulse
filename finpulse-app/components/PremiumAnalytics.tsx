@@ -245,6 +245,45 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
           </div>
         </div>
 
+        {/* AI Insight - Prominent at top */}
+        <div className="p-6 rounded-[28px] bg-gradient-to-r from-purple-500/20 via-cyan-500/10 to-purple-500/20 border border-purple-500/30 shadow-lg shadow-purple-500/10">
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/30 to-cyan-500/30 border border-purple-500/40">
+              <Zap className="w-6 h-6 text-purple-300" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="font-black text-white text-lg">AI Portfolio Insight</h3>
+                <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full bg-purple-500/30 text-purple-300 border border-purple-500/40">Live Analysis</span>
+              </div>
+              <p className="text-sm text-slate-300 leading-relaxed">
+                {metrics.diversificationScore < 50 
+                  ? "⚠️ Your portfolio could benefit from more diversification. Consider adding assets from different sectors to reduce concentration risk and improve resilience."
+                  : metrics.volatility > 40
+                  ? "📊 Your portfolio shows high volatility. Consider balancing with more stable assets or hedging positions to reduce daily swings and protect gains."
+                  : metrics.sharpeRatio < 0.5
+                  ? "📈 Your risk-adjusted returns could be improved. Focus on assets with better risk/reward ratios to maximize returns per unit of risk taken."
+                  : "✅ Your portfolio shows healthy diversification and reasonable volatility. Keep monitoring for rebalancing opportunities and stay disciplined."
+                }
+              </p>
+              <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/10">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">Risk Score</span>
+                  <span className={`text-sm font-black ${metrics.volatility > 30 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {metrics.volatility > 40 ? 'High' : metrics.volatility > 20 ? 'Medium' : 'Low'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">Diversification</span>
+                  <span className={`text-sm font-black ${metrics.diversificationScore >= 70 ? 'text-emerald-400' : metrics.diversificationScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
+                    {metrics.diversificationScore.toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Key Metrics Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
@@ -461,26 +500,6 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
                 <span className="text-xs text-slate-400">{a.name}: {a.percent.toFixed(1)}%</span>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Pro Tips */}
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20">
-          <div className="flex items-start gap-3">
-            <Zap className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <h4 className="font-bold text-white text-sm">AI Insight</h4>
-              <p className="text-xs text-slate-400 mt-1">
-                {metrics.diversificationScore < 50 
-                  ? "Your portfolio could benefit from more diversification. Consider adding assets from different sectors to reduce risk."
-                  : metrics.volatility > 40
-                  ? "Your portfolio has high volatility. Consider balancing with more stable assets to reduce daily swings."
-                  : metrics.sharpeRatio < 0.5
-                  ? "Your risk-adjusted returns could be improved. Focus on assets with better risk/reward ratios."
-                  : "Your portfolio shows healthy diversification and reasonable volatility. Keep monitoring for rebalancing opportunities."
-                }
-              </p>
-            </div>
           </div>
         </div>
       </div>

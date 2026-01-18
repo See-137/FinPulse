@@ -35,6 +35,8 @@ const POPULAR_ASSETS = [
   { symbol: 'META', name: 'Meta Platforms', type: 'STOCK' as AssetType },
   { symbol: 'PLTR', name: 'Palantir', type: 'STOCK' as AssetType },
   { symbol: 'GOLD', name: 'Gold', type: 'COMMODITY' as AssetType },
+  { symbol: 'SILVER', name: 'Silver', type: 'COMMODITY' as AssetType },
+  { symbol: 'OIL', name: 'Crude Oil', type: 'COMMODITY' as AssetType },
 ];
 
 // Real market prices fallback
@@ -56,6 +58,9 @@ const FALLBACK_PRICES: Record<string, { price: number; change24h: number }> = {
   META: { price: 595.80, change24h: 0.9 },
   PLTR: { price: 67.85, change24h: 2.4 },
   GOLD: { price: 2650, change24h: 0.3 },
+  SILVER: { price: 31.50, change24h: 0.8 },
+  OIL: { price: 72.50, change24h: -1.2 },
+  NATGAS: { price: 3.45, change24h: -2.1 },
 };
 
 export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio }) => {
