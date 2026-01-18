@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { getMarketInsightStream } from '../services/geminiService';
+import { getMarketInsightStream } from '../services/aiService';
 import { MessageSquareText, Send, Sparkles, X, ChevronRight, Mic, Lock, Crown } from 'lucide-react';
 import { User, Holding } from '../types';
 import { usePortfolioStore } from '../store/portfolioStore';

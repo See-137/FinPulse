@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { summarizeNews } from '../services/geminiService';
+import { summarizeNews } from '../services/aiService';
 import { fetchNews } from '../hooks/useMarketData';
 import { RefreshCw, ExternalLink } from 'lucide-react';
 

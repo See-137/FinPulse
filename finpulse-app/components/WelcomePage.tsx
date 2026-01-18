@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { getMarketInsightStream } from '../services/geminiService';
+import { getMarketInsightStream } from '../services/aiService';
 
 interface WelcomePageProps {
   userName: string;
