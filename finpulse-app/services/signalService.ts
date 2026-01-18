@@ -14,6 +14,35 @@ import {
 } from '../types';
 import { SIGNAL_SCORING } from '../constants';
 
+// Lazy imports for live data services to avoid circular dependencies
+let whaleWalletService: any = null;
+let technicalAnalysisService: any = null;
+let sentimentService: any = null;
+
+async function getWhaleService() {
+  if (!whaleWalletService) {
+    const { WhaleWalletService } = await import('./whaleWalletService');
+    whaleWalletService = new WhaleWalletService();
+  }
+  return whaleWalletService;
+}
+
+async function getTechnicalService() {
+  if (!technicalAnalysisService) {
+    const { TechnicalAnalysisService } = await import('./technicalAnalysisService');
+    technicalAnalysisService = new TechnicalAnalysisService();
+  }
+  return technicalAnalysisService;
+}
+
+async function getSentimentServiceInstance() {
+  if (!sentimentService) {
+    const { SentimentService } = await import('./sentimentService');
+    sentimentService = new SentimentService();
+  }
+  return sentimentService;
+}
+
 export const signalLogger = {
   debug: (msg: string, data?: any) => console.debug(`[Signal] ${msg}`, data),
   info: (msg: string, data?: any) => console.info(`[Signal] ${msg}`, data),
@@ -253,6 +282,110 @@ export function createMockSignals(symbol: string): { whale: WhaleSignal; trade: 
   };
 }
 
+/**
+ * Generate live signals for a symbol by fetching from all data sources
+ * This is the main integration point connecting live APIs to signal analysis
+ * @param symbol Asset symbol (BTC, ETH, etc.)
+ * @returns CombinedSignal with live data from all sources
+ */
+export async function generateLiveSignals(symbol: string): Promise<CombinedSignal> {
+  signalLogger.info(`Generating live signals for ${symbol}`);
+  
+  let whaleSignal: WhaleSignal | null = null;
+  let tradeSignal: TradeSignal | null = null;
+  let sentimentSignal: SentimentSignal | null = null;
+
+  // Fetch all signals in parallel with error handling for each
+  const results = await Promise.allSettled([
+    // Whale signal from whale wallet service
+    (async () => {
+      try {
+        const service = await getWhaleService();
+        const metrics = await service.getWhaleMetrics(symbol);
+        return service.convertToWhaleSignal(metrics);
+      } catch (error) {
+        signalLogger.warn(`Failed to fetch whale signal for ${symbol}:`, error);
+        return null;
+      }
+    })(),
+    
+    // Trade signal from technical analysis
+    (async () => {
+      try {
+        const service = await getTechnicalService();
+        const candles = await service.getOHLCV(symbol, '1h', 100);
+        const patterns = service.detectPatterns(candles);
+        const volume = service.analyzeVolume(candles);
+        return service.convertToTradeSignal(symbol, patterns, volume);
+      } catch (error) {
+        signalLogger.warn(`Failed to fetch trade signal for ${symbol}:`, error);
+        return null;
+      }
+    })(),
+    
+    // Sentiment signal from social data
+    (async () => {
+      try {
+        const service = await getSentimentServiceInstance();
+        return await service.getAggregatedSentiment(symbol);
+      } catch (error) {
+        signalLogger.warn(`Failed to fetch sentiment signal for ${symbol}:`, error);
+        return null;
+      }
+    })()
+  ]);
+
+  // Extract results
+  if (results[0].status === 'fulfilled' && results[0].value) {
+    whaleSignal = results[0].value;
+  }
+  if (results[1].status === 'fulfilled' && results[1].value) {
+    tradeSignal = results[1].value;
+  }
+  if (results[2].status === 'fulfilled' && results[2].value) {
+    sentimentSignal = results[2].value;
+  }
+
+  signalLogger.info(`Signals fetched for ${symbol}: whale=${!!whaleSignal}, trade=${!!tradeSignal}, sentiment=${!!sentimentSignal}`);
+
+  // Combine signals using existing logic
+  return combineSignals(symbol, whaleSignal, tradeSignal, sentimentSignal);
+}
+
+/**
+ * Generate live signals for multiple symbols in parallel
+ * @param symbols Array of asset symbols
+ * @returns Map of symbol to CombinedSignal
+ */
+export async function generateLiveSignalsBatch(symbols: string[]): Promise<Map<string, CombinedSignal>> {
+  signalLogger.info(`Generating live signals for ${symbols.length} symbols`);
+  
+  const results = await Promise.allSettled(
+    symbols.map(symbol => generateLiveSignals(symbol))
+  );
+
+  const signalMap = new Map<string, CombinedSignal>();
+  
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      signalMap.set(symbols[index], result.value);
+    } else {
+      signalLogger.error(`Failed to generate signals for ${symbols[index]}:`, result.reason);
+      // Add a neutral signal as fallback
+      signalMap.set(symbols[index], {
+        symbol: symbols[index],
+        direction: 'neutral',
+        confidenceScore: 0,
+        componentScores: { whale: 0, trade: 0, sentiment: 0 },
+        hasConflict: false,
+        createdAt: Date.now(),
+      });
+    }
+  });
+
+  return signalMap;
+}
+
 export default {
   validateSignal,
   calculateConfidence,
@@ -262,4 +395,6 @@ export default {
   combineSignals,
   getAverageAccuracy,
   createMockSignals,
+  generateLiveSignals,
+  generateLiveSignalsBatch,
 };

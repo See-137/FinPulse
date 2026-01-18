@@ -32,8 +32,16 @@ export const LEMONSQUEEZY_VARIANT_IDS: Record<Exclude<PlanType, 'FREE'>, string>
   SUPERPULSE: import.meta.env.VITE_LEMONSQUEEZY_VARIANT_SUPERPULSE || ''
 };
 
-// LemonSqueezy Store ID
-const STORE_ID = import.meta.env.VITE_LEMONSQUEEZY_STORE_ID || '';
+// Extend Window interface for LemonSqueezy.js
+declare global {
+  interface Window {
+    LemonSqueezy?: {
+      Url: {
+        Open: (url: string) => void;
+      };
+    };
+  }
+}
 
 interface CheckoutResponse {
   checkoutUrl: string;
@@ -241,8 +249,8 @@ export const openCheckoutOverlay = async (
   }
 
   // Check if LemonSqueezy.js is loaded
-  if (typeof window !== 'undefined' && (window as any).LemonSqueezy) {
-    (window as any).LemonSqueezy.Url.Open(
+  if (typeof window !== 'undefined' && window.LemonSqueezy) {
+    window.LemonSqueezy.Url.Open(
       `https://finpulse.lemonsqueezy.com/checkout/buy/${variantId}?` +
       `checkout[email]=${encodeURIComponent(email)}&` +
       `checkout[custom][user_id]=${encodeURIComponent(userId)}`
