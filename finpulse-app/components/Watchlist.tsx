@@ -67,6 +67,9 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
   const [alertModal, setAlertModal] = useState<{ symbol: string; currentPrice: number } | null>(null);
   const [alertPrice, setAlertPrice] = useState('');
   const [alertType, setAlertType] = useState<'above' | 'below'>('above');
+  
+  // Track triggered alerts to avoid repeated notifications
+  const [triggeredAlerts, setTriggeredAlerts] = useState<Set<string>>(new Set());
 
   // Get watchlist symbols for WebSocket (crypto only)
   const watchlistSymbols = useMemo(() => 
@@ -161,7 +164,55 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
 
   const handleRemoveAlert = (symbol: string) => {
     setWatchlistAlert(symbol, undefined, undefined);
+    // Remove from triggered alerts when alert is cleared
+    setTriggeredAlerts(prev => {
+      const next = new Set(prev);
+      next.delete(symbol);
+      return next;
+    });
   };
+
+  // Monitor prices and trigger browser notifications for alerts
+  useEffect(() => {
+    // Request notification permission on first render
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Check price alerts
+  useEffect(() => {
+    watchlist.forEach(item => {
+      if (!item.alertPrice || !item.alertType) return;
+      
+      const alertKey = `${item.symbol}-${item.alertPrice}-${item.alertType}`;
+      if (triggeredAlerts.has(alertKey)) return; // Already triggered
+      
+      const { price } = getPrice(item.symbol);
+      if (price === 0) return; // No price data yet
+      
+      const shouldTrigger = 
+        (item.alertType === 'above' && price >= item.alertPrice) ||
+        (item.alertType === 'below' && price <= item.alertPrice);
+      
+      if (shouldTrigger) {
+        // Mark as triggered
+        setTriggeredAlerts(prev => new Set(prev).add(alertKey));
+        
+        // Show browser notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(`🔔 FinPulse Price Alert`, {
+            body: `${item.symbol} is now ${item.alertType === 'above' ? 'above' : 'below'} $${item.alertPrice.toLocaleString()} (Current: $${price.toLocaleString()})`,
+            icon: '/favicon.ico',
+            tag: alertKey, // Prevents duplicate notifications
+          });
+        }
+        
+        // Also show in-page toast (fallback)
+        console.log(`[Alert] ${item.symbol} triggered: ${item.alertType} $${item.alertPrice}`);
+      }
+    });
+  }, [watchlist, wsPrices, marketPrices, triggeredAlerts]);
 
   return (
     <div className="space-y-6">
