@@ -295,6 +295,24 @@ async function getOrCreateUser(cognitoUser) {
 }
 
 /**
+ * Get user by email address
+ * Uses email-index GSI on users table
+ * Used to detect existing Cognito users during OAuth sign-in
+ */
+async function getUserByEmail(email) {
+  if (!email) return null;
+  
+  const result = await docClient.send(new QueryCommand({
+    TableName: USERS_TABLE,
+    IndexName: 'email-index',
+    KeyConditionExpression: 'email = :email',
+    ExpressionAttributeValues: { ':email': email.toLowerCase() }
+  }));
+  
+  return result.Items?.[0] || null;
+}
+
+/**
  * Update user profile
  */
 async function updateUser(userId, updates) {
@@ -516,8 +534,9 @@ async function linkIdentityToUser(userId, identityData) {
  * 
  * Flow:
  * 1. Check if identity exists → sign in existing user
- * 2. Check if email exists in another identity → return needsLinking
- * 3. Create new user and identity → return new user
+ * 2. Check if email exists in identities table → return needsLinking
+ * 3. Check if email exists in users table (legacy Cognito user) → return needsLinking
+ * 4. Create new user and identity → return new user
  */
 async function handleFederatedSignIn(federatedUser) {
   const { provider, providerSubject, email, emailVerified, name, picture } = federatedUser;
@@ -538,11 +557,11 @@ async function handleFederatedSignIn(federatedUser) {
     };
   }
   
-  // 2. Check if email already exists (account collision)
+  // 2. Check if email already exists in identities table (account collision)
   const emailIdentities = await getIdentitiesByEmail(email);
   
   if (emailIdentities.length > 0) {
-    // Email exists - require explicit linking (security: prevent account takeover)
+    // Email exists in identities - require explicit linking (security: prevent account takeover)
     const existingProviders = emailIdentities.map(i => i.provider);
     
     return {
@@ -554,7 +573,25 @@ async function handleFederatedSignIn(federatedUser) {
     };
   }
   
-  // 3. New user - create account and identity
+  // 3. Check if email exists in users table (legacy Cognito user without identity record)
+  // This catches users who signed up with email/password before the identities feature
+  const existingUserByEmail = await getUserByEmail(email);
+  
+  if (existingUserByEmail) {
+    // Legacy user exists - require linking via password authentication
+    console.log(`[OAuth] Found existing user by email: ${email}, requiring linking`);
+    
+    return {
+      success: false,
+      needsLinking: true,
+      email,
+      existingProviders: ['email/password'],
+      existingUserId: existingUserByEmail.userId,
+      message: `An account already exists for ${email}. Please sign in with your password first, then link your ${provider} account from Settings.`
+    };
+  }
+  
+  // 4. New user - create account and identity
   const userId = providerSubject; // Use provider's unique ID as our userId for federated users
   
   // Create user in users table

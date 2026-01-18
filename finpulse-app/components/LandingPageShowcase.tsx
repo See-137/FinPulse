@@ -159,6 +159,17 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [requiresKey, setRequiresKey] = useState(false);
   
+  // Sync initialError from parent (OAuth callback errors)
+  useEffect(() => {
+    if (initialError) {
+      setError(initialError);
+      // If it's an account linking error, make sure we're on signin mode
+      if (initialError.toLowerCase().includes('sign in with your password')) {
+        setAuthMode('signin');
+      }
+    }
+  }, [initialError]);
+  
   // Showcase State
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
