@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Logo } from '../constants';
 import { Shield, ArrowRight, Lock, User as UserIcon, Key, LayoutGrid, Wallet, Zap, MessageSquareText, Mail, CheckCircle, AlertCircle, Eye, EyeOff, TrendingUp, TrendingDown, DollarSign, Bitcoin, BarChart3, Globe, Send } from 'lucide-react';
 import { auth } from '../services/authService';
-import { PasswordStrengthMeter } from './PasswordStrengthMeter';
-import { TrustBadge, SecurityFooter } from './TrustBadges';
 
 interface LandingPageShowcaseProps {
   onLogin: (email: string, name: string) => void;
@@ -160,13 +158,6 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
   const [error, setError] = useState<string | null>(initialError || null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [requiresKey, setRequiresKey] = useState(false);
-
-  // Enhanced validation state
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [showPasswordStrength, setShowPasswordStrength] = useState(false);
-  const [emailTouched, setEmailTouched] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   
   // Sync initialError from parent (OAuth callback errors)
   useEffect(() => {
@@ -238,34 +229,6 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
     setSuccessMessage(null);
   };
 
-  // Email validation with typo suggestions
-  const validateEmail = (email: string): string | null => {
-    if (!email) return null;
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return 'Please enter a valid email address';
-    }
-
-    // Common typo suggestions
-    const domain = email.split('@')[1];
-    if (domain === 'gmial.com') return 'Did you mean gmail.com?';
-    if (domain === 'yahooo.com') return 'Did you mean yahoo.com?';
-    if (domain === 'gmai.com') return 'Did you mean gmail.com?';
-
-    return null;
-  };
-
-  // Password validation
-  const validatePassword = (password: string): string | null => {
-    if (!password) return null;
-    if (password.length < 8) return 'Password must be at least 8 characters';
-    if (!/[A-Z]/.test(password)) return 'Must include an uppercase letter';
-    if (!/[a-z]/.test(password)) return 'Must include a lowercase letter';
-    if (!/\d/.test(password)) return 'Must include a number';
-    return null;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
@@ -298,27 +261,20 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
         if (result.success && result.user) {
           onLogin(result.user.email, result.user.name);
         } else if (result.needsConfirmation) {
-          setError('Please verify your email first. Check your inbox for the confirmation code.');
+          setError('Please confirm your email first');
           setAuthMode('confirm');
-        } else if (result.error?.includes('Incorrect username or password') || result.error?.includes('User does not exist')) {
-          setError('Email or password is incorrect. Forgot your password?');
         } else {
-          setError(result.error || 'Sign in failed. Please check your credentials and try again.');
+          setError(result.error || 'Sign in failed');
         }
       } else if (authMode === 'confirm') {
         // Confirm Sign Up
-        const cleanCode = confirmCode.replace(/-/g, ''); // Remove formatting
-        const result = await auth.confirmSignUp(email, cleanCode);
+        const result = await auth.confirmSignUp(email, confirmCode);
         if (result.success) {
-          setShowSuccess(true);
-          setTimeout(() => {
-            setShowSuccess(false);
-            setSuccessMessage('Email confirmed! Signing you in...');
-            setAuthMode('signin');
-            setConfirmCode('');
-          }, 1500);
+          setSuccessMessage('Email confirmed! Please sign in.');
+          setAuthMode('signin');
+          setConfirmCode('');
         } else {
-          setError(result.error || 'Confirmation failed. Please check your code and try again.');
+          setError(result.error || 'Confirmation failed');
         }
       } else if (authMode === 'forgot') {
         // Forgot Password
@@ -456,34 +412,15 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Secure Email</label>
                     <div className="relative">
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input
+                        <input 
                         required
-                        type="email"
+                        type="email" 
                         placeholder="investor@institutional.com"
                         value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          clearMessages();
-                          if (emailTouched) {
-                            setEmailError(validateEmail(e.target.value));
-                          }
-                        }}
-                        onBlur={() => {
-                          setEmailTouched(true);
-                          setEmailError(validateEmail(email));
-                        }}
-                        aria-label="Email address"
-                        aria-invalid={!!emailError}
-                        aria-describedby={emailError ? "email-error" : undefined}
-                        className={`w-full bg-[#0b0e14] border ${emailError && emailTouched ? 'border-red-500/50' : 'border-white/10'} rounded-xl sm:rounded-2xl pl-12 pr-5 py-4 sm:py-3.5 text-base sm:text-sm text-white focus:ring-2 focus:ring-[#00e5ff] focus:border-[#00e5ff] outline-none transition-all`}
+                        onChange={(e) => { setEmail(e.target.value); clearMessages(); }}
+                        className="w-full bg-[#0b0e14] border border-white/10 rounded-xl sm:rounded-2xl pl-12 pr-5 py-3.5 text-sm text-white focus:ring-1 focus:ring-[#00e5ff] outline-none transition-all"
                         />
                     </div>
-                    {emailError && emailTouched && (
-                      <div id="email-error" role="alert" className="flex items-center gap-1.5 text-red-400 text-[10px] animate-in fade-in slide-in-from-top-1">
-                        <AlertCircle className="w-3 h-3" />
-                        <span>{emailError}</span>
-                      </div>
-                    )}
                 </div>
                 )}
 
@@ -493,41 +430,24 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Password</label>
                     <div className="relative">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input
+                        <input 
                         required
                         type={showPassword ? 'text' : 'password'}
                         placeholder="••••••••"
                         value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          clearMessages();
-                          if (authMode === 'signup') {
-                            setPasswordError(validatePassword(e.target.value));
-                          }
-                        }}
-                        onFocus={() => authMode === 'signup' && setShowPasswordStrength(true)}
-                        aria-label="Password"
-                        aria-invalid={!!passwordError}
-                        aria-describedby={passwordError ? "password-error" : undefined}
-                        className={`w-full bg-[#0b0e14] border ${passwordError && authMode === 'signup' ? 'border-orange-500/50' : 'border-white/10'} rounded-xl sm:rounded-2xl pl-12 pr-12 py-4 sm:py-3.5 text-base sm:text-sm text-white focus:ring-2 focus:ring-[#00e5ff] focus:border-[#00e5ff] outline-none transition-all`}
+                        onChange={(e) => { setPassword(e.target.value); clearMessages(); }}
+                        className="w-full bg-[#0b0e14] border border-white/10 rounded-xl sm:rounded-2xl pl-12 pr-12 py-3.5 text-sm text-white focus:ring-1 focus:ring-[#00e5ff] outline-none transition-all"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors p-1"
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
                         >
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                     </div>
-                    {passwordError && authMode === 'signup' && (
-                      <div id="password-error" role="alert" className="flex items-center gap-1.5 text-orange-400 text-[10px] animate-in fade-in slide-in-from-top-1">
-                        <AlertCircle className="w-3 h-3" />
-                        <span>{passwordError}</span>
-                      </div>
-                    )}
                     {authMode === 'signup' && (
-                      <PasswordStrengthMeter password={password} show={showPasswordStrength} />
+                      <p className="text-[9px] text-slate-600 ml-1">Min 8 characters, include uppercase, lowercase, number</p>
                     )}
                     </div>
                 )}
@@ -538,25 +458,16 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Verification Code</label>
                     <div className="relative">
                         <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input
+                        <input 
                         required
-                        type="text"
-                        inputMode="numeric"
+                        type="text" 
                         placeholder="123456"
                         value={confirmCode}
-                        onChange={(e) => {
-                          // Auto-format as XXX-XXX and only allow digits
-                          const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                          const formatted = value.length > 3 ? `${value.slice(0, 3)}-${value.slice(3)}` : value;
-                          setConfirmCode(formatted);
-                          clearMessages();
-                        }}
-                        aria-label="Verification code"
-                        className="w-full bg-[#0b0e14] border border-white/10 rounded-xl sm:rounded-2xl pl-12 pr-5 py-4 sm:py-3.5 text-lg sm:text-base text-white focus:ring-2 focus:ring-[#00e5ff] focus:border-[#00e5ff] outline-none transition-all tracking-[0.5em] text-center font-mono"
-                        maxLength={7}
+                        onChange={(e) => { setConfirmCode(e.target.value); clearMessages(); }}
+                        className="w-full bg-[#0b0e14] border border-white/10 rounded-xl sm:rounded-2xl pl-12 pr-5 py-3.5 text-sm text-white focus:ring-1 focus:ring-[#00e5ff] outline-none transition-all tracking-widest text-center font-mono"
+                        maxLength={6}
                         />
                     </div>
-                    <p className="text-[9px] text-slate-600 ml-1 text-center">Enter the 6-digit code from your email</p>
                     </div>
                 )}
 
@@ -606,24 +517,16 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                     </button>
                     </div>
                 ) : (
-                    <button
+                    <button 
                     type="submit"
-                    disabled={isLoading || (authMode === 'signup' && (!!emailError || !!passwordError))}
-                    aria-label={authMode === 'signup' ? 'Create free account' : authMode === 'signin' ? 'Sign in to your account' : 'Submit form'}
-                    className={`w-full py-3.5 sm:py-4 font-black uppercase tracking-widest rounded-xl sm:rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg gap-2 mt-4 text-[11px] sm:text-xs ${
-                      isLoading || (authMode === 'signup' && (!!emailError || !!passwordError))
-                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                        : 'bg-white text-[#0b0e14] hover:bg-[#00e5ff] hover:scale-[1.02] active:scale-[0.98] shadow-[#00e5ff]/20'
-                    }`}
+                    disabled={isLoading}
+                    className="w-full py-3.5 sm:py-4 bg-white text-[#0b0e14] font-black uppercase tracking-widest rounded-xl sm:rounded-2xl hover:bg-[#00e5ff] transition-all flex items-center justify-center shadow-lg gap-2 mt-4 text-[11px] sm:text-xs"
                     >
                     {isLoading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 border-2 border-[#0b0e14]/20 border-t-[#0b0e14] rounded-full animate-spin"></div>
-                          <span>Processing...</span>
-                        </div>
+                        <div className="w-5 h-5 border-2 border-[#0b0e14]/20 border-t-[#0b0e14] rounded-full animate-spin"></div>
                     ) : (
                         <>
-                        {authMode === 'signup' && 'Create Free Account'}
+                        {authMode === 'signup' && 'Create Account'}
                         {authMode === 'signin' && 'Sign In'}
                         {authMode === 'confirm' && 'Verify Email'}
                         {authMode === 'forgot' && 'Send Reset Code'}
@@ -662,25 +565,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                     </button>
                   </div>
                 )}
-
-                {/* Trust Badges & Security Footer */}
-                {(authMode === 'signin' || authMode === 'signup') && !requiresKey && (
-                  <div className="mt-6 space-y-4">
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <TrustBadge variant="security" text="256-bit encryption" />
-                      <TrustBadge variant="privacy" text="Read-only access" />
-                    </div>
-                    <SecurityFooter />
-                  </div>
-                )}
                 
-                {/* Keyboard Hint */}
-                {(authMode === 'signin' || authMode === 'signup') && (
-                  <div className="text-[9px] text-slate-600 text-center mt-3">
-                    Press <kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-slate-500">Tab</kbd> to navigate • <kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-slate-500">Enter</kbd> to submit
-                  </div>
-                )}
-
                 {/* Navigation Links */}
                 <div className="mt-4 text-center space-y-2">
                    {authMode === 'signin' && (
@@ -829,17 +714,6 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
            ))}
         </div>
       </div>
-
-      {/* Success Animation Overlay */}
-      {showSuccess && (
-        <div className="fixed inset-0 flex items-center justify-center bg-[#0b0e14]/80 backdrop-blur-sm z-50 animate-in fade-in duration-300">
-          <div className="bg-white/10 backdrop-blur-xl p-8 rounded-3xl border border-white/20 animate-in zoom-in-95 duration-300">
-            <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4 animate-pulse" strokeWidth={2.5} />
-            <p className="text-white text-lg font-black text-center">Success!</p>
-            <p className="text-slate-400 text-sm text-center mt-2">Email verified successfully</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
