@@ -64,17 +64,73 @@ const corsHeaders = {
 };
 
 /**
- * Extract user ID from Cognito JWT
+ * Parse cookies from request header
+ */
+function parseCookies(cookieHeader) {
+  const cookies = {};
+  if (!cookieHeader) return cookies;
+  
+  cookieHeader.split(';').forEach(cookie => {
+    const [name, ...rest] = cookie.trim().split('=');
+    if (name) {
+      cookies[name] = rest.join('=');
+    }
+  });
+  
+  return cookies;
+}
+
+/**
+ * Decode JWT token (without validation - API Gateway validates)
+ */
+function decodeJwt(token) {
+  try {
+    const cleanToken = token.replace(/^Bearer\s+/i, '');
+    const parts = cleanToken.split('.');
+    if (parts.length !== 3) return null;
+    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
+    return JSON.parse(payload);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Extract user ID from Cognito JWT (supports cookies, headers, and authorizer)
  */
 function getUserIdFromEvent(event) {
   // From API Gateway with Cognito authorizer
   if (event.requestContext?.authorizer?.claims?.sub) {
     return event.requestContext.authorizer.claims.sub;
   }
+  
+  // From httpOnly cookies (preferred for security)
+  const cookieHeader = event.headers?.Cookie || event.headers?.cookie;
+  if (cookieHeader) {
+    const cookies = parseCookies(cookieHeader);
+    const idToken = cookies.finpulse_id_token;
+    if (idToken) {
+      const claims = decodeJwt(idToken);
+      if (claims?.sub) {
+        return claims.sub;
+      }
+    }
+  }
+  
+  // From Authorization header (backward compatibility)
+  const authHeader = event.headers?.Authorization || event.headers?.authorization;
+  if (authHeader) {
+    const claims = decodeJwt(authHeader);
+    if (claims?.sub) {
+      return claims.sub;
+    }
+  }
+  
   // From headers for testing
   if (event.headers?.['x-user-id']) {
     return event.headers['x-user-id'];
   }
+  
   return null;
 }
 

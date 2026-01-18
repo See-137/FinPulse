@@ -77,6 +77,7 @@ class ApiService {
         ...options,
         headers,
         signal: controller.signal,
+        credentials: 'include', // Include httpOnly cookies for auth
       });
 
       clearTimeout(timeoutId);
