@@ -6,8 +6,9 @@ import { config } from '../config';
 // Portfolio holding type for AI context
 interface PortfolioHolding {
   symbol: string;
-  shares: number;
-  avgPrice?: number;
+  name?: string;
+  quantity: number;
+  avgCost?: number;
   currentPrice?: number;
   type?: string;
 }

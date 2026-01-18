@@ -149,10 +149,23 @@ exports.handler = async (event) => {
     // Build portfolio context if provided
     let portfolioContext = '';
     if (portfolio && Array.isArray(portfolio) && portfolio.length > 0) {
-      const holdings = portfolio.map(h => 
-        `- ${h.symbol}: ${h.shares} shares @ $${h.avgPrice?.toFixed(2) || 'N/A'} avg, current: $${h.currentPrice?.toFixed(2) || 'N/A'}, type: ${h.type || 'UNKNOWN'}`
-      ).join('\n');
-      portfolioContext = `\n\nUSER'S CURRENT PORTFOLIO:\n${holdings}\n\nAnalyze this portfolio based on the user's query.`;
+      const holdings = portfolio.map(h => {
+        const qty = h.quantity || h.shares || 0;
+        const avg = h.avgCost || h.avgPrice || 0;
+        const current = h.currentPrice || 0;
+        const value = qty * current;
+        const gainLoss = qty * (current - avg);
+        const gainLossPct = avg > 0 ? ((current - avg) / avg * 100).toFixed(2) : 'N/A';
+        return `- ${h.symbol}${h.name ? ` (${h.name})` : ''}: ${qty} units @ $${avg.toFixed(2)} avg cost, current: $${current.toFixed(2)}, value: $${value.toFixed(2)}, P/L: $${gainLoss.toFixed(2)} (${gainLossPct}%), type: ${h.type || 'UNKNOWN'}`;
+      }).join('\n');
+      
+      // Calculate totals
+      const totalValue = portfolio.reduce((sum, h) => sum + ((h.quantity || h.shares || 0) * (h.currentPrice || 0)), 0);
+      const totalCost = portfolio.reduce((sum, h) => sum + ((h.quantity || h.shares || 0) * (h.avgCost || h.avgPrice || 0)), 0);
+      const totalPL = totalValue - totalCost;
+      const totalPLPct = totalCost > 0 ? ((totalPL / totalCost) * 100).toFixed(2) : 'N/A';
+      
+      portfolioContext = `\n\nUSER'S CURRENT PORTFOLIO:\n${holdings}\n\nPORTFOLIO SUMMARY:\n- Total Value: $${totalValue.toFixed(2)}\n- Total Cost Basis: $${totalCost.toFixed(2)}\n- Total P/L: $${totalPL.toFixed(2)} (${totalPLPct}%)\n- Number of Holdings: ${portfolio.length}\n\nAnalyze this portfolio based on the user's query.`;
     }
 
     // Get OpenAI API key
