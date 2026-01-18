@@ -4,7 +4,7 @@
 locals {
   staging_suffix = "-staging"
   
-  # Staging functions - now including news
+  # Staging functions - now including news and payments
   lambda_functions_staging = {
     auth        = "finpulse-auth-staging"
     portfolio   = "finpulse-portfolio-staging"
@@ -14,6 +14,7 @@ locals {
     community   = "finpulse-community-staging"
     admin       = "finpulse-admin-staging"
     ai          = "finpulse-ai-staging"
+    payments    = "finpulse-payments-staging"
   }
 }
 
