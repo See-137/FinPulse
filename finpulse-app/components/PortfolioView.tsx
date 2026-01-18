@@ -519,7 +519,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     
     sortedHoldings.forEach(holding => {
       // Get 24h change to influence signal direction
-      const change24h = getChange24h(holding.symbol, holding.dayPL);
+      const change24h = getMarketChange(holding.symbol, holding.dayPL);
       
       // Generate mock signals for this symbol with price context
       const mockSignals = signalService.createMockSignals(holding.symbol, change24h);
