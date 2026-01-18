@@ -80,8 +80,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
             <div className="card-surface p-6 sm:p-8 rounded-[24px] sm:rounded-[32px] border-white/5 shadow-2xl bg-[#151921]/50 backdrop-blur-xl mb-12">
                 <div className="flex items-center justify-between mb-6 sm:mb-8">
                 <div>
-                    <h3 className="text-white font-black text-lg sm:text-xl mb-1">{isSignUp ? 'Establish Pulse Node' : 'Connect Session'}</h3>
-                    <p className="text-slate-500 text-[10px] sm:text-xs">{isSignUp ? 'Start your high-fidelity tracking' : 'Access your portfolio dashboard'}</p>
+                    <h3 className="text-white font-black text-lg sm:text-xl mb-1">{isSignUp ? 'Start Your Pulse' : 'Check Your Pulse'}</h3>
+                    <p className="text-slate-500 text-[10px] sm:text-xs">{isSignUp ? 'Track all your assets in one place - free' : 'Welcome back to your portfolio dashboard'}</p>
                 </div>
                 </div>
 
@@ -162,7 +162,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                         <div className="w-5 h-5 border-2 border-[#0b0e14]/20 border-t-[#0b0e14] rounded-full animate-spin"></div>
                     ) : (
                         <>
-                        {isSignUp ? 'Establish Pulse' : 'Connect Session'}
+                        {isSignUp ? 'Start Tracking Free' : 'Check My Pulse'}
                         <ArrowRight className="w-4 h-4" />
                         </>
                     )}
@@ -193,16 +193,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 </form>
 
                 <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/5 text-center">
-                <p className="text-slate-500 text-[10px] sm:text-xs font-medium">
-                    {isSignUp ? 'Already have a pulse?' : "First time here?"}{' '}
-                    <button 
+                <div className="flex items-center gap-2 justify-center">
+                  <span className="text-slate-500 text-sm">
+                    {isSignUp ? 'Already tracking?' : 'New to FinPulse?'}
+                  </span>
+                  <button
                     onClick={() => setIsSignUp(!isSignUp)}
                     aria-label={isSignUp ? 'Switch to sign in' : 'Switch to sign up'}
-                    className="text-[#00e5ff] font-black uppercase tracking-widest hover:underline transition-all"
-                    >
-                    {isSignUp ? 'Sign In' : 'Sign Up'}
-                    </button>
-                </p>
+                    className="text-[#00e5ff] text-sm font-bold hover:underline transition-all hover:scale-105"
+                  >
+                    {isSignUp ? 'Check Your Pulse →' : 'Start Tracking Free →'}
+                  </button>
+                </div>
                 </div>
             </div>
 
