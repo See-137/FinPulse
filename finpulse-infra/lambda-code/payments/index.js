@@ -1,39 +1,88 @@
 /**
- * Stripe Payments Lambda
+ * LemonSqueezy Payments Lambda
  * Handles checkout sessions, webhooks, and subscription management
+ * 
+ * LemonSqueezy API: https://docs.lemonsqueezy.com/api
+ * Webhooks: https://docs.lemonsqueezy.com/guides/developer-guide/webhooks
  */
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const crypto = require('crypto');
 
-// Plan mapping
-const PLAN_MAPPING = {
-  'price_pro_monthly': 'PRO',
-  'price_team_monthly': 'TEAM',
-  // Add your actual Stripe price IDs here
+// LemonSqueezy API configuration
+const LEMONSQUEEZY_API_KEY = process.env.LEMONSQUEEZY_API_KEY;
+const LEMONSQUEEZY_STORE_ID = process.env.LEMONSQUEEZY_STORE_ID;
+const LEMONSQUEEZY_WEBHOOK_SECRET = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
+const LEMONSQUEEZY_API_URL = 'https://api.lemonsqueezy.com/v1';
+
+// Plan mapping: LemonSqueezy variant ID -> Plan name
+const VARIANT_TO_PLAN = {
+  [process.env.LEMONSQUEEZY_VARIANT_PROPULSE]: 'PROPULSE',
+  [process.env.LEMONSQUEEZY_VARIANT_SUPERPULSE]: 'SUPERPULSE',
 };
 
 const PLAN_LIMITS = {
-  FREE: { maxAssets: 10, maxAiQueries: 5 },
-  PRO: { maxAssets: 50, maxAiQueries: 100 },
-  TEAM: { maxAssets: 1000, maxAiQueries: 1000 }
+  FREE: { maxAssets: 10, maxAiQueries: 10 },
+  PROPULSE: { maxAssets: 50, maxAiQueries: 100 },
+  SUPERPULSE: { maxAssets: 500, maxAiQueries: 1000 }
 };
 
 // CORS headers
 const headers = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, stripe-signature',
+  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://finpulse.me',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Signature',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Content-Type': 'application/json'
 };
 
-// DynamoDB for storing customer data
+// AWS SDK
 const AWS = require('aws-sdk');
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const USERS_TABLE = process.env.USERS_TABLE || 'finpulse-users';
 const SUBSCRIPTIONS_TABLE = process.env.SUBSCRIPTIONS_TABLE || 'finpulse-subscriptions';
 
 /**
- * Sanitize event for logging (remove sensitive headers)
+ * Make authenticated request to LemonSqueezy API
+ */
+async function lemonSqueezyRequest(endpoint, options = {}) {
+  const response = await fetch(`${LEMONSQUEEZY_API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Accept': 'application/vnd.api+json',
+      'Content-Type': 'application/vnd.api+json',
+      'Authorization': `Bearer ${LEMONSQUEEZY_API_KEY}`,
+      ...options.headers
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('LemonSqueezy API error:', response.status, error);
+    throw new Error(`LemonSqueezy API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Verify webhook signature
+ */
+function verifyWebhookSignature(payload, signature) {
+  if (!LEMONSQUEEZY_WEBHOOK_SECRET) {
+    console.warn('No webhook secret configured, skipping verification');
+    return true;
+  }
+
+  const hmac = crypto.createHmac('sha256', LEMONSQUEEZY_WEBHOOK_SECRET);
+  const digest = hmac.update(payload).digest('hex');
+  
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(digest)
+  );
+}
+
+/**
+ * Sanitize event for logging
  */
 function sanitizeEvent(event) {
   const sanitized = { ...event };
@@ -41,11 +90,9 @@ function sanitizeEvent(event) {
     sanitized.headers = { ...sanitized.headers };
     delete sanitized.headers.Authorization;
     delete sanitized.headers.authorization;
-    delete sanitized.headers.Cookie;
-    delete sanitized.headers.cookie;
-    delete sanitized.headers['stripe-signature'];
+    delete sanitized.headers['X-Signature'];
+    delete sanitized.headers['x-signature'];
   }
-  // Don't log full webhook body (contains sensitive payment data)
   if (sanitized.body && sanitized.path?.includes('webhook')) {
     sanitized.body = '[REDACTED - webhook payload]';
   }
@@ -92,12 +139,6 @@ exports.handler = async (event) => {
       return await handleResumeSubscription(userId);
     }
     
-    // Verify session
-    if (path.includes('/verify-session/') && method === 'GET') {
-      const sessionId = path.split('/verify-session/')[1];
-      return await handleVerifySession(sessionId);
-    }
-    
     // Webhook
     if (path.endsWith('/webhook') && method === 'POST') {
       return await handleWebhook(event);
@@ -120,88 +161,92 @@ exports.handler = async (event) => {
 };
 
 /**
- * Create a Stripe Checkout session
+ * Create a LemonSqueezy Checkout
+ * https://docs.lemonsqueezy.com/api/checkouts
  */
 async function handleCreateCheckout(body) {
-  const { userId, email, priceId, plan, successUrl, cancelUrl } = body;
+  const { userId, email, variantId, plan, successUrl, cancelUrl } = body;
 
-  // Get or create Stripe customer
-  let customerId;
-  
-  // Check if user already has a Stripe customer ID
-  const existingUser = await dynamoDB.get({
-    TableName: USERS_TABLE,
-    Key: { userId }
-  }).promise();
-
-  if (existingUser.Item?.stripeCustomerId) {
-    customerId = existingUser.Item.stripeCustomerId;
-  } else {
-    // Create new Stripe customer
-    const customer = await stripe.customers.create({
-      email,
-      metadata: { userId }
-    });
-    customerId = customer.id;
-
-    // Store customer ID
-    await dynamoDB.update({
-      TableName: USERS_TABLE,
-      Key: { userId },
-      UpdateExpression: 'SET stripeCustomerId = :cid, email = :email',
-      ExpressionAttributeValues: {
-        ':cid': customerId,
-        ':email': email
-      }
-    }).promise();
-  }
-
-  // Create checkout session
-  const session = await stripe.checkout.sessions.create({
-    customer: customerId,
-    payment_method_types: ['card'],
-    line_items: [{
-      price: priceId,
-      quantity: 1
-    }],
-    mode: 'subscription',
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    metadata: {
-      userId,
-      plan
-    },
-    subscription_data: {
-      metadata: {
-        userId,
-        plan
+  // Create checkout via LemonSqueezy API
+  const checkoutData = {
+    data: {
+      type: 'checkouts',
+      attributes: {
+        checkout_data: {
+          email: email,
+          custom: {
+            user_id: userId
+          }
+        },
+        checkout_options: {
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          button_color: '#00e5ff'
+        },
+        product_options: {
+          redirect_url: successUrl,
+          receipt_button_text: 'Go to Dashboard',
+          receipt_link_url: successUrl
+        }
+      },
+      relationships: {
+        store: {
+          data: {
+            type: 'stores',
+            id: LEMONSQUEEZY_STORE_ID
+          }
+        },
+        variant: {
+          data: {
+            type: 'variants',
+            id: variantId
+          }
+        }
       }
     }
+  };
+
+  const result = await lemonSqueezyRequest('/checkouts', {
+    method: 'POST',
+    body: JSON.stringify(checkoutData)
   });
+
+  const checkoutUrl = result.data.attributes.url;
+
+  // Store pending checkout
+  await dynamoDB.put({
+    TableName: SUBSCRIPTIONS_TABLE,
+    Item: {
+      userId,
+      status: 'pending',
+      plan,
+      variantId,
+      checkoutUrl,
+      createdAt: new Date().toISOString()
+    }
+  }).promise();
 
   return {
     statusCode: 200,
     headers,
-    body: JSON.stringify({
-      sessionId: session.id,
-      url: session.url
-    })
+    body: JSON.stringify({ checkoutUrl })
   };
 }
 
 /**
- * Create customer portal session
+ * Get customer portal URL
+ * LemonSqueezy provides customer portal links on subscriptions
  */
 async function handleCustomerPortal(body) {
   const { userId, returnUrl } = body;
 
-  // Get customer ID
-  const user = await dynamoDB.get({
-    TableName: USERS_TABLE,
+  // Get subscription from DynamoDB
+  const subscription = await dynamoDB.get({
+    TableName: SUBSCRIPTIONS_TABLE,
     Key: { userId }
   }).promise();
 
-  if (!user.Item?.stripeCustomerId) {
+  if (!subscription.Item?.lemonSqueezySubscriptionId) {
     return {
       statusCode: 404,
       headers,
@@ -209,15 +254,17 @@ async function handleCustomerPortal(body) {
     };
   }
 
-  const session = await stripe.billingPortal.sessions.create({
-    customer: user.Item.stripeCustomerId,
-    return_url: returnUrl
-  });
+  // Get subscription details from LemonSqueezy
+  const result = await lemonSqueezyRequest(
+    `/subscriptions/${subscription.Item.lemonSqueezySubscriptionId}`
+  );
+
+  const portalUrl = result.data.attributes.urls.customer_portal;
 
   return {
     statusCode: 200,
     headers,
-    body: JSON.stringify({ url: session.url })
+    body: JSON.stringify({ url: portalUrl || returnUrl })
   };
 }
 
@@ -230,18 +277,23 @@ async function handleGetSubscription(userId) {
     Key: { userId }
   }).promise();
 
-  if (!subscription.Item) {
+  if (!subscription.Item || subscription.Item.status === 'pending') {
     return {
       statusCode: 404,
       headers,
-      body: JSON.stringify({ error: 'No subscription found' })
+      body: JSON.stringify({ error: 'No active subscription found' })
     };
   }
 
   return {
     statusCode: 200,
     headers,
-    body: JSON.stringify(subscription.Item)
+    body: JSON.stringify({
+      status: subscription.Item.status,
+      plan: subscription.Item.plan,
+      currentPeriodEnd: subscription.Item.currentPeriodEnd,
+      cancelAtPeriodEnd: subscription.Item.cancelAtPeriodEnd || false
+    })
   };
 }
 
@@ -254,7 +306,7 @@ async function handleCancelSubscription(userId) {
     Key: { userId }
   }).promise();
 
-  if (!subscription.Item?.stripeSubscriptionId) {
+  if (!subscription.Item?.lemonSqueezySubscriptionId) {
     return {
       statusCode: 404,
       headers,
@@ -262,10 +314,15 @@ async function handleCancelSubscription(userId) {
     };
   }
 
-  await stripe.subscriptions.update(subscription.Item.stripeSubscriptionId, {
-    cancel_at_period_end: true
-  });
+  // Cancel via LemonSqueezy API
+  await lemonSqueezyRequest(
+    `/subscriptions/${subscription.Item.lemonSqueezySubscriptionId}`,
+    {
+      method: 'DELETE'
+    }
+  );
 
+  // Update local record
   await dynamoDB.update({
     TableName: SUBSCRIPTIONS_TABLE,
     Key: { userId },
@@ -281,7 +338,7 @@ async function handleCancelSubscription(userId) {
 }
 
 /**
- * Resume subscription
+ * Resume subscription (uncancel)
  */
 async function handleResumeSubscription(userId) {
   const subscription = await dynamoDB.get({
@@ -289,7 +346,7 @@ async function handleResumeSubscription(userId) {
     Key: { userId }
   }).promise();
 
-  if (!subscription.Item?.stripeSubscriptionId) {
+  if (!subscription.Item?.lemonSqueezySubscriptionId) {
     return {
       statusCode: 404,
       headers,
@@ -297,9 +354,22 @@ async function handleResumeSubscription(userId) {
     };
   }
 
-  await stripe.subscriptions.update(subscription.Item.stripeSubscriptionId, {
-    cancel_at_period_end: false
-  });
+  // Resume via LemonSqueezy API (update cancelled to false)
+  await lemonSqueezyRequest(
+    `/subscriptions/${subscription.Item.lemonSqueezySubscriptionId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        data: {
+          type: 'subscriptions',
+          id: subscription.Item.lemonSqueezySubscriptionId,
+          attributes: {
+            cancelled: false
+          }
+        }
+      })
+    }
+  );
 
   await dynamoDB.update({
     TableName: SUBSCRIPTIONS_TABLE,
@@ -316,47 +386,15 @@ async function handleResumeSubscription(userId) {
 }
 
 /**
- * Verify checkout session
- */
-async function handleVerifySession(sessionId) {
-  const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-  if (session.payment_status !== 'paid') {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: 'Payment not completed' })
-    };
-  }
-
-  return {
-    statusCode: 200,
-    headers,
-    body: JSON.stringify({
-      success: true,
-      plan: session.metadata.plan,
-      userId: session.metadata.userId
-    })
-  };
-}
-
-/**
- * Handle Stripe webhooks
+ * Handle LemonSqueezy webhooks
+ * https://docs.lemonsqueezy.com/guides/developer-guide/webhooks
  */
 async function handleWebhook(event) {
-  const sig = event.headers['stripe-signature'] || event.headers['Stripe-Signature'];
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  let stripeEvent;
-
-  try {
-    stripeEvent = stripe.webhooks.constructEvent(
-      event.body,
-      sig,
-      endpointSecret
-    );
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
+  const signature = event.headers['X-Signature'] || event.headers['x-signature'];
+  
+  // Verify signature
+  if (!verifyWebhookSignature(event.body, signature)) {
+    console.error('Invalid webhook signature');
     return {
       statusCode: 400,
       headers,
@@ -364,72 +402,93 @@ async function handleWebhook(event) {
     };
   }
 
-  console.log('Webhook event type:', stripeEvent.type);
+  const payload = JSON.parse(event.body);
+  const eventName = payload.meta.event_name;
+  const data = payload.data;
 
-  switch (stripeEvent.type) {
-    case 'checkout.session.completed': {
-      const session = stripeEvent.data.object;
-      await handleCheckoutComplete(session);
-      break;
+  console.log('Webhook event:', eventName);
+
+  try {
+    switch (eventName) {
+      case 'subscription_created':
+        await handleSubscriptionCreated(payload);
+        break;
+
+      case 'subscription_updated':
+        await handleSubscriptionUpdated(payload);
+        break;
+
+      case 'subscription_cancelled':
+        await handleSubscriptionCancelled(payload);
+        break;
+
+      case 'subscription_expired':
+        await handleSubscriptionExpired(payload);
+        break;
+
+      case 'subscription_payment_success':
+        console.log('Payment succeeded for subscription:', data.id);
+        break;
+
+      case 'subscription_payment_failed':
+        await handlePaymentFailed(payload);
+        break;
+
+      default:
+        console.log('Unhandled webhook event:', eventName);
     }
 
-    case 'customer.subscription.updated': {
-      const subscription = stripeEvent.data.object;
-      await handleSubscriptionUpdate(subscription);
-      break;
-    }
-
-    case 'customer.subscription.deleted': {
-      const subscription = stripeEvent.data.object;
-      await handleSubscriptionDeleted(subscription);
-      break;
-    }
-
-    case 'invoice.payment_failed': {
-      const invoice = stripeEvent.data.object;
-      await handlePaymentFailed(invoice);
-      break;
-    }
-
-    default:
-      console.log('Unhandled event type:', stripeEvent.type);
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ received: true })
+    };
+  } catch (error) {
+    console.error('Webhook processing error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Webhook processing failed' })
+    };
   }
-
-  return {
-    statusCode: 200,
-    headers,
-    body: JSON.stringify({ received: true })
-  };
 }
 
 /**
- * Handle successful checkout
+ * Handle new subscription
  */
-async function handleCheckoutComplete(session) {
-  const userId = session.metadata.userId;
-  const plan = session.metadata.plan;
-  const subscriptionId = session.subscription;
+async function handleSubscriptionCreated(payload) {
+  const data = payload.data;
+  const attributes = data.attributes;
+  const customData = payload.meta.custom_data || {};
+  const userId = customData.user_id;
 
-  // Get subscription details
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  if (!userId) {
+    console.error('No user_id in subscription custom data');
+    return;
+  }
 
-  // Store subscription info
+  const variantId = attributes.variant_id.toString();
+  const plan = VARIANT_TO_PLAN[variantId] || 'PROPULSE';
+  const limits = PLAN_LIMITS[plan];
+
+  // Store subscription
   await dynamoDB.put({
     TableName: SUBSCRIPTIONS_TABLE,
     Item: {
       userId,
-      stripeSubscriptionId: subscriptionId,
-      stripeCustomerId: session.customer,
+      lemonSqueezySubscriptionId: data.id,
+      lemonSqueezyCustomerId: attributes.customer_id,
       plan,
-      status: subscription.status,
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      createdAt: new Date().toISOString()
+      variantId,
+      status: attributes.status,
+      currentPeriodEnd: attributes.renews_at,
+      cancelAtPeriodEnd: attributes.cancelled || false,
+      createdAt: attributes.created_at,
+      updatedAt: new Date().toISOString()
     }
   }).promise();
 
   // Update user plan
-  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.FREE;
   await dynamoDB.update({
     TableName: USERS_TABLE,
     Key: { userId },
@@ -443,54 +502,127 @@ async function handleCheckoutComplete(session) {
     }
   }).promise();
 
-  console.log(`User ${userId} upgraded to ${plan}`);
+  console.log(`User ${userId} subscribed to ${plan}`);
 }
 
 /**
  * Handle subscription update
  */
-async function handleSubscriptionUpdate(subscription) {
-  const userId = subscription.metadata.userId;
-  const plan = subscription.metadata.plan;
+async function handleSubscriptionUpdated(payload) {
+  const data = payload.data;
+  const attributes = data.attributes;
+  const customData = payload.meta.custom_data || {};
+  const userId = customData.user_id;
 
   if (!userId) {
-    console.log('No userId in subscription metadata');
+    // Try to find by subscription ID
+    const result = await dynamoDB.scan({
+      TableName: SUBSCRIPTIONS_TABLE,
+      FilterExpression: 'lemonSqueezySubscriptionId = :sid',
+      ExpressionAttributeValues: { ':sid': data.id }
+    }).promise();
+
+    if (!result.Items || result.Items.length === 0) {
+      console.error('Cannot find user for subscription:', data.id);
+      return;
+    }
+
+    const foundUserId = result.Items[0].userId;
+    await updateSubscriptionStatus(foundUserId, attributes);
     return;
   }
 
+  await updateSubscriptionStatus(userId, attributes);
+}
+
+async function updateSubscriptionStatus(userId, attributes) {
   await dynamoDB.update({
     TableName: SUBSCRIPTIONS_TABLE,
     Key: { userId },
-    UpdateExpression: 'SET #status = :status, currentPeriodEnd = :cpe, cancelAtPeriodEnd = :cap',
+    UpdateExpression: 'SET #status = :status, currentPeriodEnd = :cpe, cancelAtPeriodEnd = :cap, updatedAt = :ua',
     ExpressionAttributeNames: { '#status': 'status' },
     ExpressionAttributeValues: {
-      ':status': subscription.status,
-      ':cpe': new Date(subscription.current_period_end * 1000).toISOString(),
-      ':cap': subscription.cancel_at_period_end
+      ':status': attributes.status,
+      ':cpe': attributes.renews_at,
+      ':cap': attributes.cancelled || false,
+      ':ua': new Date().toISOString()
     }
   }).promise();
 
-  // Update user status
   await dynamoDB.update({
     TableName: USERS_TABLE,
     Key: { userId },
     UpdateExpression: 'SET subscriptionStatus = :status',
     ExpressionAttributeValues: {
-      ':status': subscription.status
+      ':status': attributes.status
     }
   }).promise();
+
+  console.log(`Updated subscription status for ${userId}: ${attributes.status}`);
 }
 
 /**
- * Handle subscription deleted/canceled
+ * Handle subscription cancelled
  */
-async function handleSubscriptionDeleted(subscription) {
-  const userId = subscription.metadata.userId;
+async function handleSubscriptionCancelled(payload) {
+  const data = payload.data;
+  const customData = payload.meta.custom_data || {};
+  let userId = customData.user_id;
 
-  if (!userId) return;
+  if (!userId) {
+    const result = await dynamoDB.scan({
+      TableName: SUBSCRIPTIONS_TABLE,
+      FilterExpression: 'lemonSqueezySubscriptionId = :sid',
+      ExpressionAttributeValues: { ':sid': data.id }
+    }).promise();
 
-  // Downgrade to free
+    if (result.Items && result.Items.length > 0) {
+      userId = result.Items[0].userId;
+    } else {
+      console.error('Cannot find user for cancelled subscription:', data.id);
+      return;
+    }
+  }
+
+  await dynamoDB.update({
+    TableName: SUBSCRIPTIONS_TABLE,
+    Key: { userId },
+    UpdateExpression: 'SET #status = :status, cancelAtPeriodEnd = :cap',
+    ExpressionAttributeNames: { '#status': 'status' },
+    ExpressionAttributeValues: {
+      ':status': 'cancelled',
+      ':cap': true
+    }
+  }).promise();
+
+  console.log(`Subscription cancelled for ${userId}`);
+}
+
+/**
+ * Handle subscription expired (end of billing period after cancellation)
+ */
+async function handleSubscriptionExpired(payload) {
+  const data = payload.data;
+  const customData = payload.meta.custom_data || {};
+  let userId = customData.user_id;
+
+  if (!userId) {
+    const result = await dynamoDB.scan({
+      TableName: SUBSCRIPTIONS_TABLE,
+      FilterExpression: 'lemonSqueezySubscriptionId = :sid',
+      ExpressionAttributeValues: { ':sid': data.id }
+    }).promise();
+
+    if (result.Items && result.Items.length > 0) {
+      userId = result.Items[0].userId;
+    } else {
+      return;
+    }
+  }
+
+  // Downgrade to FREE
   const limits = PLAN_LIMITS.FREE;
+  
   await dynamoDB.update({
     TableName: USERS_TABLE,
     Key: { userId },
@@ -500,42 +632,49 @@ async function handleSubscriptionDeleted(subscription) {
       ':plan': 'FREE',
       ':ma': limits.maxAssets,
       ':mq': limits.maxAiQueries,
-      ':status': 'canceled'
+      ':status': 'expired'
     }
   }).promise();
 
-  // Update subscription record
   await dynamoDB.update({
     TableName: SUBSCRIPTIONS_TABLE,
     Key: { userId },
     UpdateExpression: 'SET #status = :status',
     ExpressionAttributeNames: { '#status': 'status' },
-    ExpressionAttributeValues: { ':status': 'canceled' }
+    ExpressionAttributeValues: { ':status': 'expired' }
   }).promise();
 
-  console.log(`User ${userId} downgraded to FREE`);
+  console.log(`User ${userId} downgraded to FREE (subscription expired)`);
 }
 
 /**
  * Handle payment failure
  */
-async function handlePaymentFailed(invoice) {
-  const customerId = invoice.customer;
+async function handlePaymentFailed(payload) {
+  const data = payload.data;
+  const customData = payload.meta.custom_data || {};
+  let userId = customData.user_id;
 
-  // Find user by customer ID
-  const result = await dynamoDB.scan({
+  if (!userId) {
+    const result = await dynamoDB.scan({
+      TableName: SUBSCRIPTIONS_TABLE,
+      FilterExpression: 'lemonSqueezySubscriptionId = :sid',
+      ExpressionAttributeValues: { ':sid': data.id }
+    }).promise();
+
+    if (result.Items && result.Items.length > 0) {
+      userId = result.Items[0].userId;
+    } else {
+      return;
+    }
+  }
+
+  await dynamoDB.update({
     TableName: USERS_TABLE,
-    FilterExpression: 'stripeCustomerId = :cid',
-    ExpressionAttributeValues: { ':cid': customerId }
+    Key: { userId },
+    UpdateExpression: 'SET subscriptionStatus = :status',
+    ExpressionAttributeValues: { ':status': 'past_due' }
   }).promise();
 
-  if (result.Items && result.Items.length > 0) {
-    const userId = result.Items[0].userId;
-    await dynamoDB.update({
-      TableName: USERS_TABLE,
-      Key: { userId },
-      UpdateExpression: 'SET subscriptionStatus = :status',
-      ExpressionAttributeValues: { ':status': 'past_due' }
-    }).promise();
-  }
+  console.log(`Payment failed for ${userId}`);
 }

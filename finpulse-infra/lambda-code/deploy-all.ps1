@@ -3,7 +3,7 @@
 Write-Host "🚀 Deploying Lambda functions with security fixes..." -ForegroundColor Green
 Write-Host "==================================================" -ForegroundColor Green
 
-$FUNCTIONS = @("admin", "auth", "portfolio", "community", "market-data", "fx", "ai")
+$FUNCTIONS = @("admin", "auth", "portfolio", "community", "market-data", "fx", "ai", "payments")
 $ENVIRONMENT = "prod"
 
 # Install shared dependencies
