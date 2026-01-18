@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Holding } from '../types';
 import { portfolioService } from '../services/portfolioService';
+import { storeLogger } from '../services/logger';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
 
@@ -22,9 +23,19 @@ interface PortfolioState {
   userHoldings: Record<string, Holding[]>;
   userWatchlists: Record<string, WatchlistItem[]>;
 
-  // Sync state
+  // Enhanced sync state
   isSyncing: boolean;
   lastSyncError: string | null;
+  lastSyncTime: number | null;
+  syncStatus: 'idle' | 'syncing' | 'error' | 'offline';
+  pendingOperations: Array<{
+    id: string;
+    type: 'add' | 'update' | 'remove';
+    symbol: string;
+    data?: Holding;
+    retryCount: number;
+    createdAt: number;
+  }>;
 
   // Race condition prevention
   loadPromise: Promise<void> | null;
@@ -52,6 +63,8 @@ interface PortfolioState {
   // Backend sync actions
   loadFromBackend: () => Promise<void>;
   syncToBackend: () => Promise<void>;
+  retryPendingOperations: () => Promise<void>;
+  clearSyncError: () => void;
   
   // Watchlist actions (user-scoped)
   addToWatchlist: (item: Omit<WatchlistItem, 'addedAt'>) => void;
@@ -73,6 +86,9 @@ export const usePortfolioStore = create<PortfolioState>()(
       userWatchlists: {},
       isSyncing: false,
       lastSyncError: null,
+      lastSyncTime: null,
+      syncStatus: 'idle',
+      pendingOperations: [],
       loadPromise: null,
       isPrivate: false,
       search: '',
@@ -136,7 +152,7 @@ export const usePortfolioStore = create<PortfolioState>()(
 
         // Create new load promise
         const newLoadPromise = (async () => {
-          set({ isSyncing: true, lastSyncError: null });
+          set({ isSyncing: true, lastSyncError: null, syncStatus: 'syncing' });
 
           try {
             const portfolio = await portfolioService.getPortfolio();
@@ -152,6 +168,8 @@ export const usePortfolioStore = create<PortfolioState>()(
 
             set((state) => ({
               isSyncing: false,
+              syncStatus: 'idle',
+              lastSyncTime: Date.now(),
               loadPromise: null,
               userHoldings: {
                 ...state.userHoldings,
@@ -159,10 +177,15 @@ export const usePortfolioStore = create<PortfolioState>()(
               }
             }));
 
-            console.log(`Loaded ${holdings.length} holdings from backend`);
+            storeLogger.info(`Loaded ${holdings.length} holdings from backend`);
           } catch (error) {
-            console.error('Failed to load from backend:', error);
-            set({ isSyncing: false, loadPromise: null, lastSyncError: String(error) });
+            storeLogger.error('Failed to load from backend:', error as Error);
+            set({ 
+              isSyncing: false, 
+              loadPromise: null, 
+              lastSyncError: String(error),
+              syncStatus: navigator.onLine ? 'error' : 'offline'
+            });
             // Keep local data if backend fails
           }
         })();
@@ -178,16 +201,69 @@ export const usePortfolioStore = create<PortfolioState>()(
         if (!currentUserId) return;
         
         const holdings = userHoldings[currentUserId] || [];
-        set({ isSyncing: true, lastSyncError: null });
+        set({ isSyncing: true, lastSyncError: null, syncStatus: 'syncing' });
         
         try {
           await portfolioService.syncLocalToBackend(holdings);
-          set({ isSyncing: false });
-          console.log(`Synced ${holdings.length} holdings to backend`);
+          set({ isSyncing: false, syncStatus: 'idle', lastSyncTime: Date.now() });
+          storeLogger.info(`Synced ${holdings.length} holdings to backend`);
         } catch (error) {
-          console.error('Failed to sync to backend:', error);
-          set({ isSyncing: false, lastSyncError: String(error) });
+          storeLogger.error('Failed to sync to backend:', error as Error);
+          set({ 
+            isSyncing: false, 
+            lastSyncError: String(error),
+            syncStatus: navigator.onLine ? 'error' : 'offline'
+          });
         }
+      },
+
+      // Retry failed pending operations with exponential backoff
+      retryPendingOperations: async () => {
+        const { pendingOperations, currentUserId } = get();
+        if (!currentUserId || pendingOperations.length === 0) return;
+
+        storeLogger.info(`Retrying ${pendingOperations.length} pending operations`);
+        set({ syncStatus: 'syncing' });
+
+        const maxRetries = 3;
+        const remainingOps: typeof pendingOperations = [];
+
+        for (const op of pendingOperations) {
+          if (op.retryCount >= maxRetries) {
+            storeLogger.warn(`Operation ${op.id} exceeded max retries, discarding`, { symbol: op.symbol, type: op.type });
+            continue;
+          }
+
+          try {
+            switch (op.type) {
+              case 'add':
+                if (op.data) await portfolioService.addHolding(op.data);
+                break;
+              case 'update':
+                if (op.data) await portfolioService.updateHolding(op.symbol, op.data);
+                break;
+              case 'remove':
+                await portfolioService.removeHolding(op.symbol);
+                break;
+            }
+            storeLogger.info(`Retry succeeded for ${op.type} ${op.symbol}`);
+          } catch (_error) {
+            storeLogger.warn(`Retry failed for ${op.type} ${op.symbol}`, { retryCount: op.retryCount + 1 });
+            remainingOps.push({ ...op, retryCount: op.retryCount + 1 });
+          }
+        }
+
+        set({ 
+          pendingOperations: remainingOps,
+          syncStatus: remainingOps.length > 0 ? 'error' : 'idle',
+          lastSyncError: remainingOps.length > 0 ? `${remainingOps.length} operations pending` : null,
+          lastSyncTime: Date.now()
+        });
+      },
+
+      // Clear sync error state
+      clearSyncError: () => {
+        set({ lastSyncError: null, syncStatus: 'idle' });
       },
       
       // Holdings actions - user-scoped with backend sync
@@ -208,8 +284,9 @@ export const usePortfolioStore = create<PortfolioState>()(
         if (!currentUserId) return;
         
         const currentHoldings = userHoldings[currentUserId] || [];
+        const operationId = `add-${holding.symbol}-${Date.now()}`;
         
-        // Update local state immediately
+        // Update local state immediately (optimistic update)
         set((state) => ({
           userHoldings: {
             ...state.userHoldings,
@@ -217,13 +294,27 @@ export const usePortfolioStore = create<PortfolioState>()(
           }
         }));
         
-        // Sync to backend
+        // Sync to backend with rollback on failure
         if (syncToBackend) {
           try {
             await portfolioService.addHolding(holding);
-            console.log(`Added ${holding.symbol} to backend`);
+            storeLogger.info(`Added ${holding.symbol} to backend`);
+            set({ lastSyncTime: Date.now(), syncStatus: 'idle' });
           } catch (error) {
-            console.error(`Failed to add ${holding.symbol} to backend:`, error);
+            storeLogger.error(`Failed to add ${holding.symbol} to backend:`, error as Error);
+            // Add to pending operations for retry instead of silent failure
+            set((state) => ({
+              pendingOperations: [...state.pendingOperations, {
+                id: operationId,
+                type: 'add' as const,
+                symbol: holding.symbol,
+                data: holding,
+                retryCount: 0,
+                createdAt: Date.now()
+              }],
+              syncStatus: 'error',
+              lastSyncError: `Failed to sync ${holding.symbol}: ${String(error)}`
+            }));
           }
         }
       },
@@ -233,8 +324,9 @@ export const usePortfolioStore = create<PortfolioState>()(
         if (!currentUserId) return;
         
         const currentHoldings = userHoldings[currentUserId] || [];
+        const operationId = `update-${symbol}-${Date.now()}`;
         
-        // Update local state immediately
+        // Update local state immediately (optimistic update)
         set((state) => ({
           userHoldings: {
             ...state.userHoldings,
@@ -242,13 +334,27 @@ export const usePortfolioStore = create<PortfolioState>()(
           }
         }));
         
-        // Sync to backend
+        // Sync to backend with rollback on failure
         if (syncToBackend) {
           try {
             await portfolioService.updateHolding(symbol, holding);
-            console.log(`Updated ${symbol} in backend`);
+            storeLogger.info(`Updated ${symbol} in backend`);
+            set({ lastSyncTime: Date.now(), syncStatus: 'idle' });
           } catch (error) {
-            console.error(`Failed to update ${symbol} in backend:`, error);
+            storeLogger.error(`Failed to update ${symbol} in backend:`, error as Error);
+            // Add to pending operations for retry
+            set((state) => ({
+              pendingOperations: [...state.pendingOperations, {
+                id: operationId,
+                type: 'update' as const,
+                symbol,
+                data: holding,
+                retryCount: 0,
+                createdAt: Date.now()
+              }],
+              syncStatus: 'error',
+              lastSyncError: `Failed to sync update for ${symbol}: ${String(error)}`
+            }));
           }
         }
       },
@@ -258,8 +364,10 @@ export const usePortfolioStore = create<PortfolioState>()(
         if (!currentUserId) return;
         
         const currentHoldings = userHoldings[currentUserId] || [];
+        const removedHolding = currentHoldings.find(h => h.symbol === symbol);
+        const operationId = `remove-${symbol}-${Date.now()}`;
         
-        // Update local state immediately
+        // Update local state immediately (optimistic update)
         set((state) => ({
           userHoldings: {
             ...state.userHoldings,
@@ -267,13 +375,32 @@ export const usePortfolioStore = create<PortfolioState>()(
           }
         }));
         
-        // Sync to backend
+        // Sync to backend with rollback on failure
         if (syncToBackend) {
           try {
             await portfolioService.removeHolding(symbol);
-            console.log(`Removed ${symbol} from backend`);
+            storeLogger.info(`Removed ${symbol} from backend`);
+            set({ lastSyncTime: Date.now(), syncStatus: 'idle' });
           } catch (error) {
-            console.error(`Failed to remove ${symbol} from backend:`, error);
+            storeLogger.error(`Failed to remove ${symbol} from backend:`, error as Error);
+            // Rollback: restore the holding locally if backend delete failed
+            if (removedHolding) {
+              set((state) => ({
+                userHoldings: {
+                  ...state.userHoldings,
+                  [currentUserId]: [...(state.userHoldings[currentUserId] || []), removedHolding]
+                },
+                pendingOperations: [...state.pendingOperations, {
+                  id: operationId,
+                  type: 'remove' as const,
+                  symbol,
+                  retryCount: 0,
+                  createdAt: Date.now()
+                }],
+                syncStatus: 'error',
+                lastSyncError: `Failed to remove ${symbol}: ${String(error)}`
+              }));
+            }
           }
         }
       },

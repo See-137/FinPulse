@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { 
-  Plus, Download, Lock, Search, Trash2, Pencil, ShieldCheck, 
+  Plus, Download, Upload, Lock, Search, Trash2, Pencil, ShieldCheck, 
   TrendingUp, TrendingDown, Bitcoin, Activity, Gem, Eye, EyeOff,
-  ArrowUpDown, ArrowUp, ArrowDown, XCircle, Wifi, WifiOff, Crown
+  ArrowUpDown, ArrowUp, ArrowDown, XCircle, Wifi, WifiOff, Crown, AlertTriangle, CheckCircle, X
 } from 'lucide-react';
 import { User, Currency, Holding, AssetType, CombinedSignal } from '../types';
 import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
@@ -63,6 +63,13 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Holding | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  
+  // CSV Import state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState<Holding[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     symbol: '',
@@ -183,6 +190,164 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     } catch (error) {
       // Export failed
       alert('Export failed. Please check your browser permissions and try again.');
+    }
+  };
+
+  // CSV Import functionality
+  const parseCSV = (text: string): { holdings: Holding[]; errors: string[] } => {
+    const lines = text.trim().split('\n');
+    const errors: string[] = [];
+    const parsedHoldings: Holding[] = [];
+    
+    if (lines.length < 2) {
+      return { holdings: [], errors: ['CSV file is empty or has no data rows'] };
+    }
+
+    // Parse header to determine column mapping
+    const headerLine = lines[0].toLowerCase();
+    const headers = headerLine.split(',').map(h => h.trim().replace(/"/g, ''));
+    
+    // Flexible column mapping - support multiple header variations
+    const symbolIndex = headers.findIndex(h => ['symbol', 'ticker', 'asset'].includes(h));
+    const nameIndex = headers.findIndex(h => ['name', 'asset name', 'asset_name'].includes(h));
+    const typeIndex = headers.findIndex(h => ['type', 'asset type', 'asset_type', 'category'].includes(h));
+    const quantityIndex = headers.findIndex(h => ['quantity', 'qty', 'amount', 'shares', 'units'].includes(h));
+    const avgCostIndex = headers.findIndex(h => ['avg cost', 'avgcost', 'avg_cost', 'average cost', 'cost basis', 'cost', 'price'].includes(h));
+
+    if (symbolIndex === -1) {
+      return { holdings: [], errors: ['Missing required column: Symbol (or Ticker)'] };
+    }
+    if (quantityIndex === -1) {
+      return { holdings: [], errors: ['Missing required column: Quantity (or Qty, Shares, Units)'] };
+    }
+
+    // Parse data rows
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      // Handle quoted values with commas inside
+      const values: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (const char of line) {
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          values.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      values.push(current.trim());
+
+      const symbol = values[symbolIndex]?.replace(/"/g, '').toUpperCase();
+      const name = nameIndex !== -1 ? values[nameIndex]?.replace(/"/g, '') : symbol;
+      const typeRaw = typeIndex !== -1 ? values[typeIndex]?.replace(/"/g, '').toUpperCase() : 'STOCK';
+      const quantity = parseFloat(values[quantityIndex]?.replace(/"/g, '') || '0');
+      const avgCost = avgCostIndex !== -1 ? parseFloat(values[avgCostIndex]?.replace(/"/g, '') || '0') : 0;
+
+      // Validate
+      if (!symbol) {
+        errors.push(`Row ${i + 1}: Missing symbol`);
+        continue;
+      }
+      if (isNaN(quantity) || quantity <= 0) {
+        errors.push(`Row ${i + 1}: Invalid quantity for ${symbol}`);
+        continue;
+      }
+
+      // Determine type
+      let type: AssetType = 'STOCK';
+      if (['CRYPTO', 'CRYPTOCURRENCY'].includes(typeRaw)) {
+        type = 'CRYPTO';
+      } else if (['COMMODITY', 'COMMODITIES'].includes(typeRaw)) {
+        type = 'COMMODITY';
+      } else if (['STOCK', 'STOCKS', 'EQUITY'].includes(typeRaw)) {
+        type = 'STOCK';
+      }
+
+      // Check for duplicates
+      const existingInList = parsedHoldings.find(h => h.symbol === symbol);
+      const existingInPortfolio = holdings.find(h => h.symbol === symbol);
+      
+      if (existingInList) {
+        errors.push(`Row ${i + 1}: Duplicate symbol ${symbol} in import file`);
+        continue;
+      }
+      if (existingInPortfolio) {
+        errors.push(`Row ${i + 1}: ${symbol} already exists in portfolio (will skip)`);
+        continue;
+      }
+
+      parsedHoldings.push({
+        symbol,
+        name: name || symbol,
+        type,
+        quantity,
+        avgCost: avgCost || 0,
+        currentPrice: avgCost || 100,
+        dayPL: 0
+      });
+    }
+
+    return { holdings: parsedHoldings, errors };
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      setImportErrors(['Please select a CSV file']);
+      return;
+    }
+
+    setImportFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const { holdings: parsed, errors } = parseCSV(text);
+      setImportPreview(parsed);
+      setImportErrors(errors);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImport = async () => {
+    // Check asset limit
+    const remainingSlots = user.credits.maxAssets - holdings.length;
+    const planConfig = SaaS_PLANS[user.plan];
+    
+    let imported = 0;
+    const skipped: string[] = [];
+
+    for (const holding of importPreview) {
+      if (imported >= remainingSlots) {
+        skipped.push(`${holding.symbol} (limit reached)`);
+        continue;
+      }
+      if (holding.type === 'COMMODITY' && !planConfig.allowCommodities) {
+        skipped.push(`${holding.symbol} (commodities require ProPulse)`);
+        continue;
+      }
+      
+      await addHolding(holding);
+      imported++;
+    }
+
+    // Close modal and show result
+    setIsImportModalOpen(false);
+    setImportPreview([]);
+    setImportErrors([]);
+    setImportFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    if (skipped.length > 0) {
+      alert(`Imported ${imported} assets. Skipped: ${skipped.join(', ')}`);
+    } else {
+      alert(`Successfully imported ${imported} assets!`);
     }
   };
 
@@ -431,6 +596,15 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
           >
             {user.plan === 'FREE' ? <Lock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
             <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Export {user.plan === 'FREE' && '(ProPulse)'}</span>
+          </button>
+          <button 
+            disabled={user.plan === 'FREE'}
+            onClick={() => setIsImportModalOpen(true)}
+            aria-label={user.plan === 'FREE' ? 'Import CSV (ProPulse feature)' : 'Import portfolio from CSV'}
+            className={`p-3 sm:p-4 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center gap-3 transition-all ${user.plan === 'FREE' ? 'opacity-30 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-emerald-400 hover:border-emerald-400/30'}`}
+          >
+            {user.plan === 'FREE' ? <Lock className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
+            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Import {user.plan === 'FREE' && '(ProPulse)'}</span>
           </button>
           <button 
             onClick={() => {
@@ -764,6 +938,130 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                 </div>
              </form>
            </div>
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsImportModalOpen(false)}>
+          <div className="bg-white dark:bg-[#151921] p-8 rounded-[32px] w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => {
+                setIsImportModalOpen(false);
+                setImportPreview([]);
+                setImportErrors([]);
+                setImportFile(null);
+              }}
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <h2 className="text-2xl font-black dark:text-white mb-2">Import Holdings</h2>
+            <p className="text-sm text-slate-500 mb-6">Upload a CSV file to bulk-import your portfolio</p>
+            
+            {/* File Upload */}
+            <div className="mb-6">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="csv-upload"
+              />
+              <label 
+                htmlFor="csv-upload"
+                className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl cursor-pointer hover:border-[#00e5ff] hover:bg-[#00e5ff]/5 transition-all"
+              >
+                <Upload className="w-10 h-10 text-slate-400 mb-3" />
+                <span className="text-sm font-bold text-slate-500">
+                  {importFile ? importFile.name : 'Click to select CSV file'}
+                </span>
+                <span className="text-xs text-slate-400 mt-1">or drag and drop</span>
+              </label>
+            </div>
+
+            {/* CSV Format Help */}
+            <div className="mb-6 p-4 bg-slate-50 dark:bg-white/5 rounded-xl">
+              <h4 className="text-xs font-black text-slate-500 uppercase mb-2">CSV Format</h4>
+              <p className="text-xs text-slate-400 mb-2">Required columns: <span className="text-emerald-400">Symbol</span>, <span className="text-emerald-400">Quantity</span></p>
+              <p className="text-xs text-slate-400">Optional: Name, Type (STOCK/CRYPTO/COMMODITY), Avg Cost</p>
+              <div className="mt-3 p-2 bg-slate-100 dark:bg-[#0b0e14] rounded-lg font-mono text-[10px] text-slate-500">
+                Symbol,Name,Type,Quantity,Avg Cost<br/>
+                BTC,Bitcoin,CRYPTO,1.5,45000<br/>
+                AAPL,Apple Inc,STOCK,50,175.50
+              </div>
+            </div>
+
+            {/* Errors */}
+            {importErrors.length > 0 && (
+              <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-black text-amber-400 uppercase">Warnings</span>
+                </div>
+                <ul className="space-y-1">
+                  {importErrors.slice(0, 5).map((error, i) => (
+                    <li key={i} className="text-xs text-amber-300">{error}</li>
+                  ))}
+                  {importErrors.length > 5 && (
+                    <li className="text-xs text-amber-400">...and {importErrors.length - 5} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            {/* Preview */}
+            {importPreview.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-black text-emerald-400 uppercase">
+                    {importPreview.length} assets ready to import
+                  </span>
+                </div>
+                <div className="max-h-40 overflow-y-auto space-y-2">
+                  {importPreview.map((h, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-black text-[#00e5ff]">{h.symbol}</span>
+                        <span className="text-xs text-slate-500">{h.name}</span>
+                        <span className="text-[9px] px-2 py-0.5 bg-slate-200 dark:bg-white/10 rounded text-slate-500">{h.type}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-bold dark:text-white">{h.quantity}</span>
+                        {h.avgCost > 0 && <span className="text-[10px] text-slate-500 ml-2">@ ${h.avgCost}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-4">
+              <button 
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportPreview([]);
+                  setImportErrors([]);
+                  setImportFile(null);
+                }}
+                className="flex-1 py-4 text-slate-500 font-black uppercase text-xs hover:bg-slate-100 dark:hover:bg-white/5 rounded-2xl transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleImport}
+                disabled={importPreview.length === 0}
+                className="flex-[2] py-5 bg-emerald-500 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Import {importPreview.length} Assets
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

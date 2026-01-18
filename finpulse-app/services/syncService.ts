@@ -183,9 +183,15 @@ class RealTimeSyncService {
 
     try {
       const lastSync = localStorage.getItem('finpulse_last_sync') || '0';
+      // FIX: Use finpulse_id_token (has email claim) not finpulse_access_token (doesn't exist)
+      const idToken = localStorage.getItem('finpulse_id_token');
+      if (!idToken) {
+        syncLogger.warn('No auth token available for sync polling');
+        return;
+      }
       const response = await fetch(`${config.api.baseUrl}/sync/changes?since=${lastSync}&device=${this.deviceId}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('finpulse_access_token')}`,
+          'Authorization': `Bearer ${idToken}`,
         },
       });
 
@@ -221,9 +227,12 @@ class RealTimeSyncService {
   private reconnect(): void {
     if (!this.userId || !this.isOnline) return;
     
-    const token = localStorage.getItem('finpulse_access_token');
+    // FIX: Use finpulse_id_token (has email claim) not finpulse_access_token (doesn't exist)
+    const token = localStorage.getItem('finpulse_id_token');
     if (token) {
       this.connectWebSocket(token);
+    } else {
+      syncLogger.warn('No auth token available for WebSocket reconnection');
     }
   }
 
@@ -352,7 +361,7 @@ class RealTimeSyncService {
     try {
       const response = await fetch(`${config.api.baseUrl}/auth/devices`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('finpulse_access_token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('finpulse_id_token')}`,
         },
       });
 
@@ -377,7 +386,7 @@ class RealTimeSyncService {
       const response = await fetch(`${config.api.baseUrl}/auth/devices/${deviceId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('finpulse_access_token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('finpulse_id_token')}`,
         },
       });
       return response.ok;
@@ -395,7 +404,7 @@ class RealTimeSyncService {
       const response = await fetch(`${config.api.baseUrl}/auth/devices/revoke-all`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('finpulse_access_token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('finpulse_id_token')}`,
           'X-Current-Device': this.deviceId,
         },
       });
