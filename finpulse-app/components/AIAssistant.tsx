@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { getMarketInsightStream } from '../services/geminiService';
 import { MessageSquareText, Send, Sparkles, X, ChevronRight, Mic, Lock, Crown } from 'lucide-react';
-import { User } from '../types';
+import { User, Holding } from '../types';
+import { usePortfolioStore } from '../store/portfolioStore';
 
 interface AIAssistantProps {
   user: User;
@@ -167,6 +168,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Get portfolio holdings for AI context
+  const getHoldings = usePortfolioStore(state => state.getHoldings);
 
   // Debug log to confirm component is rendering
   useEffect(() => {
@@ -202,13 +206,23 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
 
     setMessages(prev => [...prev, { role: 'assistant', text: "" }]);
 
+    // Get current portfolio holdings for AI context
+    const holdings = getHoldings();
+    const portfolioContext = holdings.length > 0 ? holdings.map(h => ({
+      symbol: h.symbol,
+      shares: h.shares,
+      avgPrice: h.avgPrice,
+      currentPrice: h.currentPrice,
+      type: h.type
+    })) : undefined;
+
     await getMarketInsightStream(userMsg, (text) => {
       setMessages(prev => {
         const next = [...prev];
         next[next.length - 1] = { role: 'assistant', text };
         return next;
       });
-    });
+    }, portfolioContext);
 
     onUpdateUsage(user.credits.ai + 1);
     setIsTyping(false);
