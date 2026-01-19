@@ -127,8 +127,8 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
   // Manual reconnect function
   const reconnect = useCallback(() => {
     setError(null);
-    marketWebSocket.disconnect();
-    marketWebSocket.connect({
+    // The subscribe call handles reconnection automatically
+    marketWebSocket.subscribe({
       symbols,
       onPriceUpdate: handlePriceUpdate,
       onConnectionChange: handleConnectionChange,
@@ -136,12 +136,12 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
     });
   }, [symbols, handlePriceUpdate, handleConnectionChange, handleError]);
 
-  // Connect on mount
+  // Subscribe on mount - uses the new subscriber pattern that accumulates symbols
   useEffect(() => {
     isMountedRef.current = true;
 
-    if (!enabled) {
-      // Use fallback polling if WebSocket disabled
+    if (!enabled || symbols.length === 0) {
+      // Use fallback polling if WebSocket disabled or no symbols
       startFallbackPolling();
       return () => {
         isMountedRef.current = false;
@@ -149,8 +149,8 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
       };
     }
 
-    // Connect WebSocket
-    marketWebSocket.connect({
+    // Subscribe to WebSocket (will merge with other subscribers' symbols)
+    const unsubscribe = marketWebSocket.subscribe({
       symbols,
       onPriceUpdate: handlePriceUpdate,
       onConnectionChange: handleConnectionChange,
@@ -162,10 +162,10 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
 
     return () => {
       isMountedRef.current = false;
-      marketWebSocket.disconnect();
+      unsubscribe(); // Properly unsubscribe (won't disconnect if others still subscribed)
       stopFallbackPolling();
     };
-  }, [enabled, symbols.join(',')]); // Re-connect if symbols change
+  }, [enabled, symbols.join(',')]); // Re-subscribe if symbols change
 
   return {
     prices,
