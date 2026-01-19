@@ -220,49 +220,27 @@ export const fetchNews = (category?: string) =>
 export const searchNews = (query: string) => fetchWithAuth(`/news/search?q=${encodeURIComponent(query)}`);
 
 /**
- * Fetch crypto prices from CoinGecko (free, no API key required)
- * Used as fallback for cryptos not available on Binance WebSocket
+ * Fetch crypto prices - uses AWS backend which proxies to multiple sources
+ * The backend handles CoinGecko, Binance, and other APIs server-side (no CORS issues)
  */
 export const fetchCoinGeckoPrices = async (symbols: string[]): Promise<Record<string, { price: number; change24h: number }>> => {
   if (symbols.length === 0) return {};
   
   try {
-    // CoinGecko uses IDs, not symbols. Common mappings:
-    const symbolToId: Record<string, string> = {
-      'BTC': 'bitcoin', 'ETH': 'ethereum', 'SOL': 'solana',
-      'XRP': 'ripple', 'ADA': 'cardano', 'DOT': 'polkadot',
-      'AVAX': 'avalanche-2', 'MATIC': 'matic-network', 'LINK': 'chainlink',
-      'DOGE': 'dogecoin', 'BNB': 'binancecoin', 'SHIB': 'shiba-inu',
-      'ICP': 'internet-computer', 'DN': 'destra-network', 'LAVA': 'lava-network',
-      'PEPE': 'pepe', 'ARB': 'arbitrum', 'OP': 'optimism',
-    };
+    // Route through AWS backend - it will fetch from CoinGecko/Binance server-side
+    const symbolsParam = symbols.map(s => s.toUpperCase()).join(',');
+    const response = await fetchWithAuth(`/market/prices?symbols=${symbolsParam}&type=crypto`);
     
-    const ids = symbols
-      .map(s => symbolToId[s.toUpperCase()] || s.toLowerCase())
-      .join(',');
+    if (!response.success || !response.data) return {};
     
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`
-    );
-    
-    if (!response.ok) return {};
-    
-    const data = await response.json();
     const result: Record<string, { price: number; change24h: number }> = {};
     
-    // Reverse map IDs back to symbols
-    const idToSymbol: Record<string, string> = {};
-    for (const [symbol, id] of Object.entries(symbolToId)) {
-      idToSymbol[id] = symbol;
-    }
-    
-    for (const [id, priceData] of Object.entries(data)) {
-      const symbol = idToSymbol[id] || id.toUpperCase();
-      const pd = priceData as { usd?: number; usd_24h_change?: number };
-      if (pd.usd) {
+    for (const [symbol, priceData] of Object.entries(response.data)) {
+      const pd = priceData as { price?: number; change24h?: number };
+      if (pd.price) {
         result[symbol] = {
-          price: pd.usd,
-          change24h: pd.usd_24h_change || 0,
+          price: pd.price,
+          change24h: pd.change24h || 0,
         };
       }
     }
