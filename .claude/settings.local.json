@@ -12,7 +12,13 @@
       "Bash(npm run lint:*)",
       "Bash(gh workflow run:*)",
       "Bash(git commit:*)",
-      "Bash(gh run:*)"
+      "Bash(gh run:*)",
+      "Bash(grep:*)",
+      "Bash(aws s3 sync:*)",
+      "Bash(aws cloudfront create-invalidation:*)",
+      "Bash(aws cloudfront get-invalidation:*)",
+      "Bash(aws s3:*)",
+      "Bash(claude exit-plan-mode)"
     ]
   }
 }
