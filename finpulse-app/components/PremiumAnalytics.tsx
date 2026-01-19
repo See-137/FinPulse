@@ -15,6 +15,7 @@ interface PremiumAnalyticsProps {
   currency: string;
   currencySymbol: string;
   exchangeRate: number;
+  isPrivate: boolean;
 }
 
 // Time period options
@@ -251,7 +252,8 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
   onUpgradeClick,
   // currency prop kept for API compatibility
   currencySymbol,
-  exchangeRate
+  exchangeRate,
+  isPrivate
 }) => {
   // Unlock for SUPERPULSE plan OR internal_tester role
   const isUnlocked = user.plan === 'SUPERPULSE' || user.userRole === 'internal_tester';
