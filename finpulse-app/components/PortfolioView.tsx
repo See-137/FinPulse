@@ -799,8 +799,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                                 {liveChange >= 0 ? '+' : ''}{liveChange.toFixed(1)}%
                               </span>
                             </td>
-                            <td className="px-3 py-3 overflow-hidden">
-                              <div className="max-w-full overflow-hidden">
+                            <td className="px-3 py-3">
+                              <div className="flex items-center">
                                 {signals[asset.symbol] && (
                                   <SignalCard
                                     signal={signals[asset.symbol]}
