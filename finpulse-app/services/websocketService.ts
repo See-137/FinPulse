@@ -3,6 +3,9 @@
  * 
  * Connects to Binance WebSocket for live crypto prices
  * Provides automatic reconnection and heartbeat
+ * 
+ * IMPORTANT: Uses subscriber pattern - accumulates symbols from all callers
+ * so multiple components can share the same WebSocket connection
  */
 
 import { wsLogger } from './logger';
@@ -24,6 +27,14 @@ export interface WebSocketConfig {
   onError?: (error: Error) => void;
 }
 
+interface Subscriber {
+  id: string;
+  symbols: Set<string>;
+  onPriceUpdate: (prices: Map<string, LivePrice>) => void;
+  onConnectionChange: (connected: boolean) => void;
+  onError?: (error: Error) => void;
+}
+
 type WebSocketCallback = (data: any) => void;
 
 class MarketWebSocketService {
@@ -32,10 +43,14 @@ class MarketWebSocketService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private heartbeatInterval: NodeJS.Timeout | null = null;
-  private config: WebSocketConfig | null = null;
   private prices: Map<string, LivePrice> = new Map();
   private isConnecting = false;
-  private subscriptions: Set<WebSocketCallback> = new Set();
+  private callbacks: Set<WebSocketCallback> = new Set();
+  
+  // Subscriber tracking - allows multiple components to share one connection
+  private subscribers: Map<string, Subscriber> = new Map();
+  private subscriberIdCounter = 0;
+  private currentSymbols: Set<string> = new Set();
 
   // Binance WebSocket streams for crypto
   private readonly BINANCE_WS_BASE = 'wss://stream.binance.com:9443/ws';
@@ -55,21 +70,81 @@ class MarketWebSocketService {
     // Remove 'usdt' suffix and uppercase
     return binanceSymbol.toLowerCase().replace(/usdt$/, '').toUpperCase();
   }
+  
+  /**
+   * Get all unique symbols from all subscribers
+   */
+  private getAllSymbols(): string[] {
+    const allSymbols = new Set<string>();
+    this.subscribers.forEach(sub => {
+      sub.symbols.forEach(s => allSymbols.add(s.toUpperCase()));
+    });
+    return Array.from(allSymbols);
+  }
 
   /**
-   * Connect to WebSocket with given configuration
+   * Subscribe to price updates - returns unsubscribe function
+   * Multiple callers can subscribe with different symbol sets
+   */
+  subscribe(config: WebSocketConfig): () => void {
+    const id = `sub_${++this.subscriberIdCounter}`;
+    const subscriber: Subscriber = {
+      id,
+      symbols: new Set(config.symbols.map(s => s.toUpperCase())),
+      onPriceUpdate: config.onPriceUpdate,
+      onConnectionChange: config.onConnectionChange,
+      onError: config.onError,
+    };
+    
+    this.subscribers.set(id, subscriber);
+    
+    // Check if we need to reconnect with new symbols
+    const newSymbols = this.getAllSymbols();
+    const needsReconnect = newSymbols.some(s => !this.currentSymbols.has(s));
+    
+    if (needsReconnect) {
+      this.reconnectWithSymbols(newSymbols);
+    } else if (this.ws?.readyState === WebSocket.OPEN) {
+      // Already connected, send current prices immediately
+      subscriber.onConnectionChange(true);
+      subscriber.onPriceUpdate(new Map(this.prices));
+    } else if (!this.isConnecting && this.subscribers.size === 1) {
+      // First subscriber, start connection
+      this.connectWithSymbols(newSymbols);
+    }
+    
+    // Return unsubscribe function
+    return () => {
+      this.subscribers.delete(id);
+      // Don't disconnect if other subscribers exist
+      if (this.subscribers.size === 0) {
+        this.disconnect();
+      }
+    };
+  }
+
+  /**
+   * Legacy connect method - wraps subscribe for backward compatibility
    */
   connect(config: WebSocketConfig): void {
-    if (this.isConnecting || this.ws?.readyState === WebSocket.OPEN) {
-      wsLogger.debug('WebSocket already connected or connecting');
+    // Clear any existing legacy config and use subscriber pattern
+    this.subscribe(config);
+  }
+  
+  /**
+   * Connect with specified symbols
+   */
+  private connectWithSymbols(symbols: string[]): void {
+    if (this.isConnecting) {
+      wsLogger.debug('WebSocket already connecting');
       return;
     }
 
-    this.config = config;
     this.isConnecting = true;
+    this.currentSymbols = new Set(symbols);
     
-    // Build stream URL for multiple symbols - dynamic conversion, no hardcoded list
-    const streams = config.symbols
+    // Build stream URL for multiple symbols
+    const streams = symbols
       .map(s => this.toBinanceSymbol(s))
       .map(s => `${s}@ticker`)
       .join('/');
@@ -81,6 +156,7 @@ class MarketWebSocketService {
     }
 
     const wsUrl = `${this.BINANCE_WS_BASE}/${streams}`;
+    wsLogger.info(`Connecting to Binance WebSocket with ${symbols.length} symbols: ${symbols.join(', ')}`);
     
     try {
       this.ws = new WebSocket(wsUrl);
@@ -91,6 +167,22 @@ class MarketWebSocketService {
       this.scheduleReconnect();
     }
   }
+  
+  /**
+   * Reconnect with new symbol set (when subscribers change)
+   */
+  private reconnectWithSymbols(symbols: string[]): void {
+    // Close existing connection cleanly
+    this.stopHeartbeat();
+    if (this.ws) {
+      this.ws.close(1000, 'Reconnecting with new symbols');
+      this.ws = null;
+    }
+    this.isConnecting = false;
+    
+    // Connect with merged symbols
+    this.connectWithSymbols(symbols);
+  }
 
   /**
    * Set up WebSocket event handlers
@@ -99,10 +191,12 @@ class MarketWebSocketService {
     if (!this.ws) return;
 
     this.ws.onopen = () => {
-      wsLogger.info('📡 WebSocket connected to Binance');
+      wsLogger.info(`📡 WebSocket connected to Binance (${this.currentSymbols.size} symbols)`);
       this.isConnecting = false;
       this.reconnectAttempts = 0;
-      this.config?.onConnectionChange(true);
+      
+      // Notify ALL subscribers of connection
+      this.subscribers.forEach(sub => sub.onConnectionChange(true));
       this.startHeartbeat();
     };
 
@@ -117,17 +211,20 @@ class MarketWebSocketService {
 
     this.ws.onerror = (event) => {
       wsLogger.error('WebSocket error:', event);
-      this.config?.onError?.(new Error('WebSocket connection error'));
+      // Notify ALL subscribers of error
+      this.subscribers.forEach(sub => sub.onError?.(new Error('WebSocket connection error')));
     };
 
     this.ws.onclose = (event) => {
       wsLogger.debug('WebSocket closed:', event.code, event.reason);
       this.isConnecting = false;
-      this.config?.onConnectionChange(false);
+      
+      // Notify ALL subscribers of disconnection
+      this.subscribers.forEach(sub => sub.onConnectionChange(false));
       this.stopHeartbeat();
       
-      // Auto-reconnect if not intentionally closed
-      if (event.code !== 1000) {
+      // Auto-reconnect if not intentionally closed and we still have subscribers
+      if (event.code !== 1000 && this.subscribers.size > 0) {
         this.scheduleReconnect();
       }
     };
@@ -152,10 +249,15 @@ class MarketWebSocketService {
       };
       
       this.prices.set(symbol, livePrice);
-      this.config?.onPriceUpdate(new Map(this.prices));
       
-      // Notify all subscribers
-      this.subscriptions.forEach(cb => cb(livePrice));
+      // Create a fresh copy of all prices
+      const allPrices = new Map(this.prices);
+      
+      // Notify ALL subscribers with current prices
+      this.subscribers.forEach(sub => sub.onPriceUpdate(allPrices));
+      
+      // Also notify legacy callbacks
+      this.callbacks.forEach(cb => cb(livePrice));
     }
   }
 
@@ -187,7 +289,7 @@ class MarketWebSocketService {
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       wsLogger.error('Max reconnection attempts reached');
-      this.config?.onError?.(new Error('Max reconnection attempts reached'));
+      this.subscribers.forEach(sub => sub.onError?.(new Error('Max reconnection attempts reached')));
       return;
     }
 
@@ -197,18 +299,19 @@ class MarketWebSocketService {
     wsLogger.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
     setTimeout(() => {
-      if (this.config) {
-        this.connect(this.config);
+      const symbols = this.getAllSymbols();
+      if (symbols.length > 0) {
+        this.connectWithSymbols(symbols);
       }
     }, delay);
   }
 
   /**
-   * Subscribe to price updates for specific symbol
+   * Subscribe to individual price updates (legacy pattern)
    */
-  subscribe(callback: WebSocketCallback): () => void {
-    this.subscriptions.add(callback);
-    return () => this.subscriptions.delete(callback);
+  addCallback(callback: WebSocketCallback): () => void {
+    this.callbacks.add(callback);
+    return () => this.callbacks.delete(callback);
   }
 
   /**
@@ -242,20 +345,36 @@ class MarketWebSocketService {
       this.ws = null;
     }
     this.prices.clear();
-    this.subscriptions.clear();
+    this.callbacks.clear();
+    this.currentSymbols.clear();
     this.reconnectAttempts = 0;
     this.isConnecting = false;
   }
 
   /**
-   * Update subscription symbols
+   * Update subscription symbols - triggers reconnect if needed
    */
   updateSymbols(symbols: string[]): void {
-    if (this.config) {
-      this.disconnect();
-      this.config.symbols = symbols;
-      this.connect(this.config);
+    const newSymbols = symbols.map(s => s.toUpperCase());
+    const needsReconnect = newSymbols.some(s => !this.currentSymbols.has(s));
+    
+    if (needsReconnect) {
+      this.reconnectWithSymbols(newSymbols);
     }
+  }
+  
+  /**
+   * Get count of active subscribers
+   */
+  getSubscriberCount(): number {
+    return this.subscribers.size;
+  }
+  
+  /**
+   * Get all currently subscribed symbols
+   */
+  getSubscribedSymbols(): string[] {
+    return this.getAllSymbols();
   }
 }
 
