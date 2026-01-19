@@ -56,6 +56,7 @@ aws lambda update-function-code --function-name finpulse-auth-prod --zip-file fi
 3. **API**: API Gateway → Lambda. Bearer token required.
 4. **State**: Zustand (frontend), DynamoDB (backend)
 5. **Tiers**: FREE (10 assets), PROPULSE, SUPERPULSE
+6. **Holding Type**: Includes `addedAt` timestamp for tracking time in portfolio. Used for Holding Age and Total Return metrics.
 
 ---
 
@@ -75,6 +76,8 @@ aws lambda update-function-code --function-name finpulse-auth-prod --zip-file fi
 |---------|------|
 | Auth service | `finpulse-app/services/authService.ts` |
 | Portfolio store | `finpulse-app/store/portfolioStore.ts` |
+| Portfolio view | `finpulse-app/components/PortfolioView.tsx` |
+| Premium analytics | `finpulse-app/components/PremiumAnalytics.tsx` |
 | Auth Lambda | `finpulse-infra/lambda-code/auth/index.js` |
 | Main Terraform | `finpulse-infra/main.tf` |
 

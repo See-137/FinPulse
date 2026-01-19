@@ -85,6 +85,30 @@
 
 ---
 
+## ADR-005: Use Existing addedAt for Holding Age Tracking
+**Date:** 2026-01-19
+**Status:** Accepted
+
+**Context:** Users requested Total Return metrics including holding age. Two options: use existing `addedAt` timestamp or add new `purchaseDate` field.
+
+**Decision:** Use existing `addedAt` timestamp from DynamoDB for holding age calculation (V1).
+
+**Rationale:**
+- Zero migration required - backend already returns `addedAt` ISO timestamp
+- Immediate delivery with no backend/infrastructure changes
+- "Time in FinPulse" is acceptable proxy for "actual holding age" for most users
+- Can add optional `purchaseDate` override in Phase 2 if demanded
+
+**Consequences:**
+- Holding Age shows days since added to portfolio app, not actual purchase date
+- For assets purchased before using FinPulse, age will be underestimated
+- Frontend must preserve `addedAt` in data flow (types.ts, portfolioStore.ts, portfolioService.ts)
+- Missing `addedAt` displays "N/A" gracefully
+
+**Related Commit:** 23193b1
+
+---
+
 ## Template for New Decisions
 
 ```markdown
