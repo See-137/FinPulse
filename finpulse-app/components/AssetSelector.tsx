@@ -42,11 +42,13 @@ const POPULAR_ASSETS: Asset[] = [
   { symbol: 'PLTR', name: 'Palantir', type: 'STOCK' },
   { symbol: 'COIN', name: 'Coinbase', type: 'STOCK' },
   
-  // Commodities
-  { symbol: 'GOLD', name: 'Gold', type: 'COMMODITY' },
-  { symbol: 'SILVER', name: 'Silver', type: 'COMMODITY' },
-  { symbol: 'OIL', name: 'Crude Oil', type: 'COMMODITY' },
-  { symbol: 'NATGAS', name: 'Natural Gas', type: 'COMMODITY' },
+  // Commodities (ETF tickers)
+  { symbol: 'GLD', name: 'SPDR Gold Trust', type: 'COMMODITY' },
+  { symbol: 'SLV', name: 'iShares Silver Trust', type: 'COMMODITY' },
+  { symbol: 'USO', name: 'United States Oil Fund', type: 'COMMODITY' },
+  { symbol: 'UNG', name: 'United States Natural Gas', type: 'COMMODITY' },
+  { symbol: 'DBA', name: 'Invesco Agriculture ETF', type: 'COMMODITY' },
+  { symbol: 'PDBC', name: 'Invesco Optimum Yield Diversified Commodity', type: 'COMMODITY' },
 ];
 
 interface AssetSelectorProps {

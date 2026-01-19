@@ -696,16 +696,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                       <thead>
                         <tr className="border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
                           {[
-                            { label: 'Asset', key: 'name', width: 'w-[17%]' },
-                            { label: 'Avg Cost', key: 'avgCost', width: 'w-[10%]' },
-                            { label: 'Price', key: 'marketPrice', width: 'w-[10%]' },
-                            { label: 'Qty', key: 'quantity', width: 'w-[7%]' },
-                            { label: 'Value', key: 'value', width: 'w-[10%]' },
+                            { label: 'Asset', key: 'name', width: 'w-[16%]' },
+                            { label: 'Avg Cost', key: 'avgCost', width: 'w-[9%]' },
+                            { label: 'Price', key: 'marketPrice', width: 'w-[9%]' },
+                            { label: 'Qty', key: 'quantity', width: 'w-[6%]' },
+                            { label: 'Value', key: 'value', width: 'w-[9%]' },
                             { label: 'Return $', key: 'totalReturnDollar', width: 'w-[10%]' },
-                            { label: 'Return %', key: 'totalReturnPercent', width: 'w-[9%]' },
-                            { label: 'Age', key: 'holdingAge', width: 'w-[7%]' },
+                            { label: 'Return %', key: 'totalReturnPercent', width: 'w-[8%]' },
+                            { label: 'Age', key: 'holdingAge', width: 'w-[6%]' },
                             { label: '24h', key: 'dayPL', width: 'w-[7%]' },
-                            { label: 'Signal', key: 'signal', width: 'w-[15%]' }
+                            { label: 'Signal', key: 'signal', width: 'w-[12%]' }
                           ].map((header) => (
                             <th 
                               key={header.key}
@@ -718,7 +718,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                               </div>
                             </th>
                           ))}
-                          <th className="px-3 py-3 text-[8px] font-black uppercase text-slate-500 tracking-wider text-right w-[12%]"></th>
+                          <th className="px-3 py-3 text-[8px] font-black uppercase text-slate-500 tracking-wider text-right w-[8%]"></th>
                         </tr>
                       </thead>
                       <tbody>
