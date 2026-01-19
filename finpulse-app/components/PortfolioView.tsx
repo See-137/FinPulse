@@ -930,19 +930,21 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
         <div className="mt-8">
           <PremiumAnalytics
             holdings={holdings.map(h => ({
-              id: h.id,
               symbol: h.symbol,
               name: h.name,
               type: h.type,
               quantity: h.quantity,
-              avgBuyPrice: h.avgCost,
+              avgCost: h.avgCost,
               currentPrice: getMarketPrice(h.symbol, h.avgCost),
+              dayPL: getMarketChange(h.symbol, h.dayPL),
+              addedAt: h.addedAt,
             }))}
             user={user}
             onUpgradeClick={onUpgradeClick || (() => {})}
             currency={currency}
             currencySymbol={currencySymbol}
             exchangeRate={rate}
+            isPrivate={isPrivate}
           />
         </div>
       )}
