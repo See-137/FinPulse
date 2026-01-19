@@ -219,4 +219,59 @@ export const fetchNews = (category?: string) =>
   fetchWithAuth(`/news/latest${category ? `?category=${category}` : ''}`);
 export const searchNews = (query: string) => fetchWithAuth(`/news/search?q=${encodeURIComponent(query)}`);
 
+/**
+ * Fetch crypto prices from CoinGecko (free, no API key required)
+ * Used as fallback for cryptos not available on Binance WebSocket
+ */
+export const fetchCoinGeckoPrices = async (symbols: string[]): Promise<Record<string, { price: number; change24h: number }>> => {
+  if (symbols.length === 0) return {};
+  
+  try {
+    // CoinGecko uses IDs, not symbols. Common mappings:
+    const symbolToId: Record<string, string> = {
+      'BTC': 'bitcoin', 'ETH': 'ethereum', 'SOL': 'solana',
+      'XRP': 'ripple', 'ADA': 'cardano', 'DOT': 'polkadot',
+      'AVAX': 'avalanche-2', 'MATIC': 'matic-network', 'LINK': 'chainlink',
+      'DOGE': 'dogecoin', 'BNB': 'binancecoin', 'SHIB': 'shiba-inu',
+      'ICP': 'internet-computer', 'DN': 'destra-network', 'LAVA': 'lava-network',
+      'PEPE': 'pepe', 'ARB': 'arbitrum', 'OP': 'optimism',
+    };
+    
+    const ids = symbols
+      .map(s => symbolToId[s.toUpperCase()] || s.toLowerCase())
+      .join(',');
+    
+    const response = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`
+    );
+    
+    if (!response.ok) return {};
+    
+    const data = await response.json();
+    const result: Record<string, { price: number; change24h: number }> = {};
+    
+    // Reverse map IDs back to symbols
+    const idToSymbol: Record<string, string> = {};
+    for (const [symbol, id] of Object.entries(symbolToId)) {
+      idToSymbol[id] = symbol;
+    }
+    
+    for (const [id, priceData] of Object.entries(data)) {
+      const symbol = idToSymbol[id] || id.toUpperCase();
+      const pd = priceData as { usd?: number; usd_24h_change?: number };
+      if (pd.usd) {
+        result[symbol] = {
+          price: pd.usd,
+          change24h: pd.usd_24h_change || 0,
+        };
+      }
+    }
+    
+    return result;
+  } catch (err) {
+    console.error('CoinGecko fetch failed:', err);
+    return {};
+  }
+};
+
 export default useMarketData;
