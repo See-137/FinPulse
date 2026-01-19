@@ -202,6 +202,17 @@ const AppContent: React.FC = () => {
       setIsAuthInitializing(true);
       
       try {
+        // DEV MODE: Allow bypassing auth with localStorage flag
+        const devModeUser = localStorage.getItem('finpulse_dev_user');
+        if (devModeUser && import.meta.env.DEV) {
+          console.log('[App] DEV MODE: Using local user session');
+          const parsedUser = JSON.parse(devModeUser);
+          setUser(parsedUser);
+          setView('dashboard');
+          setIsAuthInitializing(false);
+          return;
+        }
+        
         // Use new async initializeAuth that properly waits for token refresh
         const cognitoUser = await auth.initializeAuth();
         

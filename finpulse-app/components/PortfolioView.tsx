@@ -9,7 +9,7 @@ import {
 import { User, Currency, Holding, AssetType, CombinedSignal } from '../types';
 import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
 import { usePortfolioStore } from '../store/portfolioStore';
-import { useMarketData } from '../hooks/useMarketData';
+import { useMarketData, fetchCoinGeckoPrices } from '../hooks/useMarketData';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
 import { useDebounce } from '../hooks/useDebounce';
 import { AssetSelector } from './AssetSelector';
@@ -59,6 +59,24 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     symbols: cryptoSymbols, // Only subscribe to user's actual crypto holdings
     enabled: cryptoSymbols.length > 0, // Disable if no crypto in portfolio
   });
+  
+  // Additional CoinGecko prices for non-Binance cryptos
+  const [coinGeckoPrices, setCoinGeckoPrices] = useState<Record<string, { price: number; change24h: number }>>({});
+  
+  // Fetch CoinGecko prices for all cryptos (catches non-Binance coins)
+  useEffect(() => {
+    if (cryptoSymbols.length === 0) return;
+    
+    const fetchPrices = async () => {
+      const prices = await fetchCoinGeckoPrices(cryptoSymbols);
+      setCoinGeckoPrices(prices);
+    };
+    
+    fetchPrices();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchPrices, 60000);
+    return () => clearInterval(interval);
+  }, [cryptoSymbols.join(',')]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Holding | null>(null);
@@ -352,14 +370,19 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   };
 
   // Helper to get real-time market price for an asset
-  // Priority: WebSocket (real-time) -> REST API -> holding's stored price
+  // Priority: WebSocket (Binance) -> CoinGecko -> REST API -> holding's stored price
   const getMarketPrice = (symbol: string, fallbackPrice: number): number => {
     const upperSymbol = symbol.toUpperCase();
     
-    // First try WebSocket data (most real-time for crypto)
+    // First try WebSocket data (most real-time for Binance-listed crypto)
     const wsPrice = wsPrices.get(upperSymbol);
     if (wsPrice?.price) {
       return wsPrice.price;
+    }
+    
+    // Then try CoinGecko (for non-Binance cryptos like DN, LAVA, ICP)
+    if (coinGeckoPrices[upperSymbol]?.price) {
+      return coinGeckoPrices[upperSymbol].price;
     }
     
     // Then try REST API data (works for all asset types)
@@ -375,14 +398,19 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   };
 
   // Helper to get 24h change from market data
-  // Priority: WebSocket -> REST API -> holding's stored change
+  // Priority: WebSocket -> CoinGecko -> REST API -> holding's stored change
   const getMarketChange = (symbol: string, fallbackChange: number): number => {
     const upperSymbol = symbol.toUpperCase();
     
-    // First try WebSocket data (real-time for crypto)
+    // First try WebSocket data (real-time for Binance crypto)
     const wsPrice = wsPrices.get(upperSymbol);
     if (wsPrice?.change24h !== undefined) {
       return wsPrice.change24h;
+    }
+    
+    // Then try CoinGecko (for non-Binance cryptos)
+    if (coinGeckoPrices[upperSymbol]?.change24h !== undefined) {
+      return coinGeckoPrices[upperSymbol].change24h;
     }
     
     // Then try REST API data

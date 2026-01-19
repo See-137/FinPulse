@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { marketWebSocket, LivePrice } from '../services/websocketService';
-import { fetchMarketPrices } from './useMarketData';
+import { fetchMarketPrices, fetchCoinGeckoPrices } from './useMarketData';
 
 interface UseWebSocketPricesOptions {
   symbols?: string[];
@@ -72,9 +72,10 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
     setError(err);
   }, []);
 
-  // Fallback to REST API polling
+  // Fallback to REST API + CoinGecko polling for non-Binance cryptos
   const fetchFallbackPrices = useCallback(async () => {
     try {
+      // First try the AWS backend API
       const response = await fetchMarketPrices();
       if (response.success && response.data && isMountedRef.current) {
         const newPrices = new Map<string, LivePrice>();
@@ -92,7 +93,6 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
         });
         
         setPrices(prev => {
-          // Merge with existing prices
           const merged = new Map(prev);
           newPrices.forEach((value, key) => merged.set(key, value));
           return merged;
@@ -101,9 +101,40 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
         setIsLoading(false);
       }
     } catch (err) {
-      console.error('Fallback fetch failed:', err);
+      console.error('Backend API fetch failed:', err);
     }
-  }, []);
+    
+    // Also fetch from CoinGecko for any crypto symbols not yet priced
+    if (symbols.length > 0 && isMountedRef.current) {
+      try {
+        const coinGeckoPrices = await fetchCoinGeckoPrices(symbols);
+        if (Object.keys(coinGeckoPrices).length > 0) {
+          setPrices(prev => {
+            const merged = new Map(prev);
+            Object.entries(coinGeckoPrices).forEach(([symbol, data]) => {
+              // Only add if we don't already have this price from WebSocket
+              if (!merged.has(symbol) || !merged.get(symbol)?.price) {
+                merged.set(symbol, {
+                  symbol,
+                  price: data.price,
+                  change24h: data.change24h,
+                  high24h: data.price,
+                  low24h: data.price,
+                  volume24h: 0,
+                  timestamp: Date.now(),
+                });
+              }
+            });
+            return merged;
+          });
+          setLastUpdate(new Date());
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error('CoinGecko fallback failed:', err);
+      }
+    }
+  }, [symbols]);
 
   const startFallbackPolling = useCallback(() => {
     if (fallbackTimerRef.current) return;
