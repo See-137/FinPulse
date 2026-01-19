@@ -4,6 +4,8 @@
  * Suppresses logs in production, verbose in development
  */
 
+import * as Sentry from '@sentry/react';
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface LogContext {
@@ -48,10 +50,11 @@ class Logger {
     console.error(`${this.prefix} ${message}`, error || '');
 
     // Send to Sentry in production
-    if (!this.isDevelopment) {
-      const { captureException } = require('@sentry/react');
-      if (error instanceof Error) {
-        captureException(error, { tags: { module: this.prefix } });
+    if (!this.isDevelopment && error instanceof Error) {
+      try {
+        Sentry.captureException(error, { tags: { module: this.prefix } });
+      } catch {
+        // Sentry not available, ignore
       }
     }
   }
