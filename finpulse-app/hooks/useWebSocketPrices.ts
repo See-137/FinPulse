@@ -24,11 +24,12 @@ interface UseWebSocketPricesReturn {
   lastUpdate: Date | null;
 }
 
-const DEFAULT_CRYPTO_SYMBOLS = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOT', 'AVAX', 'MATIC', 'LINK', 'DOGE'];
+// No default symbols - hook subscribes to whatever symbols the caller provides
+// This allows any crypto to work dynamically without hardcoded lists
 
 export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): UseWebSocketPricesReturn {
   const {
-    symbols = DEFAULT_CRYPTO_SYMBOLS,
+    symbols = [], // Empty by default - caller provides their portfolio symbols
     enabled = true,
     fallbackInterval = 60000,
   } = options;

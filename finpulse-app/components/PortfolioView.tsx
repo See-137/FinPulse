@@ -50,14 +50,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     fetchFx: true,
   });
   
-  // Real-time WebSocket prices for crypto
+  // Real-time WebSocket prices for crypto - subscribes to user's actual crypto holdings
   const cryptoSymbols = useMemo(() => 
     holdings.filter(h => h.type === 'CRYPTO').map(h => h.symbol),
     [holdings]
   );
   const { prices: wsPrices, isConnected: wsConnected } = useWebSocketPrices({
-    symbols: cryptoSymbols.length > 0 ? cryptoSymbols : ['BTC', 'ETH', 'SOL'],
-    enabled: true,
+    symbols: cryptoSymbols, // Only subscribe to user's actual crypto holdings
+    enabled: cryptoSymbols.length > 0, // Disable if no crypto in portfolio
   });
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -351,73 +351,46 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     }
   };
 
-  // Real market prices (as of Jan 4, 2026) - used when API doesn't return data
-  const realMarketPrices: Record<string, { price: number; change24h: number }> = {
-    // Crypto (from your screenshot)
-    BTC: { price: 97500, change24h: 2.1 },
-    ETH: { price: 3132.81, change24h: -1.87 },
-    SOL: { price: 210.50, change24h: 3.2 },
-    XRP: { price: 2.09, change24h: -4.54 },
-    ADA: { price: 1.05, change24h: 1.8 },
-    DOT: { price: 7.85, change24h: -0.5 },
-    AVAX: { price: 42.30, change24h: 2.1 },
-    MATIC: { price: 0.58, change24h: -1.2 },
-    LINK: { price: 23.45, change24h: 1.5 },
-    DOGE: { price: 0.42, change24h: 5.2 },
-    // Stocks (from your screenshot)
-    NVDA: { price: 188.85, change24h: 5.16 },
-    AAPL: { price: 248.50, change24h: 1.2 },
-    MSFT: { price: 430.20, change24h: 0.8 },
-    GOOGL: { price: 192.75, change24h: -0.5 },
-    AMZN: { price: 225.40, change24h: 1.1 },
-    TSLA: { price: 410.30, change24h: 3.5 },
-    META: { price: 595.80, change24h: 0.9 },
-    JPM: { price: 245.60, change24h: 0.3 },
-    V: { price: 315.40, change24h: 0.6 },
-    MA: { price: 520.75, change24h: 0.4 },
-    PLTR: { price: 67.85, change24h: 2.4 },
-    // Commodities
-    GOLD: { price: 2650, change24h: 0.3 },
-    SILVER: { price: 31.50, change24h: 0.8 },
-    OIL: { price: 72.50, change24h: -1.2 },
-    NATGAS: { price: 3.45, change24h: -2.1 },
-  };
-
   // Helper to get real-time market price for an asset
+  // Priority: WebSocket (real-time) -> REST API -> holding's stored price
   const getMarketPrice = (symbol: string, fallbackPrice: number): number => {
     const upperSymbol = symbol.toUpperCase();
-    // First try WebSocket data (most real-time)
+    
+    // First try WebSocket data (most real-time for crypto)
     const wsPrice = wsPrices.get(upperSymbol);
     if (wsPrice?.price) {
       return wsPrice.price;
     }
-    // Then try REST API data
-    if (marketPrices && marketPrices[upperSymbol]?.price) {
+    
+    // Then try REST API data (works for all asset types)
+    if (marketPrices?.[upperSymbol]?.price) {
       return marketPrices[upperSymbol].price;
     }
-    if (marketPrices && marketPrices[symbol]?.price) {
+    if (marketPrices?.[symbol]?.price) {
       return marketPrices[symbol].price;
     }
-    // Fall back to real market prices
-    if (realMarketPrices[upperSymbol]) {
-      return realMarketPrices[upperSymbol].price;
-    }
+    
+    // Fall back to holding's stored price (last known price)
     return fallbackPrice;
   };
 
   // Helper to get 24h change from market data
+  // Priority: WebSocket -> REST API -> holding's stored change
   const getMarketChange = (symbol: string, fallbackChange: number): number => {
     const upperSymbol = symbol.toUpperCase();
-    // First try API data
-    if (marketPrices && marketPrices[upperSymbol]?.change24h !== undefined) {
+    
+    // First try WebSocket data (real-time for crypto)
+    const wsPrice = wsPrices.get(upperSymbol);
+    if (wsPrice?.change24h !== undefined) {
+      return wsPrice.change24h;
+    }
+    
+    // Then try REST API data
+    if (marketPrices?.[upperSymbol]?.change24h !== undefined) {
       return marketPrices[upperSymbol].change24h;
     }
-    if (marketPrices && marketPrices[symbol]?.change24h !== undefined) {
+    if (marketPrices?.[symbol]?.change24h !== undefined) {
       return marketPrices[symbol].change24h;
-    }
-    // Fall back to real market prices
-    if (realMarketPrices[upperSymbol]) {
-      return realMarketPrices[upperSymbol].change24h;
     }
     return fallbackChange;
   };

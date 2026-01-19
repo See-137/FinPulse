@@ -40,21 +40,21 @@ class MarketWebSocketService {
   // Binance WebSocket streams for crypto
   private readonly BINANCE_WS_BASE = 'wss://stream.binance.com:9443/ws';
   
-  // Map our symbols to Binance format (lowercase + usdt)
-  private readonly symbolMap: Record<string, string> = {
-    'BTC': 'btcusdt',
-    'ETH': 'ethusdt',
-    'SOL': 'solusdt',
-    'XRP': 'xrpusdt',
-    'ADA': 'adausdt',
-    'DOT': 'dotusdt',
-    'AVAX': 'avaxusdt',
-    'MATIC': 'maticusdt',
-    'LINK': 'linkusdt',
-    'DOGE': 'dogeusdt',
-    'BNB': 'bnbusdt',
-    'SHIB': 'shibusdt',
-  };
+  /**
+   * Convert symbol to Binance format (e.g., BTC -> btcusdt)
+   * Works with any crypto symbol - no hardcoded list needed
+   */
+  private toBinanceSymbol(symbol: string): string {
+    return `${symbol.toLowerCase()}usdt`;
+  }
+  
+  /**
+   * Convert Binance symbol back to our format (e.g., btcusdt -> BTC)
+   */
+  private fromBinanceSymbol(binanceSymbol: string): string {
+    // Remove 'usdt' suffix and uppercase
+    return binanceSymbol.toLowerCase().replace(/usdt$/, '').toUpperCase();
+  }
 
   /**
    * Connect to WebSocket with given configuration
@@ -68,10 +68,9 @@ class MarketWebSocketService {
     this.config = config;
     this.isConnecting = true;
     
-    // Build stream URL for multiple symbols
+    // Build stream URL for multiple symbols - dynamic conversion, no hardcoded list
     const streams = config.symbols
-      .map(s => this.symbolMap[s.toUpperCase()])
-      .filter(Boolean)
+      .map(s => this.toBinanceSymbol(s))
       .map(s => `${s}@ticker`)
       .join('/');
 
@@ -140,36 +139,24 @@ class MarketWebSocketService {
   private handleMessage(data: any): void {
     // Binance ticker format
     if (data.e === '24hrTicker') {
-      const symbol = this.reverseSymbolMap(data.s);
-      if (symbol) {
-        const livePrice: LivePrice = {
-          symbol,
-          price: parseFloat(data.c), // Current price
-          change24h: parseFloat(data.P), // Price change percent
-          high24h: parseFloat(data.h),
-          low24h: parseFloat(data.l),
-          volume24h: parseFloat(data.v),
-          timestamp: data.E,
-        };
-        
-        this.prices.set(symbol, livePrice);
-        this.config?.onPriceUpdate(new Map(this.prices));
-        
-        // Notify all subscribers
-        this.subscriptions.forEach(cb => cb(livePrice));
-      }
+      // Dynamic conversion - works with any crypto symbol
+      const symbol = this.fromBinanceSymbol(data.s);
+      const livePrice: LivePrice = {
+        symbol,
+        price: parseFloat(data.c), // Current price
+        change24h: parseFloat(data.P), // Price change percent
+        high24h: parseFloat(data.h),
+        low24h: parseFloat(data.l),
+        volume24h: parseFloat(data.v),
+        timestamp: data.E,
+      };
+      
+      this.prices.set(symbol, livePrice);
+      this.config?.onPriceUpdate(new Map(this.prices));
+      
+      // Notify all subscribers
+      this.subscriptions.forEach(cb => cb(livePrice));
     }
-  }
-
-  /**
-   * Reverse map Binance symbol to our format
-   */
-  private reverseSymbolMap(binanceSymbol: string): string | null {
-    const lower = binanceSymbol.toLowerCase();
-    for (const [our, binance] of Object.entries(this.symbolMap)) {
-      if (binance === lower) return our;
-    }
-    return null;
   }
 
   /**
