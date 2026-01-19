@@ -70,6 +70,7 @@ export const portfolioService = {
             avgCost: h.avgBuyPrice || h.avgCost || 0,
             currentPrice: h.currentPrice || 0,
             notes: h.notes || '',
+            addedAt: h.addedAt,
           })),
           totalValue: data.totalValue,
           lastUpdated: data.lastUpdated,
