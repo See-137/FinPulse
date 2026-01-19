@@ -164,6 +164,7 @@ export const usePortfolioStore = create<PortfolioState>()(
               avgCost: h.avgCost,
               currentPrice: h.currentPrice || h.avgCost,
               dayPL: 0,
+              addedAt: h.addedAt,
             }));
 
             set((state) => ({
@@ -290,7 +291,10 @@ export const usePortfolioStore = create<PortfolioState>()(
         set((state) => ({
           userHoldings: {
             ...state.userHoldings,
-            [currentUserId]: [...currentHoldings, holding]
+            [currentUserId]: [...currentHoldings, {
+              ...holding,
+              addedAt: holding.addedAt || new Date().toISOString()
+            }]
           }
         }));
         

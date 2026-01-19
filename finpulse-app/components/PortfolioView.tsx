@@ -494,6 +494,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
             aValue = getMarketChange(a.symbol, a.dayPL);
             bValue = getMarketChange(b.symbol, b.dayPL);
             break;
+          case 'totalReturnDollar':
+            aValue = a.quantity * (getMarketPrice(a.symbol, a.avgCost) - a.avgCost);
+            bValue = b.quantity * (getMarketPrice(b.symbol, b.avgCost) - b.avgCost);
+            break;
+          case 'totalReturnPercent':
+            aValue = a.avgCost > 0 ? (getMarketPrice(a.symbol, a.avgCost) - a.avgCost) / a.avgCost : 0;
+            bValue = b.avgCost > 0 ? (getMarketPrice(b.symbol, b.avgCost) - b.avgCost) / b.avgCost : 0;
+            break;
+          case 'holdingAge':
+            aValue = a.addedAt ? (Date.now() - new Date(a.addedAt).getTime()) : 0;
+            bValue = b.addedAt ? (Date.now() - new Date(b.addedAt).getTime()) : 0;
+            break;
           default:
             // For other columns, get value from holding object
             aValue = a[sortConfig.key as keyof Holding] as number;
@@ -685,12 +697,15 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                         <tr className="border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
                           {[
                             { label: 'Asset', key: 'name', width: 'w-[17%]' },
-                            { label: 'Avg Cost', key: 'avgCost', width: 'w-[11%]' },
-                            { label: 'Price', key: 'marketPrice', width: 'w-[11%]' },
-                            { label: 'Qty', key: 'quantity', width: 'w-[8%]' },
-                            { label: 'Value', key: 'value', width: 'w-[11%]' },
+                            { label: 'Avg Cost', key: 'avgCost', width: 'w-[10%]' },
+                            { label: 'Price', key: 'marketPrice', width: 'w-[10%]' },
+                            { label: 'Qty', key: 'quantity', width: 'w-[7%]' },
+                            { label: 'Value', key: 'value', width: 'w-[10%]' },
+                            { label: 'Return $', key: 'totalReturnDollar', width: 'w-[10%]' },
+                            { label: 'Return %', key: 'totalReturnPercent', width: 'w-[9%]' },
+                            { label: 'Age', key: 'holdingAge', width: 'w-[7%]' },
                             { label: '24h', key: 'dayPL', width: 'w-[7%]' },
-                            { label: 'Signal', key: 'signal', width: 'w-[20%]' }
+                            { label: 'Signal', key: 'signal', width: 'w-[15%]' }
                           ].map((header) => (
                             <th 
                               key={header.key}
@@ -712,7 +727,26 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                           const liveChange = getMarketChange(asset.symbol, asset.dayPL);
                           const totalAssetValue = asset.quantity * livePrice;
                           const profitLoss = asset.avgCost > 0 ? ((livePrice - asset.avgCost) / asset.avgCost) * 100 : 0;
-                          
+
+                          // Total Return calculations
+                          const totalReturnDollar = (livePrice - asset.avgCost) * asset.quantity;
+                          const totalReturnPercent = asset.avgCost > 0
+                            ? ((livePrice - asset.avgCost) / asset.avgCost) * 100
+                            : 0;
+
+                          // Holding Age calculation
+                          const holdingAgeDays = asset.addedAt
+                            ? Math.max(0, Math.floor((Date.now() - new Date(asset.addedAt).getTime()) / (1000 * 60 * 60 * 24)))
+                            : null;
+
+                          const formatHoldingAge = (days: number | null): string => {
+                            if (days === null) return 'N/A';
+                            if (days < 7) return `${days}d`;
+                            if (days < 30) return `${Math.floor(days / 7)}w ${days % 7}d`;
+                            if (days < 365) return `${Math.floor(days / 30)}mo`;
+                            return `${(days / 365).toFixed(1)}y`;
+                          };
+
                           return (
                           <tr key={idx} className="border-b border-slate-200 dark:border-white/5 last:border-0 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors group">
                             <td className="px-3 py-3">
@@ -746,6 +780,19 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                             </td>
                             <td className="px-3 py-3 font-bold text-xs dark:text-white">
                               {isPrivate ? '••••' : `${currencySymbol}${(totalAssetValue * rate).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className={`font-bold text-xs ${totalReturnDollar >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {isPrivate ? '••••' : `${totalReturnDollar >= 0 ? '+' : ''}${currencySymbol}${(Math.abs(totalReturnDollar) * rate).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className={`font-bold text-xs ${totalReturnPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {totalReturnPercent >= 0 ? '+' : ''}{totalReturnPercent.toFixed(1)}%
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 font-medium text-xs text-slate-400">
+                              {formatHoldingAge(holdingAgeDays)}
                             </td>
                             <td className="px-3 py-3">
                               <span className={`font-bold text-xs ${liveChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>

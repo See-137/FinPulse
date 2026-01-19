@@ -30,6 +30,7 @@ export interface Holding {
   avgCost: number;  // Changed from avgBuyPrice
   currentPrice: number;
   dayPL: number;    // Added - used in portfolio calculations
+  addedAt?: string; // ISO 8601 timestamp - when added to portfolio
 }
 
 export interface Influencer {

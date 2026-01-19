@@ -5,7 +5,7 @@
 
 import React, { useMemo, useState, useCallback } from 'react';
 import { XAxis, YAxis, ResponsiveContainer, Tooltip, AreaChart, Area, BarChart, Bar, Cell, PieChart as RechartsPie, Pie } from 'recharts';
-import { TrendingUp, TrendingDown, Shield, Zap, Target, PieChart, Lock, BarChart3, Activity, Calendar, Download, Info, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Shield, Zap, Target, PieChart, Lock, BarChart3, Activity, Calendar, Download, Info, RefreshCw, DollarSign, Clock } from 'lucide-react';
 import { Holding, User } from '../types';
 
 interface PremiumAnalyticsProps {
@@ -108,7 +108,16 @@ const calculateMetrics = (holdings: Holding[], historicalData: HistoricalDataPoi
   const allocations = holdings.map(h => (h.currentPrice * h.quantity) / totalValue);
   const herfindahlIndex = allocations.reduce((sum, a) => sum + Math.pow(a, 2), 0);
   const diversificationScore = Math.min(100, ((1 - herfindahlIndex) * 100 * (assetCount / 10)));
-  
+
+  // Average holding age
+  const holdingsWithAge = holdings.filter(h => h.addedAt);
+  const avgHoldingAgeDays = holdingsWithAge.length > 0
+    ? Math.round(holdingsWithAge.reduce((sum, h) => {
+        const days = Math.floor((Date.now() - new Date(h.addedAt!).getTime()) / (1000 * 60 * 60 * 24));
+        return sum + days;
+      }, 0) / holdingsWithAge.length)
+    : 0;
+
   return {
     totalValue,
     totalCost,
@@ -119,7 +128,10 @@ const calculateMetrics = (holdings: Holding[], historicalData: HistoricalDataPoi
     maxDrawdown: maxDrawdown * 100,
     bestDay,
     worstDay,
-    diversificationScore: Math.round(diversificationScore)
+    diversificationScore: Math.round(diversificationScore),
+    totalReturnDollar: totalPnL,
+    totalReturnPercent: pnlPercent,
+    avgHoldingAgeDays
   };
 };
 
@@ -441,6 +453,42 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             icon={<Shield className="w-4 h-4" />}
             color={metrics.maxDrawdown > 20 ? 'rose' : 'cyan'}
             tooltip="Largest peak-to-trough decline in the selected period"
+          />
+        </div>
+
+        {/* Additional Return Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <MetricCard
+            label="Total Return $"
+            value={isPrivate ? '••••••' : `${metrics.totalReturnDollar >= 0 ? '+' : ''}${formatValue(metrics.totalReturnDollar)}`}
+            subValue="Unrealized P&L"
+            icon={<DollarSign className="w-4 h-4" />}
+            trend={metrics.totalReturnDollar >= 0 ? 'up' : 'down'}
+            color={metrics.totalReturnDollar >= 0 ? 'emerald' : 'rose'}
+            tooltip="Total unrealized profit/loss in dollars across all holdings"
+          />
+          <MetricCard
+            label="Total Return %"
+            value={`${metrics.totalReturnPercent >= 0 ? '+' : ''}${metrics.totalReturnPercent.toFixed(1)}%`}
+            subValue="Portfolio gain/loss"
+            icon={<TrendingUp className="w-4 h-4" />}
+            color={metrics.totalReturnPercent >= 0 ? 'emerald' : 'rose'}
+            tooltip="Portfolio-level return percentage relative to total cost basis"
+          />
+          <MetricCard
+            label="Avg Holding Age"
+            value={metrics.avgHoldingAgeDays < 7
+              ? `${metrics.avgHoldingAgeDays}d`
+              : metrics.avgHoldingAgeDays < 30
+              ? `${Math.floor(metrics.avgHoldingAgeDays / 7)}w`
+              : metrics.avgHoldingAgeDays < 365
+              ? `${Math.floor(metrics.avgHoldingAgeDays / 30)}mo`
+              : `${(metrics.avgHoldingAgeDays / 365).toFixed(1)}y`
+            }
+            subValue="Avg investment time"
+            icon={<Clock className="w-4 h-4" />}
+            color="purple"
+            tooltip="Average time assets have been held in your portfolio"
           />
         </div>
 
