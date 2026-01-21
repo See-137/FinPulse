@@ -4,10 +4,10 @@
  */
 
 resource "aws_wafv2_ip_set" "blacklist" {
-  name             = "${var.project_name}-blacklist-${var.environment}"
-  scope            = "CLOUDFRONT"
+  name               = "${var.project_name}-blacklist-${var.environment}"
+  scope              = "CLOUDFRONT"
   ip_address_version = "IPV4"
-  addresses        = []
+  addresses          = []
 
   tags = merge(
     var.tags,
@@ -44,7 +44,7 @@ resource "aws_wafv2_web_acl" "cloudfront" {
 
         # Exclude known false positives
         rule_action_override {
-          name          = "SizeRestrictions_BODY"
+          name = "SizeRestrictions_BODY"
           action_to_use {
             count {}
           }
@@ -129,7 +129,7 @@ resource "aws_wafv2_web_acl" "cloudfront" {
 
     statement {
       rate_based_statement {
-        limit              = var.waf_rate_limit  # Default 2000 requests per 5 mins
+        limit              = var.waf_rate_limit # Default 2000 requests per 5 mins
         aggregate_key_type = "IP"
 
         # Don't count CloudFront requests against rate limit
@@ -207,7 +207,7 @@ resource "aws_wafv2_web_acl" "cloudfront" {
 
         # Allow CloudFront health checks
         rule_action_override {
-          name          = "CategoryHttpLibrary"
+          name = "CategoryHttpLibrary"
           action_to_use {
             count {}
           }
@@ -284,7 +284,7 @@ resource "aws_wafv2_web_acl_logging_configuration" "cloudfront" {
     default_behavior = "KEEP"
 
     filter {
-      behavior   = "KEEP"
+      behavior = "KEEP"
       condition {
         action_condition {
           action = "BLOCK"
@@ -294,7 +294,7 @@ resource "aws_wafv2_web_acl_logging_configuration" "cloudfront" {
     }
 
     filter {
-      behavior   = "KEEP"
+      behavior = "KEEP"
       condition {
         action_condition {
           action = "COUNT"
