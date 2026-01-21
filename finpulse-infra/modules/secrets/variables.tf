@@ -18,10 +18,10 @@ variable "secret_names" {
     # Alpaca is now the ONLY market data provider (stocks + crypto)
     # Replaces: coingecko-api-key, alphavantage-api-key, exchangerate-api-key
     "alpaca-credentials",
-    
+
     # AI/LLM service
     "gemini-api-key",
-    
+
     # News APIs (optional, for news feed feature)
     "gnews-api-key",
     "newsapi-key"

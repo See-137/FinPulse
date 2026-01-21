@@ -3,7 +3,7 @@
 
 locals {
   staging_suffix = "-staging"
-  
+
   # Staging functions - now including news and payments
   lambda_functions_staging = {
     auth        = "finpulse-auth-staging"
@@ -38,12 +38,12 @@ resource "aws_lambda_function" "staging" {
 
   environment {
     variables = {
-      ENVIRONMENT              = "staging"
+      ENVIRONMENT = "staging"
       # API keys are fetched from Secrets Manager at runtime, not hardcoded
       # Staging uses the same prod secrets - separate staging secrets can be created if needed
-      SECRETS_PREFIX           = "finpulse/prod"
-      COGNITO_USER_POOL_ID    = aws_cognito_user_pool.staging.id
-      COGNITO_CLIENT_ID       = aws_cognito_user_pool_client.staging.id
+      SECRETS_PREFIX       = "finpulse/prod"
+      COGNITO_USER_POOL_ID = aws_cognito_user_pool.staging.id
+      COGNITO_CLIENT_ID    = aws_cognito_user_pool_client.staging.id
     }
   }
 
@@ -203,7 +203,7 @@ resource "aws_dynamodb_table" "users_staging" {
   }
 
   point_in_time_recovery {
-    enabled = false  # Disabled for staging to save costs
+    enabled = false # Disabled for staging to save costs
   }
 
   server_side_encryption {
@@ -455,7 +455,7 @@ resource "aws_elasticache_cluster" "staging" {
   cluster_id           = "finpulse-cache-staging"
   engine               = "redis"
   engine_version       = "7.1"
-  node_type            = "cache.t4g.micro"  # Smallest for staging
+  node_type            = "cache.t4g.micro" # Smallest for staging
   num_cache_nodes      = 1
   parameter_group_name = "default.redis7"
   port                 = 6379

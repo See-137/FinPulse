@@ -36,7 +36,7 @@ resource "aws_cloudfront_distribution" "frontend" {
       https_port             = 443
       origin_protocol_policy = "http-only"
       # SECURITY FIX: Remove deprecated TLS 1.0/1.1 protocols
-      origin_ssl_protocols   = ["TLSv1.2"]
+      origin_ssl_protocols = ["TLSv1.2"]
     }
   }
 

@@ -18,7 +18,24 @@
       "Bash(aws cloudfront create-invalidation:*)",
       "Bash(aws cloudfront get-invalidation:*)",
       "Bash(aws s3:*)",
-      "Bash(claude exit-plan-mode)"
+      "Bash(claude exit-plan-mode)",
+      "Bash(git fetch:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(aws sts:*)",
+      "Bash(terraform version:*)",
+      "Bash(terraform init:*)",
+      "Bash(terraform validate:*)",
+      "Bash(terraform fmt:*)",
+      "Bash(test:*)",
+      "Bash(gh workflow list:*)",
+      "Bash(aws cloudfront get-distribution:*)",
+      "Bash(aws lambda list-functions:*)",
+      "Bash(aws cognito-idp describe-user-pool:*)",
+      "Bash(aws dynamodb list-tables:*)",
+      "Bash(aws apigateway get-rest-apis:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh api:*)",
+      "Bash(npm ci)"
     ]
   }
 }

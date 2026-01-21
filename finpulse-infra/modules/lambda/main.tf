@@ -215,10 +215,10 @@ resource "aws_lambda_function" "market_data_service" {
 
   environment {
     variables = {
-      ENVIRONMENT            = var.environment
-      REDIS_ENDPOINT         = var.redis_endpoint
-      ALPACA_SECRET_ARN      = var.secret_arns["alpaca-credentials"]
-      ALLOWED_ORIGIN         = "https://finpulse.me"
+      ENVIRONMENT       = var.environment
+      REDIS_ENDPOINT    = var.redis_endpoint
+      ALPACA_SECRET_ARN = var.secret_arns["alpaca-credentials"]
+      ALLOWED_ORIGIN    = "https://finpulse.me"
     }
   }
 

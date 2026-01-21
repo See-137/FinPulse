@@ -583,8 +583,8 @@ resource "aws_api_gateway_method_settings" "all" {
     throttling_rate_limit  = var.throttle_rate_limit  # Steady-state rate
 
     # Enable detailed CloudWatch metrics
-    metrics_enabled = true
-    logging_level   = var.api_gateway_logging_level
+    metrics_enabled    = true
+    logging_level      = var.api_gateway_logging_level
     data_trace_enabled = var.environment != "prod" # Only in dev/staging
   }
 }
@@ -670,7 +670,7 @@ resource "aws_api_gateway_usage_plan" "public" {
   }
 
   quota_settings {
-    limit  = var.public_quota_limit  # Lower quota for public
+    limit  = var.public_quota_limit # Lower quota for public
     period = var.public_quota_period
   }
 

@@ -104,7 +104,7 @@ variable "cloudwatch_log_retention_days" {
   type        = number
   # SECURITY FIX: Increase production log retention for audit/compliance
   # Production should use 30 days minimum for audit trail
-  default     = 30
+  default = 30
 }
 
 # =============================================================================
