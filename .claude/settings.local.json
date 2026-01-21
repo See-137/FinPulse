@@ -35,7 +35,8 @@
       "Bash(aws apigateway get-rest-apis:*)",
       "Bash(gh pr list:*)",
       "Bash(gh api:*)",
-      "Bash(npm ci)"
+      "Bash(npm ci)",
+      "Bash(git cherry-pick:*)"
     ]
   }
 }
