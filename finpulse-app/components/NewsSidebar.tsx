@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchNews } from '../hooks/useMarketData';
 import { PlanType, User } from '../types';
 import { usePortfolioStore } from '../store/portfolioStore';
-import { InfluencerTrends } from './InfluencerTrends';
+import { InfluencerFeed } from './InfluencerFeed';
 
 interface NewsArticle {
   id: string;
@@ -192,8 +192,8 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan: _userPlan, u
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
         {activeFilter === 'Whales' ? (
-          // Influencer Trends Tab
-          <InfluencerTrends user={user || null} onUpgradeClick={onUpgradeClick} />
+          // Influencer Feed Tab - Shows tweets filtered by user's holdings
+          <InfluencerFeed user={user || null} holdings={holdings} onUpgradeClick={onUpgradeClick} />
         ) : loading ? (
           // Skeleton Loader
           Array(4).fill(0).map((_, i) => (
