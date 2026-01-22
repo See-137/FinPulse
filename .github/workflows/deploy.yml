@@ -52,6 +52,7 @@ jobs:
           VITE_OAUTH_REDIRECT_URI: https://finpulse.me/oauth/callback
           VITE_OAUTH_LOGOUT_URI: https://finpulse.me
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_TWITTER_BEARER_TOKEN: ${{ secrets.VITE_TWITTER_BEARER_TOKEN }}
           VITE_ENABLE_AI: true
           VITE_ENABLE_COMMUNITY: true
           VITE_ENABLE_NEWS: true
