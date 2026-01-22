@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { 
-  Plus, Download, Upload, Lock, Search, Trash2, Pencil, ShieldCheck, 
+import {
+  Plus, Download, Upload, Lock, Search, Trash2, Pencil, ShieldCheck,
   TrendingUp, TrendingDown, Bitcoin, Activity, Gem, Eye, EyeOff,
-  ArrowUpDown, ArrowUp, ArrowDown, XCircle, Wifi, WifiOff, Crown, AlertTriangle, CheckCircle, X
+  ArrowUpDown, ArrowUp, ArrowDown, Wifi, WifiOff, Crown, AlertTriangle, CheckCircle, X
 } from 'lucide-react';
 import { User, Currency, Holding, AssetType, CombinedSignal } from '../types';
 import { CURRENCY_RATES, SaaS_PLANS } from '../constants';

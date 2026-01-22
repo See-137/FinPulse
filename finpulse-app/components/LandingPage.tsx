@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Logo } from '../constants';
-import { Shield, ArrowRight, Lock, TrendingUp, User as UserIcon, Key, Zap, Globe, Cpu, CheckCircle } from 'lucide-react';
+import { Shield, ArrowRight, Lock, TrendingUp, User as UserIcon, Key, Zap, Globe, Cpu } from 'lucide-react';
 import { DashboardPreview } from './DashboardPreview';
 import { auth } from '../services/authService';
 

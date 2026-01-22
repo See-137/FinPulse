@@ -273,8 +273,8 @@ describe('WebSocketService', () => {
     });
 
     it('should debounce rapid updates for same symbol', async () => {
-      const debounceDelay = 100;
-      const updates = [];
+      // Test assumes 100ms debounce delay
+      const updates: Array<{symbol: string; price: number}> = [];
 
       for (let i = 0; i < 10; i++) {
         updates.push({

@@ -21,7 +21,7 @@ describe('useMarketData', () => {
       ok: true,
       json: async () => mockMarketData,
     };
-    (global.fetch as typeof fetch).mockResolvedValueOnce(response as Response);
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(response as Response);
 
     // Note: This is a placeholder test structure
     // The actual implementation depends on the hook's structure
@@ -29,7 +29,7 @@ describe('useMarketData', () => {
   });
 
   it('should handle API errors gracefully', async () => {
-    (global.fetch as typeof fetch).mockRejectedValueOnce(new Error('Network error'));
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network error'));
 
     // Test error handling
     expect(true).toBe(true);

@@ -36,7 +36,7 @@ const SYMBOL_KEYWORDS: Record<string, string[]> = {
   'PLTR': ['palantir', 'pltr'],
 };
 
-export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan, user, onUpgradeClick }) => {
+export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan: _userPlan, user, onUpgradeClick }) => {
   const [activeFilter, setActiveFilter] = useState<'Holdings' | 'Watchlist' | 'Whales' | 'All'>('All');
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);

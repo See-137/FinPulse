@@ -124,7 +124,7 @@ describe('Watchlist', () => {
   });
 
   it('calls onAddToPortfolio when provided', async () => {
-    const user = userEvent.setup();
+    userEvent.setup();
     render(<Watchlist currency="USD" onAddToPortfolio={mockOnAddToPortfolio} />);
     
     // There should be an "add to portfolio" option for watchlist items

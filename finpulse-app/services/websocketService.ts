@@ -216,7 +216,7 @@ class MarketWebSocketService {
     };
 
     this.ws.onclose = (event) => {
-      wsLogger.debug('WebSocket closed:', event.code, event.reason);
+      wsLogger.debug('WebSocket closed:', { code: event.code, reason: event.reason });
       this.isConnecting = false;
       
       // Notify ALL subscribers of disconnection

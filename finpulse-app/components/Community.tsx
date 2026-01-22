@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, ThumbsUp, TrendingUp, Search, Plus, User, Calendar, Send, X, Loader2 } from 'lucide-react';
 import { getPosts, createPost, likePost, type Post } from '../services/communityService';
-import { useLanguage, formatT } from '../i18n';
+import { useLanguage } from '../i18n';
 import { componentLogger } from '../services/logger';
 
 // Fallback mock data when API is unavailable

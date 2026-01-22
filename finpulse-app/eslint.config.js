@@ -59,6 +59,16 @@ export default [
         Response: 'readonly',
         Event: 'readonly',
         performance: 'readonly',
+        // Additional DOM types for tests
+        Storage: 'readonly',
+        MessageEvent: 'readonly',
+        CloseEvent: 'readonly',
+        Location: 'readonly',
+        // File and notification APIs
+        File: 'readonly',
+        FileReader: 'readonly',
+        FileList: 'readonly',
+        Notification: 'readonly',
         // Node.js / Build tools
         __dirname: 'readonly',
         __filename: 'readonly',

@@ -54,8 +54,7 @@ describe('SyncService', () => {
     });
 
     it('should persist queue to localStorage', async () => {
-      const queueKey = 'sync_queue';
-      // Would test localStorage persistence
+      // Would test localStorage persistence with key 'sync_queue'
       expect(localStorage).toBeDefined();
     });
 

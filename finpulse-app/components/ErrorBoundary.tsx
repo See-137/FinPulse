@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+  static getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> {
     // Update state so the next render will show the fallback UI
     return { hasError: true };
   }
@@ -38,7 +38,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log error with componentLogger in development
     componentLogger.error('[ErrorBoundary] Caught error:', error);
-    componentLogger.error('[ErrorBoundary] Error info:', errorInfo);
+    componentLogger.error('[ErrorBoundary] Error info:', { componentStack: errorInfo.componentStack });
 
     // Store error details in state
     this.setState({

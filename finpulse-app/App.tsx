@@ -36,10 +36,10 @@ import { useChangelog } from './components/ChangelogModal';
 import { useOnboarding } from './components/OnboardingFlow';
 import { milestoneService } from './services/milestoneService';
 import { Milestone } from './types/notifications';
-import { Shield, LayoutGrid, Users, Menu, X, Terminal, Star, Globe, Check } from 'lucide-react';
+import { LayoutGrid, Users, Menu, X, Terminal, Star, Check } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
-import { auth, type CognitoUser } from './services/authService';
-import { LanguageProvider, useLanguage, type Language } from './i18n';
+import { auth } from './services/authService';
+import { LanguageProvider, useLanguage } from './i18n';
 import { usePortfolioStore } from './store/portfolioStore';
 import { api } from './services/apiService';
 
@@ -76,8 +76,8 @@ const USER_STORAGE_KEY = 'finpulse_user_session';
 
 // Inner App component that uses language context
 const AppContent: React.FC = () => {
-  const { t, language, setLanguage, isRTL } = useLanguage();
-  const { setCurrentUser, clearCurrentUser, getHoldings } = usePortfolioStore();
+  const { t, language, setLanguage } = useLanguage();
+  const { setCurrentUser, clearCurrentUser } = usePortfolioStore();
   
   // OAuth callback handling state
   const [isOAuthProcessing, setIsOAuthProcessing] = useState(false);
@@ -171,8 +171,8 @@ const AppContent: React.FC = () => {
     return (localStorage.getItem('theme') as Theme) || 'system';
   });
 
-  // Helper to check if JWT is expired
-  const isTokenExpired = (token: string): boolean => {
+  // Helper to check if JWT is expired (kept for future use)
+  const _isTokenExpired = (token: string): boolean => {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const expiry = payload.exp * 1000;
@@ -397,7 +397,7 @@ const AppContent: React.FC = () => {
 
   // Step 1: Fetch user profile from backend (DynamoDB via /auth/me)
   // Returns user object and createdAt timestamp for onboarding logic
-  const fetchUserProfile = async (userId: string): Promise<{ user: User; createdAt?: string } | null> => {
+  const fetchUserProfile = async (_userId: string): Promise<{ user: User; createdAt?: string } | null> => {
     try {
       const idToken = localStorage.getItem('finpulse_id_token');
       if (!idToken) {
@@ -452,7 +452,7 @@ const AppContent: React.FC = () => {
   // No need for separate POST - /auth/me handles creation on first access
 
   // Step 3-5: Handle login with full Cognito + backend flow
-  const handleLogin = async (email: string, name: string) => {
+  const handleLogin = async (_email: string, _name: string) => {
     const cognitoUser = auth.getCurrentUser();
     if (!cognitoUser) {
       console.error('No Cognito user found');
@@ -723,9 +723,9 @@ const AppContent: React.FC = () => {
                     onUpgradeClick={() => setIsPricingOpen(true)}
                   />
                 ) : activeTab === 'watchlist' ? (
-                  <Watchlist 
+                  <Watchlist
                     currency={currency}
-                    onAddToPortfolio={(symbol, name, type) => {
+                    onAddToPortfolio={(_symbol, _name, _type) => {
                       // Switch to portfolio tab with pre-filled data
                       setActiveTab('portfolio');
                       // The add modal will be handled by PortfolioView

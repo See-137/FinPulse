@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { X, ShieldAlert, Zap, RefreshCw, UserPlus } from 'lucide-react';
+import { X, ShieldAlert, RefreshCw } from 'lucide-react';
 import { User, PlanType } from '../types';
 import { SaaS_PLANS } from '../constants';
 

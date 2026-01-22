@@ -23,7 +23,7 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
   const [fxRate, setFxRate] = useState<number>(CURRENCY_RATES[currency]);
   
   // Real-time WebSocket prices
-  const { prices, isConnected, lastUpdate } = useWebSocketPrices({
+  const { prices, isConnected } = useWebSocketPrices({
     symbols: CRYPTO_SYMBOLS,
     enabled: true,
   });

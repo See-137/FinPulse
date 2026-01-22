@@ -184,7 +184,7 @@ describe('ApiService', () => {
         json: async () => {
           throw new Error('Invalid JSON');
         },
-      } as Response);
+      } as unknown as Response);
 
       const response = await api.getMarketPrices();
 
