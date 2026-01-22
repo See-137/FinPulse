@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { User, PlanType } from '../types';
 import { SaaS_PLANS } from '../constants';
-import { redirectToCheckout, redirectToCustomerPortal } from '../services/lemonSqueezyService';
+import { createCheckoutSession, redirectToCustomerPortal } from '../services/lemonSqueezyService';
 import { useLanguage } from '../i18n';
 import { PricingCard } from './PricingCard';
 
@@ -43,7 +43,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
     setError(null);
 
     try {
-      const { url } = await redirectToCheckout(user.id, user.email, plan as Exclude<PlanType, 'FREE'>);
+      const { url } = await createCheckoutSession(user.id, user.email, plan as Exclude<PlanType, 'FREE'>);
       
       // Check if it's a demo URL (doesn't contain stripe.com)
       if (url.includes('demo_upgrade') || url.includes('demo_')) {

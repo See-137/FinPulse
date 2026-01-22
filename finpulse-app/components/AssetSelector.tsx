@@ -355,11 +355,11 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
           {search.length >= 2 && (
             <div className="p-2 border-t border-slate-200 dark:border-white/10 
               text-xs text-slate-400 text-center">
-              {(!filterTypes || filterTypes.includes('CRYPTO')) 
+              {(!filterTypes || filterTypes.includes('CRYPTO'))
                 ? `${t('assetSelector.searchPoweredBy')} CoinGecko`
                 : filterTypes.includes('STOCK')
                 ? `${t('assetSelector.searchPoweredBy')} Alpaca`
-                : t('assetSelector.typeCommoditySymbol', 'Type any commodity symbol')}
+                : t('assetSelector.typeCommoditySymbol')}
             </div>
           )}
         </div>

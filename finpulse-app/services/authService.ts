@@ -66,7 +66,7 @@ const INTERNAL_TESTER_CONFIG = {
 // Auth state change callback type
 type AuthStateCallback = (user: CognitoUser | null) => void;
 
-class AuthService {
+export class AuthService {
   private cognitoUrl: string;
   private clientId: string;
   private currentUser: CognitoUser | null = null;
@@ -520,7 +520,7 @@ class AuthService {
   ): Promise<AuthResult> {
     authLogger.info('[OAuth] handleFederatedSignIn started', { provider: provider?.name, email: tokenPayload?.email });
     try {
-      authLogger.debug('[OAuth] Calling API:', `${config.apiUrl}/auth/federated-signin`);
+      authLogger.debug('[OAuth] Calling API:', { url: `${config.apiUrl}/auth/federated-signin` });
       const response = await fetch(`${config.apiUrl}/auth/federated-signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -535,7 +535,7 @@ class AuthService {
         }),
       });
 
-      authLogger.debug('[OAuth] API response status:', response.status);
+      authLogger.debug('[OAuth] API response status:', { status: response.status });
       const data = await response.json();
       authLogger.debug('[OAuth] API response data:', data);
 

@@ -7,7 +7,7 @@
 
 import { getTwitterClient, buildInfluencerQuery } from './dataProviders/twitterAPI';
 import { getSentimentAnalyzer } from './nlp/sentimentAnalyzer';
-import { cacheService, getSentimentCacheKey, getInfluencerTweetsCacheKey } from './cacheService';
+import { cacheService, getSentimentCacheKey } from './cacheService';
 import { apiConfig } from '../config/apiKeys';
 import { INFLUENCER_LIST } from '../constants';
 import type {
@@ -15,7 +15,6 @@ import type {
   InfluencerSentiment,
   SentimentSignal,
   SignalDirection,
-  Influencer,
 } from '../types';
 
 // Alias for backward compatibility

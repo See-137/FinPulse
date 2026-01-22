@@ -123,6 +123,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userPlan, on
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
+    return undefined;
   }, [isOpen]);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;

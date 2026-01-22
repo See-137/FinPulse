@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Logo } from '../constants';
-import { Shield, ArrowRight, Lock, User as UserIcon, Key, LayoutGrid, Wallet, Zap, MessageSquareText, Mail, CheckCircle, AlertCircle, Eye, EyeOff, TrendingUp, TrendingDown, DollarSign, Bitcoin, BarChart3, Globe, Send } from 'lucide-react';
+import { Shield, ArrowRight, Lock, User as UserIcon, Key, LayoutGrid, Wallet, Zap, MessageSquareText, Mail, CheckCircle, AlertCircle, Eye, EyeOff, TrendingUp, Send } from 'lucide-react';
 import { auth } from '../services/authService';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { TrustBadge, SecurityFooter } from './TrustBadges';

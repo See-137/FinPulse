@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { getMarketInsightStream } from '../services/aiService';
-import { MessageSquareText, Send, Sparkles, X, ChevronRight, Mic, Lock, Crown } from 'lucide-react';
-import { User, Holding } from '../types';
+import { Send, Sparkles, X, Crown } from 'lucide-react';
+import { User } from '../types';
 import { usePortfolioStore } from '../store/portfolioStore';
 
 interface AIAssistantProps {
@@ -11,8 +11,8 @@ interface AIAssistantProps {
   onUpdateUsage: (credits: number) => void;
 }
 
-// Simple markdown renderer for AI responses
-const renderMarkdown = (text: string): React.ReactNode => {
+// Simple markdown renderer for AI responses (kept for fallback use)
+const _renderMarkdown = (text: string): React.ReactNode => {
   if (!text) return null;
   
   const lines = text.split('\n');
@@ -79,7 +79,7 @@ const renderMarkdown = (text: string): React.ReactNode => {
     return parts.length === 1 ? parts[0] : <>{parts}</>;
   };
 
-  lines.forEach((line, index) => {
+  lines.forEach((line, _index) => {
     const trimmed = line.trim();
     
     // Empty line

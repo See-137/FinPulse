@@ -7,11 +7,9 @@ import { NOTIFICATION_STORAGE_KEYS } from '../types/notifications';
 
 type NotificationChannel = 'modal' | 'bell' | 'banner';
 
-interface NotificationEvent {
-  type: 'version_update' | 'new_feature' | 'maintenance' | 'offer' | 'announcement';
-  id: string;
-  channels: NotificationChannel[];
-}
+// NotificationEvent interface reserved for future use
+// type: 'version_update' | 'new_feature' | 'maintenance' | 'offer' | 'announcement'
+// id: string; channels: NotificationChannel[]
 
 /**
  * Coordination Rules:

@@ -36,7 +36,8 @@
       "Bash(gh pr list:*)",
       "Bash(gh api:*)",
       "Bash(npm ci)",
-      "Bash(git cherry-pick:*)"
+      "Bash(git cherry-pick:*)",
+      "Bash(npm test:*)"
     ]
   }
 }

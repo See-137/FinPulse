@@ -16,9 +16,6 @@ export const STRIPE_PRICE_IDS: Record<Exclude<PlanType, 'FREE'>, string> = {
   SUPERPULSE: import.meta.env.VITE_STRIPE_PRICE_SUPERPULSE || 'price_superpulse_monthly'
 };
 
-// Stripe publishable key - safe to expose
-const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
-
 interface CheckoutSessionResponse {
   sessionId: string;
   url: string;
@@ -66,11 +63,11 @@ export const createCheckoutSession = async (
     }
 
     return response.json();
-  } catch (error) {
+  } catch (_error) {
     // Fallback: Demo mode for development
     // In production, you would have a real Stripe backend
     console.warn('Payment backend unavailable, using demo mode for plan upgrade');
-    
+
     // Return a demo session that will trigger the plan change
     return {
       sessionId: `demo_session_${userId}_${Date.now()}`,
@@ -122,7 +119,7 @@ export const getCustomerPortalUrl = async (userId: string): Promise<string> => {
 
     const data: CustomerPortalResponse = await response.json();
     return data.url;
-  } catch (error) {
+  } catch (_error) {
     // Fallback: Return to current page (demo mode)
     console.warn('Payment portal unavailable, returning to home page');
     return window.location.origin;

@@ -88,8 +88,8 @@ export const PricingCard: React.FC<PricingCardProps> = ({
         <span className="text-slate-400">{t('pricing.perMonth')}</span>
       </div>
 
-      {/* Description */}
-      <p className="text-slate-400 text-sm mt-3">{plan.description}</p>
+      {/* Features summary */}
+      <p className="text-slate-400 text-sm mt-3">{plan.features[0]}</p>
 
       {/* CTA Button */}
       <button

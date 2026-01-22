@@ -68,8 +68,8 @@ export class ConfluenceDetector {
       sentiment
     );
 
-    // Determine majority direction
-    const direction = this.determineMajorityDirection(signals);
+    // Determine majority direction (used in divergence detection)
+    this.determineMajorityDirection(signals);
 
     // Detect divergences
     const divergence = this.detectDivergence(whale, sentiment, technical);

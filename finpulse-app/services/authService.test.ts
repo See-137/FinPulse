@@ -377,10 +377,12 @@ describe('AuthService', () => {
         json: async () => ({ success: true }),
       } as Response);
 
-      const result = await authService.linkOAuthProvider('google', {
-        accessToken: 'oauth-access-token',
-        idToken: 'oauth-id-token',
-      });
+      const result = await authService.linkOAuthProvider(
+        'google',
+        'google-subject-id',
+        'user-password',
+        'linking-token-123'
+      );
 
       expect(result.success).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith(
@@ -398,10 +400,12 @@ describe('AuthService', () => {
         json: async () => ({ error: 'Provider already linked' }),
       } as Response);
 
-      const result = await authService.linkOAuthProvider('google', {
-        accessToken: 'oauth-access-token',
-        idToken: 'oauth-id-token',
-      });
+      const result = await authService.linkOAuthProvider(
+        'google',
+        'google-subject-id',
+        'user-password',
+        'linking-token-123'
+      );
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('already linked');

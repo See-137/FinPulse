@@ -32,7 +32,6 @@ const mockLocation = {
 describe('lemonSqueezyService', () => {
   let originalFetch: typeof fetch;
   let originalLocalStorage: Storage;
-  let originalLocation: Location;
 
   beforeEach(() => {
     vi.resetAllMocks();

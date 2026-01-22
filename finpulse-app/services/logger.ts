@@ -6,10 +6,15 @@
 
 import * as Sentry from '@sentry/react';
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
 interface LogContext {
   [key: string]: unknown;
+}
+
+// Helper to normalize unknown errors to Error | LogContext
+function normalizeError(err: unknown): Error | LogContext {
+  if (err instanceof Error) return err;
+  if (typeof err === 'object' && err !== null) return err as LogContext;
+  return { value: String(err) };
 }
 
 class Logger {
@@ -39,20 +44,23 @@ class Logger {
   /**
    * Warning logs - shown in all environments
    */
-  warn(message: string, context?: LogContext): void {
-    console.warn(`${this.prefix} ${message}`, context || '');
+  warn(message: string, context?: LogContext | unknown): void {
+    const ctx = context ? normalizeError(context) : '';
+    console.warn(`${this.prefix} ${message}`, ctx);
   }
 
   /**
    * Error logs - always shown and sent to Sentry in production
+   * Accepts unknown type for catch block compatibility
    */
-  error(message: string, error?: Error | LogContext, context?: LogContext): void {
-    console.error(`${this.prefix} ${message}`, error || '');
+  error(message: string, error?: unknown, _context?: LogContext): void {
+    const normalizedError = error ? normalizeError(error) : '';
+    console.error(`${this.prefix} ${message}`, normalizedError);
 
     // Send to Sentry in production
-    if (!this.isDevelopment && error instanceof Error) {
+    if (!this.isDevelopment && normalizedError instanceof Error) {
       try {
-        Sentry.captureException(error, { tags: { module: this.prefix } });
+        Sentry.captureException(normalizedError, { tags: { module: this.prefix } });
       } catch {
         // Sentry not available, ignore
       }

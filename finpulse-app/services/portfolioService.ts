@@ -4,7 +4,7 @@
  */
 
 import { config } from '../config';
-import { Holding, AssetType } from '../types';
+import { Holding } from '../types';
 import { createLogger } from './logger';
 
 const portfolioLogger = createLogger('Portfolio');
@@ -97,7 +97,6 @@ export const portfolioService = {
           quantity: holding.quantity,
           avgBuyPrice: holding.avgCost,
           currentPrice: holding.currentPrice || holding.avgCost,
-          notes: holding.notes || '',
         }),
       });
       
@@ -111,6 +110,7 @@ export const portfolioService = {
           quantity: data.quantity,
           avgCost: data.avgBuyPrice || data.avgCost,
           currentPrice: data.currentPrice,
+          dayPL: data.dayPL ?? 0,
         };
       }
       throw new Error(result.error || 'Failed to add holding');
@@ -131,7 +131,6 @@ export const portfolioService = {
           quantity: updates.quantity,
           avgBuyPrice: updates.avgCost,
           currentPrice: updates.currentPrice,
-          notes: updates.notes,
         }),
       });
       
@@ -145,6 +144,7 @@ export const portfolioService = {
           quantity: data.quantity,
           avgCost: data.avgBuyPrice || data.avgCost,
           currentPrice: data.currentPrice,
+          dayPL: data.dayPL ?? 0,
         };
       }
       throw new Error(result.error || 'Failed to update holding');

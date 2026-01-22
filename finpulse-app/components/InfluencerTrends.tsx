@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { influencerService } from '../services/influencerService';
 import { Influencer, User, PlanType } from '../types';
-import { 
-  Lock, TrendingUp, ExternalLink, Crown, Sparkles, 
-  Users, Filter, Search, Star, Zap, ChevronRight 
+import {
+  Lock, ExternalLink,
+  Users, Search, Star, Zap, ChevronRight
 } from 'lucide-react';
 import { INFLUENCER_LIST } from '../constants';
 

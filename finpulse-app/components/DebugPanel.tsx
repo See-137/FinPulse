@@ -20,7 +20,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose, current
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
   
-  const { setCurrentUser, userHoldings, userWatchlists } = usePortfolioStore();
+  const { setCurrentUser } = usePortfolioStore();
 
   const loadStorageData = () => {
     try {

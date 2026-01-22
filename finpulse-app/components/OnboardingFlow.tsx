@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  X, ChevronRight, ChevronLeft, Sparkles, LayoutGrid, 
+import {
+  ChevronRight, ChevronLeft, Sparkles, LayoutGrid,
   Plus, RefreshCw, Bot, Users, Crown, Lock, Check,
   TrendingUp, Zap, ArrowRight
 } from 'lucide-react';

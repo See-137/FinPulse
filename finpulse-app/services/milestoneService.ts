@@ -75,7 +75,7 @@ export const MILESTONES: Milestone[] = [
   },
   {
     id: 'first_asset_added',
-    trigger: (user, stats) => {
+    trigger: (_user, stats) => {
       return stats.assetsCount === 1;
     },
     message: "🎉 Great job! You added your first asset. Keep building your portfolio!",
