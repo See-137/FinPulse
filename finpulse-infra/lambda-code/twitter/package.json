@@ -1,0 +1,9 @@
+{
+  "name": "finpulse-twitter-lambda",
+  "version": "1.0.0",
+  "description": "Twitter/X API proxy for FinPulse",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.470.0"
+  }
+}

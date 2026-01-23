@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { getTwitterClient, buildInfluencerQuery } from '../services/dataProviders/twitterAPI';
 import { influencerService } from '../services/influencerService';
 import type { TweetData, PlanType } from '../types';
+
+// Backend API endpoint for Twitter proxy
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod';
+const TWITTER_API_URL = `${API_BASE_URL}/twitter/tweets`;
 
 // Symbol keywords for broader matching (same as NewsSidebar)
 const SYMBOL_KEYWORDS: Record<string, string[]> = {
@@ -137,38 +140,43 @@ export function useInfluencerTweets(
     setError(null);
 
     try {
-      const client = getTwitterClient();
+      // Build query parameters for backend API
+      const usernames = accessibleInfluencers.map(inf => inf.username);
+      const keywords = searchKeywords.length > 0 ? searchKeywords : [];
 
-      // Check if Twitter API is configured
-      if (!client.isConfigured()) {
-        // Use mock data in demo mode
-        const mockFiltered = filterTweetsByHoldings(MOCK_TWEETS, holdingSymbols, accessibleInfluencers.map(i => i.username));
+      // Call backend Twitter proxy API
+      const params = new URLSearchParams({
+        usernames: usernames.join(','),
+        keywords: keywords.join(','),
+        max_results: maxTweets.toString(),
+      });
+
+      const response = await fetch(`${TWITTER_API_URL}?${params}`);
+      const data = await response.json();
+
+      if (data.success && data.tweets && data.tweets.length > 0) {
+        // Transform dates from strings to Date objects
+        const tweets: TweetData[] = data.tweets.map((tweet: TweetData & { createdAt: string }) => ({
+          ...tweet,
+          createdAt: new Date(tweet.createdAt),
+        }));
+
+        // Additional client-side filtering to ensure relevance
+        const filtered = filterTweetsByHoldings(tweets, holdingSymbols, usernames);
+        setTweets(filtered);
+        setIsDemo(false);
+        setLastUpdated(new Date());
+      } else {
+        // API returned no tweets or error - use mock data
+        console.log('Twitter API returned no data, using mock tweets');
+        const mockFiltered = filterTweetsByHoldings(MOCK_TWEETS, holdingSymbols, usernames);
         setTweets(mockFiltered.slice(0, maxTweets));
         setIsDemo(true);
+        if (data.error) {
+          setError(data.error);
+        }
         setLastUpdated(new Date());
-        setLoading(false);
-        return;
       }
-
-      // Build query for accessible influencers + holding keywords
-      const usernames = accessibleInfluencers.map(inf => inf.username);
-
-      // If user has no holdings, just get recent tweets from influencers
-      let query: string;
-      if (searchKeywords.length > 0) {
-        query = buildInfluencerQuery(usernames, searchKeywords);
-      } else {
-        // Get all tweets from accessible influencers
-        query = usernames.map(u => `from:${u}`).join(' OR ');
-      }
-
-      const results = await client.searchTweets(query, maxTweets);
-
-      // Additional client-side filtering to ensure relevance
-      const filtered = filterTweetsByHoldings(results, holdingSymbols, usernames);
-      setTweets(filtered);
-      setIsDemo(false);
-      setLastUpdated(new Date());
     } catch (err) {
       console.error('Error fetching influencer tweets:', err);
       // Fall back to mock data on error
