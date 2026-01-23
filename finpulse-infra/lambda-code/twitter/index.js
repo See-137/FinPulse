@@ -83,7 +83,8 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
 
     const url = new URL(`${TWITTER_API_BASE}/tweets/search/recent`);
     url.searchParams.append('query', query);
-    url.searchParams.append('max_results', Math.min(maxResults, 100).toString());
+    // Twitter API requires max_results between 10 and 100
+    url.searchParams.append('max_results', Math.max(10, Math.min(maxResults, 100)).toString());
     url.searchParams.append('tweet.fields', 'created_at,public_metrics,author_id');
     url.searchParams.append('expansions', 'author_id');
     url.searchParams.append('user.fields', 'username,name');
