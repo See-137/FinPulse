@@ -1,7 +1,7 @@
 # FinPulse Agent Memory
 
 > Stable project facts, commands, and invariants. Updated automatically.
-> Last updated: 2026-01-19
+> Last updated: 2026-01-24
 
 ---
 
@@ -92,3 +92,33 @@ aws lambda update-function-code --function-name finpulse-auth-prod --zip-file fi
 - [ ] Git commit with descriptive message
 - [ ] Push to remote
 - [ ] Infra changes: plan reviewed, apply only on explicit request
+
+---
+
+## Session History (2026-01-24)
+
+### Performance Improvements Deployed
+
+1. **Portfolio Batch Sync** - `POST /portfolio/batch` endpoint for 10x faster sync
+2. **Request Deduplication** - `inFlightRequests` Map prevents duplicate concurrent requests
+3. **localStorage Caching** - 5-min TTL for instant page loads (`finpulse_cache_*` keys)
+4. **Alpaca Rate Limiting** - Sliding window 180 req/min enforcement
+5. **Exponential Backoff** - Retry logic (1s → 2s → 4s) for transient failures
+
+### Twitter API Fixes
+
+- **Query Batching** - Splits 30 influencers into batches fitting 512 char limit
+- **Stale Cache Fallback** - Returns cached tweets (up to 30 min old) during rate limits
+
+### Key Lambda Files Modified
+
+| Lambda | Path |
+| ------ | ---- |
+| Portfolio | `finpulse-infra/lambda-code/portfolio/index.js` |
+| Market Data | `finpulse-infra/lambda-code/market-data/index.js` |
+| Twitter | `finpulse-infra/lambda-code/twitter/index.js` |
+
+### Memory Commands Established
+
+- **"Vault"** = Save/sync memory at end of session
+- **"Key"** = Load/recall memory at start of new session
