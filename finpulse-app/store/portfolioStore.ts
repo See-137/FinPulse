@@ -248,7 +248,7 @@ export const usePortfolioStore = create<PortfolioState>()(
                 break;
             }
             storeLogger.info(`Retry succeeded for ${op.type} ${op.symbol}`);
-          } catch (_error) {
+          } catch {
             storeLogger.warn(`Retry failed for ${op.type} ${op.symbol}`, { retryCount: op.retryCount + 1 });
             remainingOps.push({ ...op, retryCount: op.retryCount + 1 });
           }

@@ -96,7 +96,7 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan: _userPlan, u
       } else {
         setNewsSource('offline');
       }
-    } catch (error) {
+    } catch {
       // Show empty state instead of fake news
       setArticles([]);
       setNewsSource('offline');

@@ -46,7 +46,7 @@ export const NewsFeed: React.FC = () => {
         setNews(transformed);
         setIsLive(true);
       }
-    } catch (err) {
+    } catch {
       // Using fallback news
     } finally {
       setRefreshing(false);

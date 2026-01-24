@@ -43,6 +43,9 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
 
+  // Stable key for symbols to avoid complex dependency expression
+  const symbolsKey = symbols.join(',');
+
   // Handle price updates from WebSocket
   const handlePriceUpdate = useCallback((newPrices: Map<string, LivePrice>) => {
     if (!isMountedRef.current) return;
@@ -52,16 +55,20 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
   }, []);
 
   // Handle connection status changes
+  // Refs to hold callback functions to avoid circular dependencies
+  const startFallbackPollingRef = useRef<() => void>(() => {});
+  const stopFallbackPollingRef = useRef<() => void>(() => {});
+
   const handleConnectionChange = useCallback((connected: boolean) => {
     if (!isMountedRef.current) return;
     setIsConnected(connected);
-    
+
     if (!connected) {
       // Start fallback polling when disconnected
-      startFallbackPolling();
+      startFallbackPollingRef.current();
     } else {
       // Stop fallback when connected
-      stopFallbackPolling();
+      stopFallbackPollingRef.current();
     }
   }, []);
 
@@ -109,10 +116,10 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
 
   const startFallbackPolling = useCallback(() => {
     if (fallbackTimerRef.current) return;
-    
+
     // Immediate fetch
     fetchFallbackPrices();
-    
+
     // Set up interval
     fallbackTimerRef.current = setInterval(fetchFallbackPrices, fallbackInterval);
   }, [fetchFallbackPrices, fallbackInterval]);
@@ -123,6 +130,10 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
       fallbackTimerRef.current = null;
     }
   }, []);
+
+  // Update refs to avoid stale closures
+  startFallbackPollingRef.current = startFallbackPolling;
+  stopFallbackPollingRef.current = stopFallbackPolling;
 
   // Manual reconnect function
   const reconnect = useCallback(() => {
@@ -165,7 +176,7 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
       unsubscribe(); // Properly unsubscribe (won't disconnect if others still subscribed)
       stopFallbackPolling();
     };
-  }, [enabled, symbols.join(',')]); // Re-subscribe if symbols change
+  }, [enabled, symbols, symbolsKey, fetchFallbackPrices, handlePriceUpdate, handleConnectionChange, handleError, startFallbackPolling, stopFallbackPolling]); // Re-subscribe if symbols change
 
   return {
     prices,

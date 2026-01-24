@@ -43,7 +43,7 @@ const getDirectionIcon = (direction: string) => {
  */
 const CompactSignalCard: React.FC<SignalCardProps> = ({ signal, onClick }) => {
   const colors = getDirectionColor(signal.direction);
-  const components = [
+  const _components = [
     signal.componentScores.whale > 0 && 'Whale',
     signal.componentScores.trade > 0 && 'Trade',
     signal.componentScores.sentiment > 0 && 'Sentiment',

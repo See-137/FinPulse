@@ -36,7 +36,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ userName, onContinue }
             }
           }
         );
-      } catch (error) {
+      } catch {
         // Pulse stream failed silently
       } finally {
         clearTimeout(safetyTimer);

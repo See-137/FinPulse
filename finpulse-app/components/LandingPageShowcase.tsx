@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Logo } from '../constants';
 import { Shield, ArrowRight, Lock, User as UserIcon, Key, LayoutGrid, Wallet, Zap, MessageSquareText, Mail, CheckCircle, AlertCircle, Eye, EyeOff, TrendingUp, Send } from 'lucide-react';
 import { auth } from '../services/authService';
@@ -228,7 +228,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
     checkKey();
   }, []);
 
-  const resetRotationTimer = () => {
+  const resetRotationTimer = useCallback(() => {
     if (rotationTimerRef.current) {
       clearInterval(rotationTimerRef.current);
     }
@@ -237,7 +237,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
         setActiveIndex((prev) => (prev + 1) % SHOWCASE_ITEMS.length);
       }
     }, 3000); // 3 seconds - faster rotation
-  };
+  }, [isHovering]);
 
   // Initialize and clean up rotation
   useEffect(() => {
@@ -250,7 +250,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
     return () => {
       if (rotationTimerRef.current) clearInterval(rotationTimerRef.current);
     };
-  }, [isHovering]);
+  }, [isHovering, resetRotationTimer]);
 
   const handleManualSelect = (index: number) => {
     setActiveIndex(index);
@@ -379,7 +379,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
           setError(result.error || 'Password reset failed');
         }
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);

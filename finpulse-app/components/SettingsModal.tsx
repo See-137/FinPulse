@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, CreditCard, Sparkles, Check, ChevronRight, Moon, Sun, Monitor, Palette, LogOut, Download, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, CreditCard, Sparkles, ChevronRight, Moon, Sun, Monitor, Palette, LogOut, Download, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { User, PlanType, Theme } from '../types';
 import { SaaS_PLANS } from '../constants';
 import { auth } from '../services/authService';
@@ -19,11 +19,11 @@ interface SettingsModalProps {
   onLogout: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  user, 
-  onUpgrade,
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  user,
+  onUpgrade: _onUpgrade,
   onOpenPricing,
   currentTheme,
   onThemeChange,
