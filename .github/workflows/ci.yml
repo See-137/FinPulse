@@ -1,18 +1,36 @@
+# FinPulse CI Pipeline
+# Runs on all PRs to ensure code quality
+
 name: CI
 
 on:
   pull_request:
-    branches: [main]
-    paths:
-      - 'finpulse-app/**'
+    branches: [main, develop]
 
-defaults:
-  run:
-    working-directory: finpulse-app
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
 
 jobs:
-  lint-and-build:
+  # ============================================
+  # Frontend CI
+  # ============================================
+  frontend:
+    name: Frontend
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.changed_files, 'finpulse-app/')
+
+    defaults:
+      run:
+        working-directory: finpulse-app
 
     steps:
       - name: Checkout code
@@ -21,7 +39,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: finpulse-app/package-lock.json
 
@@ -49,11 +67,112 @@ jobs:
           VITE_ENABLE_NEWS: true
         run: npm run build
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: finpulse-app/dist/
+          retention-days: 1
+
       - name: Build summary
         run: |
-          echo "## Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "## Frontend Build Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Bundle size:" >> $GITHUB_STEP_SUMMARY
+          echo "**Bundle sizes:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          ls -lh dist/assets/*.js >> $GITHUB_STEP_SUMMARY
+          ls -lh dist/assets/*.js >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No JS bundles found"
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # Lambda CI
+  # ============================================
+  lambda:
+    name: Lambda
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.changed_files, 'finpulse-infra/lambda-code/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate Lambda code
+        run: |
+          cd finpulse-infra/lambda-code
+          for dir in */; do
+            if [[ -f "${dir}index.js" ]]; then
+              echo "Checking ${dir}..."
+              node --check "${dir}index.js" || exit 1
+            fi
+          done
+          echo "All Lambda code syntax is valid"
+
+      - name: Check package.json files
+        run: |
+          cd finpulse-infra/lambda-code
+          for dir in */; do
+            if [[ -f "${dir}package.json" ]]; then
+              echo "Validating ${dir}package.json..."
+              cd "$dir"
+              npm install --dry-run 2>&1 | head -20 || true
+              cd ..
+            fi
+          done
+
+  # ============================================
+  # Terraform Validation
+  # ============================================
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.changed_files, 'finpulse-infra/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.6.0'
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: finpulse-infra
+        continue-on-error: true
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: finpulse-infra
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: finpulse-infra
+
+  # ============================================
+  # All Checks Passed (for branch protection)
+  # ============================================
+  ci-complete:
+    name: CI Complete
+    runs-on: ubuntu-latest
+    needs: [frontend, lambda, terraform]
+    if: always()
+
+    steps:
+      - name: Check results
+        run: |
+          if [[ "${{ needs.frontend.result }}" == "failure" ]] || \
+             [[ "${{ needs.lambda.result }}" == "failure" ]] || \
+             [[ "${{ needs.terraform.result }}" == "failure" ]]; then
+            echo "One or more checks failed"
+            exit 1
+          fi
+          echo "All checks passed!"
