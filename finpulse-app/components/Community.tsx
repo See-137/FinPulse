@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MessageSquare, ThumbsUp, TrendingUp, Search, Plus, User, Calendar, Send, X, Loader2 } from 'lucide-react';
 import { getPosts, createPost, likePost, type Post } from '../services/communityService';
 import { useLanguage } from '../i18n';
@@ -65,12 +65,7 @@ export const Community: React.FC = () => {
     localStorage.setItem(LIKED_POSTS_KEY, JSON.stringify([...likedPosts]));
   }, [likedPosts]);
 
-  // Fetch posts on mount
-  useEffect(() => {
-    fetchPosts();
-  }, [filterType]);
-
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     setLoading(true);
     setApiError(null);
     try {
@@ -93,7 +88,12 @@ export const Community: React.FC = () => {
           } finally {
       setLoading(false);
     }
-  };
+  }, [filterType]);
+
+  // Fetch posts on mount and when filter changes
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
 
   const handleCreatePost = async () => {
     if (!newPostContent.trim()) return;

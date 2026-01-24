@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
+import './src/index.css';
 import App from './App';
 
 // Initialize Sentry for error tracking (production only)

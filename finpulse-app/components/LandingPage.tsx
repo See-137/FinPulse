@@ -5,6 +5,12 @@ import { Shield, ArrowRight, Lock, TrendingUp, User as UserIcon, Key, Zap, Globe
 import { DashboardPreview } from './DashboardPreview';
 import { auth } from '../services/authService';
 
+// Type for AI Studio window extension
+interface AIStudioWindow {
+  hasSelectedApiKey: () => Promise<boolean>;
+  openSelectKey: () => Promise<void>;
+}
+
 interface LandingPageProps {
   onLogin: (email: string, name: string) => void;
 }
@@ -19,7 +25,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
   useEffect(() => {
     const checkKey = async () => {
       // Use type assertion to access aistudio safely if it's not perfectly typed in the environment
-      const aiStudio = (window as any).aistudio;
+      const aiStudio = (window as unknown as { aistudio?: AIStudioWindow }).aistudio;
       if (aiStudio) {
         const hasKey = await aiStudio.hasSelectedApiKey();
         setRequiresKey(!hasKey);
@@ -29,7 +35,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
   }, []);
 
   const handleKeySelection = async () => {
-    const aiStudio = (window as any).aistudio;
+    const aiStudio = (window as unknown as { aistudio?: AIStudioWindow }).aistudio;
     if (aiStudio) {
       await aiStudio.openSelectKey();
       // Assume success as per guidelines to avoid race conditions

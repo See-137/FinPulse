@@ -3,7 +3,7 @@
  * Progressive 7-step welcome experience for new users
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ChevronRight, ChevronLeft, Sparkles, LayoutGrid,
   Plus, RefreshCw, Bot, Users, Crown, Lock, Check,
@@ -439,10 +439,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 export const useOnboarding = (userCreatedAt?: string, userId?: string) => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // User-scoped storage key
-  const getStorageKey = () => userId 
-    ? `finpulse_onboarding_completed_${userId}` 
-    : NOTIFICATION_STORAGE_KEYS.ONBOARDING_COMPLETED;
+  // User-scoped storage key - memoized to avoid recreating on every render
+  const getStorageKey = useCallback(() => userId
+    ? `finpulse_onboarding_completed_${userId}`
+    : NOTIFICATION_STORAGE_KEYS.ONBOARDING_COMPLETED, [userId]);
 
   useEffect(() => {
     // Wait for userId to be available
@@ -474,7 +474,7 @@ export const useOnboarding = (userCreatedAt?: string, userId?: string) => {
     // For new users (or unknown state), show onboarding after delay
     const timer = setTimeout(() => setShowOnboarding(true), 500);
     return () => clearTimeout(timer);
-  }, [userCreatedAt, userId]);
+  }, [userCreatedAt, userId, getStorageKey]);
 
   const completeOnboarding = () => {
     localStorage.setItem(getStorageKey(), 'true');

@@ -45,9 +45,10 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ userName, onContinue }
     };
 
     fetchPulse();
-    
+
     return () => { isMounted = false; };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount - isReady is SET not used as dependency
 
   return (
     <div className="min-h-screen bg-[#0b0e14] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-700">

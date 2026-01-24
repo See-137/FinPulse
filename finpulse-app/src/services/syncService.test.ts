@@ -20,7 +20,7 @@ class MockWebSocket {
     this.onopen?.();
   }
   
-  simulateMessage(data: any) {
+  simulateMessage(data: Record<string, unknown>) {
     this.onmessage?.({ data: JSON.stringify(data) } as MessageEvent);
   }
   
@@ -68,7 +68,7 @@ describe('syncService', () => {
     originalFetch = global.fetch;
     
     mockWs = new MockWebSocket();
-    global.WebSocket = vi.fn(() => mockWs) as any;
+    global.WebSocket = vi.fn(() => mockWs) as unknown as typeof WebSocket;
     Object.defineProperty(global, 'localStorage', { value: mockLocalStorage, writable: true });
     global.fetch = mockFetch;
     

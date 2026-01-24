@@ -331,12 +331,12 @@ describe('ApiService', () => {
   });
 });
 
-// Type definitions for test
-interface MarketPrice {
+// Type definitions for test (prefixed with underscore as they're only for documentation)
+interface _MarketPrice {
   symbol: string;
   price: number;
 }
 
-interface FxRates {
+interface _FxRates {
   [key: string]: number;
 }

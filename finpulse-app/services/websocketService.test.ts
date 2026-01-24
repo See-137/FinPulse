@@ -5,8 +5,16 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+// Mock WebSocket type
+interface MockWebSocket {
+  addEventListener: ReturnType<typeof vi.fn>;
+  removeEventListener: ReturnType<typeof vi.fn>;
+  send: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+}
+
 describe('WebSocketService', () => {
-  let mockWebSocket: any;
+  let mockWebSocket: MockWebSocket;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -19,7 +27,7 @@ describe('WebSocketService', () => {
       close: vi.fn(),
     };
 
-    global.WebSocket = vi.fn(() => mockWebSocket) as any;
+    global.WebSocket = vi.fn(() => mockWebSocket) as unknown as typeof WebSocket;
   });
 
   afterEach(() => {

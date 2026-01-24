@@ -262,7 +262,7 @@ describe('AuthService', () => {
         json: async () => mockTokens,
       } as Response);
 
-      const refreshToken = 'old-refresh-token';
+      const _refreshToken = 'old-refresh-token';
 
       // This is a private method, but we test it indirectly through signIn that triggers refresh
       // For direct testing, we'd need to restructure the service

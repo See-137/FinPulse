@@ -328,7 +328,8 @@ const AppContent: React.FC = () => {
     };
 
     handleOAuthCallback();
-  }, []); // Run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount - setCurrentUser is stable
 
   // Persist session
   useEffect(() => {
@@ -576,7 +577,7 @@ const AppContent: React.FC = () => {
 
   if (view === 'landing') {
     // Default to Showcase unless explicitly disabled
-    const showcaseDisabled = (import.meta as any)?.env?.VITE_LANDING_SHOWCASE === 'false';
+    const showcaseDisabled = (import.meta as ImportMeta & { env?: Record<string, string> })?.env?.VITE_LANDING_SHOWCASE === 'false';
     
     // Show loading spinner while processing OAuth
     if (isOAuthProcessing) {
