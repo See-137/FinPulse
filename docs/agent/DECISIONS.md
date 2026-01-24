@@ -1,7 +1,7 @@
 # FinPulse Architecture Decision Records
 
 > Short ADR-style decisions with rationale.
-> Last updated: 2026-01-19
+> Last updated: 2026-01-25
 
 ---
 
@@ -106,6 +106,60 @@
 - Missing `addedAt` displays "N/A" gracefully
 
 **Related Commit:** 23193b1
+
+---
+
+## ADR-006: Comprehensive CI/CD Pipeline with GitHub Actions
+
+**Date:** 2026-01-25
+**Status:** Accepted
+
+**Context:** Needed professional CI/CD pipeline with proper gates, security scanning, and deployment automation.
+
+**Decision:** Implement 7 GitHub Actions workflows in root `.github/workflows/`:
+- `ci.yml` - lint, typecheck, test, build
+- `deploy.yml` - S3/CloudFront deployment with staging+production environments
+- `deploy-lambdas.yml` - Lambda deployment
+- `terraform.yml` - infra changes with plan-on-PR, apply-with-approval
+- `security.yml` - CodeQL, npm audit, tfsec, gitleaks
+- `release.yml` - automated GitHub releases on tag push
+- `labeler.yml` - PR auto-labeling
+
+**Rationale:**
+- Previous deploy.yml had `continue-on-error: true` allowing broken code to deploy
+- Workflows in subfolders (finpulse-infra/.github/) don't trigger
+- Need security scanning for supply chain protection
+- Need environment gates for production safety
+
+**Consequences:**
+- All workflows must be in root `.github/workflows/`
+- Production deploys require manual approval in GitHub environment
+- Dependabot enabled for dependency updates
+- Branch protection enforced on main
+
+---
+
+## ADR-007: V3 Release Strategy
+
+**Date:** 2026-01-25
+**Status:** Accepted
+
+**Context:** Major version release with Whale Watch, Total Return Tracking, and security enhancements.
+
+**Decision:** Use multi-channel in-app notification system:
+- `changelogs.json` - drives ChangelogModal (shows once)
+- `banners.json` - drives TopBanner (dismissible, 7-day duration)
+- `NotificationBell` - persistent notification center
+- Email template ready for external announcement
+
+**Rationale:**
+- Users who miss modal will see banner
+- NotificationBell provides persistent access
+- Coordination service prevents notification fatigue
+
+**Consequences:**
+- Version-specific test assertions should be avoided (use content-agnostic patterns)
+- NotificationCoordinator manages channel priority: modal > banner > bell
 
 ---
 
