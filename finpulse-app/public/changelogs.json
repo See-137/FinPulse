@@ -1,6 +1,35 @@
 {
   "changelogs": [
     {
+      "version": "3.0.0",
+      "releaseDate": "2026-01-25",
+      "features": [
+        "🐋 Whale Watch: Track crypto influencers & their market insights in real-time",
+        "📈 Total Return Tracking: See your true portfolio performance with holding age metrics",
+        "🔐 Enhanced Security: httpOnly cookies & Redis rate limiting for bulletproof auth",
+        "💳 Seamless Payments: LemonSqueezy integration for frictionless subscriptions",
+        "🤖 Smarter AI: Upgraded OpenAI backend for more accurate portfolio analysis",
+        "🔍 Live Stock Search: Real-time validation via Alpaca Data API",
+        "🛡️ GDPR Compliance: Full data privacy controls & consent management",
+        "🔔 Browser Alerts: Get price notifications even when you're not on FinPulse",
+        "⚡ Enterprise CI/CD: Professional deployment pipeline with security scanning"
+      ],
+      "bugFixes": [
+        "Fixed Twitter API rate limiting with smart caching",
+        "Resolved SSO account duplication issues",
+        "Fixed commodity price fetching for Gold, Oil & more",
+        "Corrected WebSocket price stream stability",
+        "Fixed portfolio table layout on mobile devices"
+      ],
+      "improvements": [
+        "5x faster price sync with optimized API batching",
+        "Redesigned auth flow with witty, friendly copy",
+        "Enhanced Premium Analytics dashboard",
+        "CoinGecko fallback for 500+ additional cryptos",
+        "Improved landing page UX & conversion flow"
+      ]
+    },
+    {
       "version": "2.0.0",
       "releaseDate": "2026-01-04",
       "features": [

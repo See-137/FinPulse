@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinPulse V3 is Here!</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6;
+      color: #1a1a2e;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f8;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #0891b2 0%, #06b6d4 50%, #22d3ee 100%);
+      padding: 40px 30px;
+      text-align: center;
+    }
+    .header h1 {
+      color: #ffffff;
+      margin: 0;
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .header p {
+      color: rgba(255, 255, 255, 0.9);
+      margin: 10px 0 0;
+      font-size: 18px;
+    }
+    .content {
+      padding: 40px 30px;
+    }
+    .greeting {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .intro {
+      font-size: 16px;
+      color: #4a4a6a;
+      margin-bottom: 30px;
+    }
+    .feature-section {
+      margin-bottom: 30px;
+    }
+    .feature-section h2 {
+      font-size: 20px;
+      color: #0891b2;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .feature-list li {
+      padding: 12px 0;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 15px;
+    }
+    .feature-list li:last-child {
+      border-bottom: none;
+    }
+    .cta-section {
+      text-align: center;
+      margin: 40px 0;
+    }
+    .cta-button {
+      display: inline-block;
+      background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
+      color: #ffffff;
+      text-decoration: none;
+      padding: 16px 40px;
+      border-radius: 30px;
+      font-size: 18px;
+      font-weight: 600;
+      box-shadow: 0 4px 15px rgba(8, 145, 178, 0.4);
+    }
+    .cta-button:hover {
+      background: linear-gradient(135deg, #0e7490 0%, #0891b2 100%);
+    }
+    .footer {
+      background-color: #f8fafc;
+      padding: 30px;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer p {
+      color: #6b7280;
+      font-size: 14px;
+      margin: 5px 0;
+    }
+    .footer a {
+      color: #0891b2;
+      text-decoration: none;
+    }
+    .social-links {
+      margin-top: 20px;
+    }
+    .social-links a {
+      display: inline-block;
+      margin: 0 10px;
+      color: #6b7280;
+      text-decoration: none;
+    }
+    .unsubscribe {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>FinPulse V3 is Here!</h1>
+      <p>Your portfolio tracking just got a major upgrade</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <p class="greeting">Hey {{username}},</p>
+
+      <p class="intro">
+        We've been working hard behind the scenes, and today we're excited to announce
+        <strong>FinPulse V3</strong> - our biggest update yet! Here's what's new:
+      </p>
+
+      <!-- Features -->
+      <div class="feature-section">
+        <h2>What's New in V3</h2>
+        <ul class="feature-list">
+          <li><strong>Whale Watch</strong> - Track crypto influencers & their market insights in real-time</li>
+          <li><strong>Total Return Tracking</strong> - See your true portfolio performance with holding age metrics</li>
+          <li><strong>Enhanced Security</strong> - httpOnly cookies & Redis rate limiting for bulletproof auth</li>
+          <li><strong>Smarter AI</strong> - Upgraded OpenAI backend for more accurate portfolio analysis</li>
+          <li><strong>Live Stock Search</strong> - Real-time validation via Alpaca Data API</li>
+          <li><strong>GDPR Compliance</strong> - Full data privacy controls & consent management</li>
+          <li><strong>Browser Alerts</strong> - Get price notifications even when you're not on FinPulse</li>
+        </ul>
+      </div>
+
+      <!-- Performance -->
+      <div class="feature-section">
+        <h2>Performance Improvements</h2>
+        <ul class="feature-list">
+          <li><strong>5x faster</strong> price sync with optimized API batching</li>
+          <li><strong>CoinGecko fallback</strong> for 500+ additional cryptos</li>
+          <li><strong>Redesigned auth flow</strong> with friendlier experience</li>
+        </ul>
+      </div>
+
+      <!-- CTA -->
+      <div class="cta-section">
+        <a href="https://finpulse.me/dashboard" class="cta-button">
+          Explore V3 Now
+        </a>
+      </div>
+
+      <p style="text-align: center; color: #6b7280; font-size: 14px;">
+        Thank you for being part of the FinPulse community.<br>
+        We can't wait to hear what you think!
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>FinPulse</strong> - Track smarter. Invest better.</p>
+      <p>
+        <a href="https://finpulse.me">finpulse.me</a>
+      </p>
+
+      <div class="social-links">
+        <a href="https://twitter.com/finpulseapp">Twitter</a>
+        <a href="https://discord.gg/finpulse">Discord</a>
+      </div>
+
+      <p class="unsubscribe">
+        You're receiving this because you have a FinPulse account.<br>
+        <a href="{{unsubscribe_url}}">Unsubscribe from product updates</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

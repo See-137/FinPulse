@@ -1,37 +1,37 @@
 {
   "banners": [
     {
-      "id": "banner_v2_launch",
-      "message": "🎉 Welcome to FinPulse V2! Explore the new AI Copilot and redesigned dashboard.",
+      "id": "banner_v3_launch",
+      "message": "🚀 FinPulse V3 is here! Whale Watch, Total Returns, Enhanced Security & more.",
       "variant": "success",
       "ctaText": "See What's New",
       "ctaUrl": "#changelog",
       "targetPlans": null,
-      "startDate": "2026-01-04T00:00:00Z",
-      "endDate": "2026-01-18T23:59:59Z",
-      "priority": 10
+      "startDate": "2026-01-25T00:00:00Z",
+      "endDate": "2026-02-08T23:59:59Z",
+      "priority": 100
     },
     {
-      "id": "banner_propulse_promo",
-      "message": "🚀 Upgrade to ProPulse and track commodities like Gold & Oil - $9.90/month",
+      "id": "banner_whale_watch",
+      "message": "🐋 New: Track crypto whales & influencers in real-time with Whale Watch!",
+      "variant": "info",
+      "ctaText": "Explore Whales",
+      "ctaUrl": "/dashboard?tab=whales",
+      "targetPlans": null,
+      "startDate": "2026-01-25T00:00:00Z",
+      "endDate": "2026-02-15T23:59:59Z",
+      "priority": 50
+    },
+    {
+      "id": "banner_propulse_promo_v3",
+      "message": "⚡ Unlock Premium Analytics, Commodities & unlimited AI with ProPulse - $9.90/mo",
       "variant": "info",
       "ctaText": "Upgrade Now",
       "ctaUrl": "#pricing",
       "targetPlans": ["FREE"],
-      "startDate": "2026-01-04T00:00:00Z",
-      "endDate": "2026-02-01T23:59:59Z",
-      "priority": 5
-    },
-    {
-      "id": "banner_ai_feature",
-      "message": "💡 New: Ask our AI Copilot anything about your portfolio or market trends!",
-      "variant": "info",
-      "ctaText": "Try AI",
-      "ctaUrl": "#ai",
-      "targetPlans": ["PROPULSE", "SUPERPULSE"],
-      "startDate": "2026-01-04T00:00:00Z",
-      "endDate": "2026-01-31T23:59:59Z",
-      "priority": 3
+      "startDate": "2026-01-25T00:00:00Z",
+      "endDate": "2026-03-01T23:59:59Z",
+      "priority": 30
     }
   ]
 }
