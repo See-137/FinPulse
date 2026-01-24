@@ -1,0 +1,181 @@
+# FinPulse Release Automation
+# Semantic versioning and changelog generation
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.github/dependabot.yml'
+
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: 'Dry run (no actual release)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ============================================
+  # Analyze commits and determine version
+  # ============================================
+  analyze:
+    name: Analyze Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.analyze.outputs.should_release }}
+      version_type: ${{ steps.analyze.outputs.version_type }}
+      current_version: ${{ steps.version.outputs.current }}
+      new_version: ${{ steps.version.outputs.new }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current version
+        id: version
+        run: |
+          # Get latest tag or default to 0.0.0
+          CURRENT=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          CURRENT=${CURRENT#v}
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+
+          # Parse version components
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+          # Determine bump type
+          if [[ "${{ github.event.inputs.version_type }}" != "" ]]; then
+            BUMP_TYPE="${{ github.event.inputs.version_type }}"
+          else
+            # Auto-detect from commit messages
+            COMMITS=$(git log $(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")..HEAD --pretty=format:"%s")
+
+            if echo "$COMMITS" | grep -qi "BREAKING CHANGE\|!:"; then
+              BUMP_TYPE="major"
+            elif echo "$COMMITS" | grep -qi "^feat"; then
+              BUMP_TYPE="minor"
+            else
+              BUMP_TYPE="patch"
+            fi
+          fi
+
+          # Calculate new version
+          case $BUMP_TYPE in
+            major)
+              NEW_VERSION="$((MAJOR + 1)).0.0"
+              ;;
+            minor)
+              NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+              ;;
+            patch)
+              NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+              ;;
+          esac
+
+          echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $CURRENT -> $NEW_VERSION ($BUMP_TYPE)"
+
+      - name: Analyze commits
+        id: analyze
+        run: |
+          # Check if there are meaningful changes since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [[ -z "$LAST_TAG" ]]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "version_type=patch" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Count commits since last tag (excluding docs-only)
+          COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"%s" | grep -v "^docs:" | wc -l)
+
+          if [[ $COMMITS -gt 0 ]]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "version_type=${{ github.event.inputs.version_type || 'patch' }}" >> $GITHUB_OUTPUT
+
+  # ============================================
+  # Create Release
+  # ============================================
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: needs.analyze.outputs.should_release == 'true' && github.event.inputs.dry_run != 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          if [[ -n "$LAST_TAG" ]]; then
+            # Group commits by type
+            echo "### Features" >> CHANGELOG.md
+            git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" | grep "^- feat" >> CHANGELOG.md || echo "_None_" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+
+            echo "### Bug Fixes" >> CHANGELOG.md
+            git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" | grep "^- fix" >> CHANGELOG.md || echo "_None_" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+
+            echo "### Other Changes" >> CHANGELOG.md
+            git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" | grep -v "^- feat\|^- fix" >> CHANGELOG.md || echo "_None_" >> CHANGELOG.md
+          else
+            echo "Initial release" >> CHANGELOG.md
+          fi
+
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$LAST_TAG...v${{ needs.analyze.outputs.new_version }}" >> CHANGELOG.md
+
+          cat CHANGELOG.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.analyze.outputs.new_version }}
+          name: Release v${{ needs.analyze.outputs.new_version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release summary
+        run: |
+          echo "## Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** v${{ needs.analyze.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous:** v${{ needs.analyze.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[View Release](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.analyze.outputs.new_version }})" >> $GITHUB_STEP_SUMMARY
