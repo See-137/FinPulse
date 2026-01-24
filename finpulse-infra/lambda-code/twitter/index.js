@@ -127,6 +127,7 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
     // Fetch tweets from each batch (max 2 batches to avoid rate limits)
     const batchesToFetch = batches.slice(0, 2);
     const allTweets = [];
+    let rateLimited = false;
 
     for (const batch of batchesToFetch) {
         const userPart = batch.map(u => `from:${u}`).join(' OR ');
@@ -151,8 +152,9 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
 
         if (!response.ok) {
             if (response.status === 429) {
-                console.warn('Twitter rate limit hit, returning partial results');
-                break; // Return what we have so far
+                console.warn('Twitter rate limit hit');
+                rateLimited = true;
+                break; // Stop fetching, try to return cached/partial data
             }
             const errorText = await response.text();
             console.error('Twitter API error:', response.status, errorText);
@@ -164,13 +166,24 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
         allTweets.push(...tweets);
     }
 
+    // If rate limited and we got nothing, try to return stale cache (up to 30 min old)
+    if (rateLimited && allTweets.length === 0 && cached) {
+        const STALE_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+        if ((Date.now() - cached.timestamp) < STALE_CACHE_TTL) {
+            console.log('Rate limited - returning stale cached results');
+            return cached.data;
+        }
+    }
+
     // Sort by created date and deduplicate
     const uniqueTweets = [...new Map(allTweets.map(t => [t.id, t])).values()]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, maxResults);
 
-    // Cache results
-    tweetsCache.set(cacheKey, { data: uniqueTweets, timestamp: Date.now() });
+    // Only cache if we got results
+    if (uniqueTweets.length > 0) {
+        tweetsCache.set(cacheKey, { data: uniqueTweets, timestamp: Date.now() });
+    }
 
     return uniqueTweets;
 }
