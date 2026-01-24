@@ -272,6 +272,7 @@ resource "aws_wafv2_web_acl" "cloudfront" {
 
 resource "aws_wafv2_web_acl_logging_configuration" "cloudfront" {
   resource_arn            = aws_wafv2_web_acl.cloudfront.arn
+  # WAF logging requires just the log group ARN (without :* suffix)
   log_destination_configs = [aws_cloudwatch_log_group.waf.arn]
 
   redacted_fields {
@@ -306,7 +307,8 @@ resource "aws_wafv2_web_acl_logging_configuration" "cloudfront" {
 }
 
 resource "aws_cloudwatch_log_group" "waf" {
-  name              = "/aws/waf/${var.project_name}-${var.environment}"
+  # WAF logging requires log group name to start with "aws-waf-logs-"
+  name              = "aws-waf-logs-${var.project_name}-${var.environment}"
   retention_in_days = var.environment == "prod" ? 30 : 7
 
   tags = merge(
