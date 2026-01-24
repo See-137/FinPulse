@@ -1,7 +1,7 @@
 # FinPulse Agent Memory
 
 > Stable project facts, commands, and invariants. Updated automatically.
-> Last updated: 2026-01-19
+> Last updated: 2026-01-25
 
 ---
 
@@ -80,6 +80,53 @@ aws lambda update-function-code --function-name finpulse-auth-prod --zip-file fi
 | Premium analytics | `finpulse-app/components/PremiumAnalytics.tsx` |
 | Auth Lambda | `finpulse-infra/lambda-code/auth/index.js` |
 | Main Terraform | `finpulse-infra/main.tf` |
+
+---
+
+## Current Version
+
+**V3.0.0** (Released 2026-01-25)
+- Whale Watch feature
+- Total Return Tracking
+- Enhanced Security (httpOnly cookies, Redis rate limiting)
+- GDPR Compliance
+- Browser push notifications
+
+---
+
+## CI/CD Pipeline
+
+GitHub Actions workflows (must be in root `.github/workflows/`, NOT in subfolders):
+
+| Workflow | File | Trigger |
+|----------|------|---------|
+| CI | `ci.yml` | Push/PR to main |
+| Deploy | `deploy.yml` | Push to main |
+| Lambda Deploy | `deploy-lambdas.yml` | Manual/changes to lambda-code/ |
+| Terraform | `terraform.yml` | PR with infra changes |
+| Security | `security.yml` | Push/PR + weekly |
+| Release | `release.yml` | Push tag v*.*.* |
+| Labeler | `labeler.yml` | PR opened |
+
+**GitHub Environments**: `staging`, `production` (with manual approval)
+
+**Branch Protection**: main branch protected, requires PR review
+
+---
+
+## ESLint Configuration
+
+- Config file: `finpulse-app/eslint.config.js` (flat config format)
+- Scripts folder is **ignored** (no linting for `scripts/`)
+- Console warnings allowed for `log`, `warn`, `error`
+
+---
+
+## Testing Patterns
+
+- Use **content-agnostic** test assertions when possible
+- Avoid hardcoding version-specific text (e.g., "V2 is Live!")
+- Use `it.skip()` for flaky tests that need investigation
 
 ---
 
