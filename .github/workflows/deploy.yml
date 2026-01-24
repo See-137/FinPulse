@@ -135,6 +135,10 @@ jobs:
     if: needs.build.outputs.environment == 'staging'
     environment: staging
 
+    defaults:
+      run:
+        working-directory: .
+
     env:
       S3_BUCKET: finpulse-frontend-staging-383349724213
       CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_STAGING }}
@@ -181,6 +185,10 @@ jobs:
     needs: build
     if: needs.build.outputs.environment == 'production'
     environment: production  # Requires manual approval in GitHub
+
+    defaults:
+      run:
+        working-directory: .
 
     env:
       S3_BUCKET: finpulse-frontend-prod-383349724213
