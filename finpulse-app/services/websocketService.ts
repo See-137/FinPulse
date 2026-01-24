@@ -209,8 +209,11 @@ class MarketWebSocketService {
       }
     };
 
-    this.ws.onerror = (event) => {
-      wsLogger.error('WebSocket error:', event);
+    this.ws.onerror = () => {
+      // Only log once per connection attempt to reduce noise
+      if (!this.isConnecting) {
+        wsLogger.warn('WebSocket connection failed - falling back to REST API');
+      }
       // Notify ALL subscribers of error
       this.subscribers.forEach(sub => sub.onError?.(new Error('WebSocket connection error')));
     };
