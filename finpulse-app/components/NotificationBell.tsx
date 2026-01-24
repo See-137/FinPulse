@@ -11,49 +11,100 @@ import { PlanType } from '../types';
 
 interface NotificationBellProps {
   userPlan: PlanType;
+  userId?: string;
   onNavigate?: (url: string) => void;
 }
 
-// Sample notifications (in production, fetch from API)
-const DEFAULT_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'notif_v2_launch',
-    type: 'feature',
-    title: 'FinPulse V2 is Live! 🚀',
-    description: 'Explore the new AI Copilot, redesigned dashboard, and more.',
-    timestamp: '2026-01-04T10:00:00Z',
-    isRead: false,
-    ctaText: 'Explore',
-    ctaUrl: '#dashboard'
-  },
-  {
-    id: 'notif_asset_selector',
-    type: 'feature',
-    title: 'New Asset Selector',
-    description: 'Browse 35+ popular assets or search from thousands more.',
-    timestamp: '2026-01-04T09:00:00Z',
-    isRead: false
-  },
-  {
-    id: 'notif_upgrade_offer',
-    type: 'offer',
-    title: 'Unlock Commodities Tracking',
-    description: 'Track Gold, Oil, and more with ProPulse - just $9.90/month.',
-    timestamp: '2026-01-03T14:00:00Z',
-    isRead: false,
-    ctaText: 'Upgrade',
-    ctaUrl: '#pricing',
-    targetPlans: ['FREE']
-  },
-  {
-    id: 'notif_community',
-    type: 'announcement',
-    title: 'Community Features Enhanced',
-    description: 'Share insights, discover strategies, and connect with other investors.',
-    timestamp: '2026-01-02T11:00:00Z',
-    isRead: false
+// Generate user-specific storage key
+const getUserStorageKey = (userId?: string) => {
+  const base = NOTIFICATION_STORAGE_KEYS.READ_NOTIFICATIONS;
+  return userId ? `${base}_${userId}` : base;
+};
+
+const getUserSignupKey = (userId?: string) => {
+  const base = NOTIFICATION_STORAGE_KEYS.USER_SIGNUP_DATE;
+  return userId ? `${base}_${userId}` : base;
+};
+
+// Dynamic notification generator based on user context
+function generateNotifications(userPlan: PlanType, userId?: string): Notification[] {
+  const notifications: Notification[] = [];
+  const now = new Date();
+
+  // Get user's first seen date to determine which notifications to show
+  const userSignupKey = getUserSignupKey(userId);
+  const userSignupStr = localStorage.getItem(userSignupKey);
+  const userSignup = userSignupStr ? new Date(userSignupStr) : now;
+
+  // Record signup date if not already recorded
+  if (!userSignupStr) {
+    localStorage.setItem(userSignupKey, now.toISOString());
   }
-];
+
+  const daysSinceSignup = Math.floor((now.getTime() - userSignup.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Welcome notification (only for new users within 7 days)
+  if (daysSinceSignup <= 7) {
+    notifications.push({
+      id: 'welcome',
+      type: 'feature',
+      title: 'Welcome to FinPulse!',
+      description: 'Add your first assets to start tracking your portfolio.',
+      timestamp: userSignup.toISOString(),
+      isRead: false,
+      ctaText: 'Add Assets',
+      ctaUrl: '#portfolio'
+    });
+  }
+
+  // Community tip (show after 1 day)
+  if (daysSinceSignup >= 1 && daysSinceSignup <= 14) {
+    notifications.push({
+      id: 'community_tip',
+      type: 'announcement',
+      title: 'Join the Community',
+      description: 'Share insights and learn from other investors.',
+      timestamp: new Date(userSignup.getTime() + 1000 * 60 * 60 * 24).toISOString(),
+      isRead: false,
+      ctaText: 'Explore',
+      ctaUrl: '#community'
+    });
+  }
+
+  // Whale tracking tip (show after 2 days)
+  if (daysSinceSignup >= 2 && daysSinceSignup <= 14) {
+    notifications.push({
+      id: 'whale_tip',
+      type: 'feature',
+      title: 'Track Influencers',
+      description: 'See what crypto influencers are saying in the Whales tab.',
+      timestamp: new Date(userSignup.getTime() + 1000 * 60 * 60 * 48).toISOString(),
+      isRead: false,
+      ctaText: 'View Whales',
+      ctaUrl: '#whales'
+    });
+  }
+
+  // Upgrade prompt for FREE users (show after 5 days)
+  if (userPlan === 'FREE' && daysSinceSignup >= 5) {
+    notifications.push({
+      id: 'upgrade_prompt',
+      type: 'offer',
+      title: 'Unlock More Features',
+      description: 'Track commodities, get more AI queries, and access advanced analytics.',
+      timestamp: new Date(userSignup.getTime() + 1000 * 60 * 60 * 120).toISOString(),
+      isRead: false,
+      ctaText: 'View Plans',
+      ctaUrl: '#pricing',
+      targetPlans: ['FREE']
+    });
+  }
+
+  // Sort by timestamp (newest first)
+  return notifications.sort((a, b) =>
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+}
 
 const getNotificationIcon = (type: Notification['type']) => {
   switch (type) {
@@ -84,24 +135,28 @@ const formatTimeAgo = (timestamp: string): string => {
   return date.toLocaleDateString();
 };
 
-export const NotificationBell: React.FC<NotificationBellProps> = ({ userPlan, onNavigate }) => {
+export const NotificationBell: React.FC<NotificationBellProps> = ({ userPlan, userId, onNavigate }) => {
   const { t, isRTL } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const storageKey = getUserStorageKey(userId);
 
   // Load notifications and read state
   useEffect(() => {
     const loadNotifications = () => {
+      // Generate dynamic notifications based on user context
+      const generated = generateNotifications(userPlan, userId);
+
       // Filter notifications by plan
-      const filtered = DEFAULT_NOTIFICATIONS.filter(n => {
+      const filtered = generated.filter(n => {
         if (!n.targetPlans) return true;
         return n.targetPlans.includes(userPlan);
       });
 
-      // Load read state from localStorage
-      const readIds = JSON.parse(localStorage.getItem(NOTIFICATION_STORAGE_KEYS.READ_NOTIFICATIONS) || '[]');
-      
+      // Load read state from user-scoped localStorage
+      const readIds = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
       setNotifications(filtered.map(n => ({
         ...n,
         isRead: readIds.includes(n.id)
@@ -109,7 +164,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userPlan, on
     };
 
     loadNotifications();
-  }, [userPlan]);
+  }, [userPlan, userId, storageKey]);
 
   // Close on outside click
   useEffect(() => {
@@ -129,20 +184,20 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userPlan, on
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const markAsRead = (id: string) => {
-    const readIds = JSON.parse(localStorage.getItem(NOTIFICATION_STORAGE_KEYS.READ_NOTIFICATIONS) || '[]');
+    const readIds = JSON.parse(localStorage.getItem(storageKey) || '[]');
     if (!readIds.includes(id)) {
       readIds.push(id);
-      localStorage.setItem(NOTIFICATION_STORAGE_KEYS.READ_NOTIFICATIONS, JSON.stringify(readIds));
+      localStorage.setItem(storageKey, JSON.stringify(readIds));
     }
-    
-    setNotifications(prev => prev.map(n => 
+
+    setNotifications(prev => prev.map(n =>
       n.id === id ? { ...n, isRead: true } : n
     ));
   };
 
   const markAllAsRead = () => {
     const allIds = notifications.map(n => n.id);
-    localStorage.setItem(NOTIFICATION_STORAGE_KEYS.READ_NOTIFICATIONS, JSON.stringify(allIds));
+    localStorage.setItem(storageKey, JSON.stringify(allIds));
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 

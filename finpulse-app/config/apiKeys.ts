@@ -59,19 +59,14 @@ interface ApiConfig {
 }
 
 /**
- * Get environment variable with fallback
+ * Get environment variable with fallback (Vite compatible)
  */
 function getEnv(key: string, defaultValue: string | null = null): string | null {
-  if (typeof window === 'undefined') {
-    // Server-side (Node.js)
-    return process.env[key] || defaultValue;
-  } else {
-    // Client-side (browser) - only public vars
-    if (key.startsWith('NEXT_PUBLIC_')) {
-      return (window as any).__NEXT_DATA__?.props?.env?.[key] || defaultValue;
-    }
-    return defaultValue;
-  }
+  // Vite exposes env vars via import.meta.env
+  // VITE_* prefixed vars are exposed to client
+  const viteKey = key.replace('NEXT_PUBLIC_', 'VITE_');
+  const value = (import.meta.env as Record<string, string | undefined>)[viteKey];
+  return value || defaultValue;
 }
 
 /**
@@ -158,9 +153,9 @@ export const apiConfig: ApiConfig = {
   },
 
   features: {
-    liveWhaleData: getBoolEnv('NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA', false),
-    liveSentiment: getBoolEnv('NEXT_PUBLIC_ENABLE_LIVE_SENTIMENT', false),
-    liveTechnical: getBoolEnv('NEXT_PUBLIC_ENABLE_LIVE_TECHNICAL', false),
+    liveWhaleData: getBoolEnv('VITE_ENABLE_LIVE_WHALE_DATA', true), // Enable live data by default
+    liveSentiment: getBoolEnv('VITE_ENABLE_LIVE_SENTIMENT', true),  // Enable live data by default
+    liveTechnical: getBoolEnv('VITE_ENABLE_LIVE_TECHNICAL', true),  // Enable live data by default
   },
 
   cache: {

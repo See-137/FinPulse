@@ -27,57 +27,7 @@ const SYMBOL_KEYWORDS: Record<string, string[]> = {
   'MATIC': ['polygon', 'matic'],
 };
 
-// Mock tweets for demo mode (when Twitter API is not configured)
-const MOCK_TWEETS: TweetData[] = [
-  {
-    id: 'mock-1',
-    authorUsername: 'elonmusk',
-    text: 'Bitcoin is the future of money. The legacy financial system is slowly waking up to this reality. $BTC',
-    createdAt: new Date(Date.now() - 1000 * 60 * 30), // 30 mins ago
-    metrics: { likes: 125000, retweets: 28000, replies: 15000, views: 8500000 },
-    mentionedSymbols: ['BTC'],
-  },
-  {
-    id: 'mock-2',
-    authorUsername: 'saylor',
-    text: 'MicroStrategy now holds 450,000 BTC. Digital gold is the best treasury reserve asset for corporations. The math is undeniable. #Bitcoin',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    metrics: { likes: 45000, retweets: 12000, replies: 3200, views: 2100000 },
-    mentionedSymbols: ['BTC'],
-  },
-  {
-    id: 'mock-3',
-    authorUsername: 'VitalikButerin',
-    text: 'The Ethereum roadmap continues to execute. Layer 2 scaling is working better than expected. $ETH ecosystem grows stronger every day.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-    metrics: { likes: 38000, retweets: 8500, replies: 2800, views: 1800000 },
-    mentionedSymbols: ['ETH'],
-  },
-  {
-    id: 'mock-4',
-    authorUsername: 'CathieDWood',
-    text: 'NVDA continues to lead the AI revolution. Our research shows GPU demand will accelerate through 2026. Innovation solves problems.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-    metrics: { likes: 22000, retweets: 5200, replies: 1800, views: 950000 },
-    mentionedSymbols: ['NVDA'],
-  },
-  {
-    id: 'mock-5',
-    authorUsername: 'cz_binance',
-    text: 'Crypto adoption is happening faster in emerging markets. Building the future of finance, one block at a time. $BNB',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
-    metrics: { likes: 31000, retweets: 7800, replies: 2400, views: 1400000 },
-    mentionedSymbols: ['BNB'],
-  },
-  {
-    id: 'mock-6',
-    authorUsername: 'elonmusk',
-    text: 'Tesla accepting Bitcoin again. The network has improved significantly on energy efficiency. $TSLA $BTC',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
-    metrics: { likes: 185000, retweets: 42000, replies: 28000, views: 12000000 },
-    mentionedSymbols: ['TSLA', 'BTC'],
-  },
-];
+// No mock data - show real tweets or proper empty state
 
 interface UseInfluencerTweetsOptions {
   refreshInterval?: number; // ms, default 5 minutes
@@ -140,15 +90,14 @@ export function useInfluencerTweets(
     setError(null);
 
     try {
-      // Build query parameters for backend API
       const usernames = accessibleInfluencers.map(inf => inf.username);
-      const keywords = searchKeywords.length > 0 ? searchKeywords : [];
 
-      // Call backend Twitter proxy API
+      // First try: Fetch tweets from influencers WITHOUT keyword filter
+      // This ensures we get recent tweets even if they don't mention user's holdings
       const params = new URLSearchParams({
         usernames: usernames.join(','),
-        keywords: keywords.join(','),
-        max_results: maxTweets.toString(),
+        keywords: '', // Empty - get all recent tweets from these users
+        max_results: String(Math.max(maxTweets * 2, 50)), // Fetch more, filter client-side
       });
 
       const response = await fetch(`${TWITTER_API_URL}?${params}`);
@@ -156,21 +105,20 @@ export function useInfluencerTweets(
 
       if (data.success && data.tweets && data.tweets.length > 0) {
         // Transform dates from strings to Date objects
-        const tweets: TweetData[] = data.tweets.map((tweet: TweetData & { createdAt: string }) => ({
+        const allTweets: TweetData[] = data.tweets.map((tweet: TweetData & { createdAt: string }) => ({
           ...tweet,
           createdAt: new Date(tweet.createdAt),
         }));
 
-        // Additional client-side filtering to ensure relevance
-        const filtered = filterTweetsByHoldings(tweets, holdingSymbols, usernames);
-        setTweets(filtered);
+        // Client-side filtering: prioritize tweets mentioning user's holdings
+        const filtered = filterTweetsByHoldings(allTweets, holdingSymbols, usernames);
+        setTweets(filtered.slice(0, maxTweets));
         setIsDemo(false);
         setLastUpdated(new Date());
       } else {
-        // API returned no tweets or error - use mock data
-        console.log('Twitter API returned no data, using mock tweets');
-        const mockFiltered = filterTweetsByHoldings(MOCK_TWEETS, holdingSymbols, usernames);
-        setTweets(mockFiltered.slice(0, maxTweets));
+        // API returned no tweets - show empty state (no mock data)
+        console.log('Twitter API returned no data');
+        setTweets([]);
         setIsDemo(true);
         if (data.error) {
           setError(data.error);
@@ -179,16 +127,15 @@ export function useInfluencerTweets(
       }
     } catch (err) {
       console.error('Error fetching influencer tweets:', err);
-      // Fall back to mock data on error
-      const mockFiltered = filterTweetsByHoldings(MOCK_TWEETS, holdingSymbols, accessibleInfluencers.map(i => i.username));
-      setTweets(mockFiltered.slice(0, maxTweets));
+      // Show empty state with error - no mock data
+      setTweets([]);
       setIsDemo(true);
       setError(err instanceof Error ? err.message : 'Failed to fetch tweets');
       setLastUpdated(new Date());
     } finally {
       setLoading(false);
     }
-  }, [userPlan, accessibleInfluencers, searchKeywords, holdingSymbols, maxTweets]);
+  }, [userPlan, accessibleInfluencers, holdingSymbols, maxTweets]);
 
   // Initial fetch
   useEffect(() => {
