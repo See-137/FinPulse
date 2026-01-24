@@ -30,7 +30,7 @@ class Logger {
    */
   debug(message: string, context?: LogContext): void {
     if (this.isDevelopment) {
-      console.debug(`${this.prefix} ${message}`, context || '');
+      console.log(`${this.prefix} [DEBUG] ${message}`, context || '');
     }
   }
 
@@ -38,7 +38,7 @@ class Logger {
    * Info logs - shown in all environments
    */
   info(message: string, context?: LogContext): void {
-    console.info(`${this.prefix} ${message}`, context || '');
+    console.log(`${this.prefix} [INFO] ${message}`, context || '');
   }
 
   /**

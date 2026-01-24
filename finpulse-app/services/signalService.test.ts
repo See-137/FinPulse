@@ -13,6 +13,7 @@ import {
   combineSignals,
   getAverageAccuracy,
 } from './signalService';
+import type { SignalDirection } from '../types';
 import { WhaleSignal, TradeSignal, SentimentSignal } from '../types';
 import { SIGNAL_SCORING } from '../constants';
 
@@ -54,7 +55,7 @@ describe('Signal Service', () => {
     });
 
     it('should reject signal with invalid direction', () => {
-      const invalid = { ...mockWhale, direction: 'invalid' as any };
+      const invalid = { ...mockWhale, direction: 'invalid' as SignalDirection };
       expect(validateSignal(invalid)).toBe(false);
     });
 
@@ -85,7 +86,7 @@ describe('Signal Service', () => {
 
     it('should clamp confidence to 0-100 range', () => {
       const veryHigh = { ...mockWhale, score: 150 };
-      const confidence = calculateConfidence(veryHigh as any, null, null);
+      const confidence = calculateConfidence(veryHigh as WhaleSignal, null, null);
       expect(confidence).toBeLessThanOrEqual(100);
       expect(confidence).toBeGreaterThanOrEqual(0);
     });

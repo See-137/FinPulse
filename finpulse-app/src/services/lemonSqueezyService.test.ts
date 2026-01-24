@@ -275,7 +275,7 @@ describe('lemonSqueezyService', () => {
   describe('LemonSqueezy Overlay', () => {
     it('should check for LemonSqueezy.js availability', () => {
       // Without LemonSqueezy.js loaded
-      const hasLemonSqueezy = typeof window !== 'undefined' && (window as any).LemonSqueezy;
+      const hasLemonSqueezy = typeof window !== 'undefined' && (window as unknown as { LemonSqueezy?: unknown }).LemonSqueezy;
       expect(hasLemonSqueezy).toBeFalsy();
     });
 

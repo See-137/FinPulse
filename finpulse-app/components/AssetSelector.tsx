@@ -126,7 +126,7 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
             
             const cryptoResults: Asset[] = (cryptoData.coins || [])
               .slice(0, 10)
-              .map((coin: any) => ({
+              .map((coin: { symbol: string; name: string }) => ({
                 symbol: coin.symbol.toUpperCase(),
                 name: coin.name,
                 type: 'CRYPTO' as AssetType,
@@ -148,8 +148,8 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
             
             if (stockData.success && Array.isArray(stockData.data)) {
               const stockResults: Asset[] = stockData.data
-                .filter((stock: any) => !excludeSymbols.includes(stock.symbol))
-                .map((stock: any) => ({
+                .filter((stock: { symbol: string }) => !excludeSymbols.includes(stock.symbol))
+                .map((stock: { symbol: string; name: string }) => ({
                   symbol: stock.symbol,
                   name: stock.name,
                   type: 'STOCK' as AssetType,

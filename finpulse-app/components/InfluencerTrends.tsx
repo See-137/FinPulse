@@ -60,16 +60,17 @@ export const InfluencerTrends: React.FC<InfluencerTrendsProps> = ({ user, onUpgr
   const [showLocked, setShowLocked] = useState(false);
 
   // Get accessible influencers based on user plan
+  const userPlan = user?.plan;
   const accessibleInfluencers = useMemo(() => {
-    if (!user) return [];
-    return influencerService.getAccessibleInfluencers(user.plan);
-  }, [user?.plan]);
+    if (!userPlan) return [];
+    return influencerService.getAccessibleInfluencers(userPlan);
+  }, [userPlan]);
 
   // Get locked influencers (higher tier)
   const lockedInfluencers = useMemo(() => {
-    if (!user) return INFLUENCER_LIST;
+    if (!userPlan) return INFLUENCER_LIST;
     return INFLUENCER_LIST.filter(inf => !accessibleInfluencers.some(a => a.username === inf.username));
-  }, [user?.plan, accessibleInfluencers]);
+  }, [userPlan, accessibleInfluencers]);
 
   // Get unique focus areas from accessible influencers
   const focusAreas = useMemo(() => {

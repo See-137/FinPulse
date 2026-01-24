@@ -5,6 +5,12 @@ import { auth } from '../services/authService';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { TrustBadge, SecurityFooter } from './TrustBadges';
 
+// Type for AI Studio window extension
+interface AIStudioWindow {
+  hasSelectedApiKey: () => Promise<boolean>;
+  openSelectKey: () => Promise<void>;
+}
+
 interface LandingPageShowcaseProps {
   onLogin: (email: string, name: string) => void;
   initialError?: string | null;
@@ -219,7 +225,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
 
   useEffect(() => {
     const checkKey = async () => {
-      const aiStudio = (window as any).aistudio;
+      const aiStudio = (window as unknown as { aistudio?: AIStudioWindow }).aistudio;
       if (aiStudio) {
         const hasKey = await aiStudio.hasSelectedApiKey();
         setRequiresKey(!hasKey);
@@ -259,7 +265,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
   };
 
   const handleKeySelection = async () => {
-    const aiStudio = (window as any).aistudio;
+    const aiStudio = (window as unknown as { aistudio?: AIStudioWindow }).aistudio;
     if (aiStudio) {
       await aiStudio.openSelectKey();
       setRequiresKey(false);
