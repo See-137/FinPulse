@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import {
   Plus, Download, Upload, Lock, Search, Trash2, Pencil, ShieldCheck,
   TrendingUp, TrendingDown, Bitcoin, Activity, Gem, Eye, EyeOff,
-  ArrowUpDown, ArrowUp, ArrowDown, Wifi, WifiOff, Crown, AlertTriangle, CheckCircle, X
+  ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, CheckCircle, X
 } from 'lucide-react';
 import { User, Currency, Holding, AssetType, CombinedSignal } from '../types';
 import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
@@ -27,9 +27,9 @@ interface PortfolioViewProps {
 
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser, currency, onCurrencyChange, onUpgradeClick }) => {
   // Use Zustand store for shared state (including holdings for news filtering)
-  const { 
-    isPrivate, search, filterType, getHoldings, getWatchlist,
-    setIsPrivate, setSearch, setFilterType, setHoldings, addHolding, updateHolding, removeHolding,
+  const {
+    isPrivate, search, filterType, getHoldings,
+    setIsPrivate, setSearch, setFilterType, addHolding, updateHolding, removeHolding,
     isSyncing
   } = usePortfolioStore();
   
@@ -43,7 +43,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   );
 
   // Fetch real-time market prices (REST API) - dynamically based on user's holdings
-  const { prices: marketPrices, loading: pricesLoading } = useMarketData({
+  const { prices: marketPrices } = useMarketData({
     symbols: holdingSymbols,
     refreshInterval: 30000,
     fetchNews: false,  // News is fetched separately by NewsSidebar
@@ -55,7 +55,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     holdings.filter(h => h.type === 'CRYPTO').map(h => h.symbol),
     [holdings]
   );
-  const { prices: wsPrices, isConnected: wsConnected } = useWebSocketPrices({
+  const { prices: wsPrices } = useWebSocketPrices({
     symbols: cryptoSymbols, // Only subscribe to user's actual crypto holdings
     enabled: cryptoSymbols.length > 0, // Disable if no crypto in portfolio
   });
@@ -63,20 +63,23 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   // Additional CoinGecko prices for non-Binance cryptos
   const [coinGeckoPrices, setCoinGeckoPrices] = useState<Record<string, { price: number; change24h: number }>>({});
   
+  // Stable key for cryptoSymbols to avoid complex dependency expression
+  const cryptoSymbolsKey = useMemo(() => cryptoSymbols.join(','), [cryptoSymbols]);
+
   // Fetch CoinGecko prices for all cryptos (catches non-Binance coins)
   useEffect(() => {
     if (cryptoSymbols.length === 0) return;
-    
+
     const fetchPrices = async () => {
       const prices = await fetchCoinGeckoPrices(cryptoSymbols);
       setCoinGeckoPrices(prices);
     };
-    
+
     fetchPrices();
     // Refresh every 60 seconds
     const interval = setInterval(fetchPrices, 60000);
     return () => clearInterval(interval);
-  }, [cryptoSymbols.join(',')]);
+  }, [cryptoSymbols, cryptoSymbolsKey]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Holding | null>(null);
@@ -205,7 +208,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
         // Using 1 second to be safe across different browsers
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
-    } catch (error) {
+    } catch {
       // Export failed
       alert('Export failed. Please check your browser permissions and try again.');
     }
@@ -371,20 +374,20 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
 
   // Helper to get real-time market price for an asset
   // Priority: WebSocket (Binance) -> CoinGecko -> REST API -> holding's stored price
-  const getMarketPrice = (symbol: string, fallbackPrice: number): number => {
+  const getMarketPrice = useCallback((symbol: string, fallbackPrice: number): number => {
     const upperSymbol = symbol.toUpperCase();
-    
+
     // First try WebSocket data (most real-time for Binance-listed crypto)
     const wsPrice = wsPrices.get(upperSymbol);
     if (wsPrice?.price) {
       return wsPrice.price;
     }
-    
+
     // Then try CoinGecko (for non-Binance cryptos like DN, LAVA, ICP)
     if (coinGeckoPrices[upperSymbol]?.price) {
       return coinGeckoPrices[upperSymbol].price;
     }
-    
+
     // Then try REST API data (works for all asset types)
     if (marketPrices?.[upperSymbol]?.price) {
       return marketPrices[upperSymbol].price;
@@ -392,27 +395,27 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     if (marketPrices?.[symbol]?.price) {
       return marketPrices[symbol].price;
     }
-    
+
     // Fall back to holding's stored price (last known price)
     return fallbackPrice;
-  };
+  }, [wsPrices, coinGeckoPrices, marketPrices]);
 
   // Helper to get 24h change from market data
   // Priority: WebSocket -> CoinGecko -> REST API -> holding's stored change
-  const getMarketChange = (symbol: string, fallbackChange: number): number => {
+  const getMarketChange = useCallback((symbol: string, fallbackChange: number): number => {
     const upperSymbol = symbol.toUpperCase();
-    
+
     // First try WebSocket data (real-time for Binance crypto)
     const wsPrice = wsPrices.get(upperSymbol);
     if (wsPrice?.change24h !== undefined) {
       return wsPrice.change24h;
     }
-    
+
     // Then try CoinGecko (for non-Binance cryptos)
     if (coinGeckoPrices[upperSymbol]?.change24h !== undefined) {
       return coinGeckoPrices[upperSymbol].change24h;
     }
-    
+
     // Then try REST API data
     if (marketPrices?.[upperSymbol]?.change24h !== undefined) {
       return marketPrices[upperSymbol].change24h;
@@ -421,7 +424,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
       return marketPrices[symbol].change24h;
     }
     return fallbackChange;
-  };
+  }, [wsPrices, coinGeckoPrices, marketPrices]);
 
   // Calculate total value using real market prices
   const totalValue = holdings.reduce((sum, h) => {
@@ -433,25 +436,25 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   const portfolio24hChange = useMemo(() => {
     let totalCurrentValue = 0;
     let totalPreviousValue = 0;
-    
+
     holdings.forEach(h => {
       const currentPrice = getMarketPrice(h.symbol, h.currentPrice);
       const change24hPercent = getMarketChange(h.symbol, h.dayPL);
       const assetCurrentValue = h.quantity * currentPrice;
       // Calculate previous value: currentValue / (1 + change%)
       const assetPreviousValue = assetCurrentValue / (1 + change24hPercent / 100);
-      
+
       totalCurrentValue += assetCurrentValue;
       totalPreviousValue += assetPreviousValue;
     });
-    
+
     const dollarChange = totalCurrentValue - totalPreviousValue;
-    const percentChange = totalPreviousValue > 0 
-      ? ((totalCurrentValue - totalPreviousValue) / totalPreviousValue) * 100 
+    const percentChange = totalPreviousValue > 0
+      ? ((totalCurrentValue - totalPreviousValue) / totalPreviousValue) * 100
       : 0;
-    
+
     return { dollarChange, percentChange };
-  }, [holdings, marketPrices, wsPrices]);
+  }, [holdings, getMarketPrice, getMarketChange]);
   
   const data = [
     { name: 'Crypto', type: 'CRYPTO', value: holdings.filter(h => h.type === 'CRYPTO').reduce((sum, h) => sum + h.quantity * getMarketPrice(h.symbol, h.currentPrice), 0), color: '#00e5ff' },
@@ -524,7 +527,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
       });
     }
     return sortableItems;
-  }, [filteredHoldings, sortConfig, marketPrices, wsPrices]);
+  }, [filteredHoldings, sortConfig, getMarketPrice, getMarketChange]);
 
   // Generate signals for each holding (influenced by 24h price change for realism)
   const signals = useMemo<Record<string, CombinedSignal>>(() => {
@@ -549,7 +552,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     });
     
     return signalMap;
-  }, [sortedHoldings, marketPrices, wsPrices]);
+  }, [sortedHoldings, getMarketChange]);
 
   const renderSortIcon = (key: string) => {
     if (sortConfig?.key !== key) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
