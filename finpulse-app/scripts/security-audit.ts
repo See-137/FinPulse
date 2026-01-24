@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-
+/* eslint-disable no-console */
 /**
  * FinPulse Security Audit Script
  * Performs automated checks on codebase for common security issues

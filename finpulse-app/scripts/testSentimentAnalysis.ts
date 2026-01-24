@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Test Script: Sentiment Analysis
  *

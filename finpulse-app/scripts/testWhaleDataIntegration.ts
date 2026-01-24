@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Test Script: Whale Data Integration
  *
