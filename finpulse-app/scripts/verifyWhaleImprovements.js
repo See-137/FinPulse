@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Verification Script: Whale Feature Quick Wins
  *
