@@ -1,0 +1,252 @@
+# FinPulse Terraform CI/CD Pipeline
+# Plan on PR, Apply only with manual approval
+#
+# Required GitHub Secrets:
+# - AWS_ACCESS_KEY_ID: AWS access key
+# - AWS_SECRET_ACCESS_KEY: AWS secret key
+
+name: Terraform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'finpulse-infra/**/*.tf'
+      - 'finpulse-infra/**/*.tfvars'
+      - '.github/workflows/terraform.yml'
+
+  pull_request:
+    branches: [main]
+    paths:
+      - 'finpulse-infra/**/*.tf'
+      - 'finpulse-infra/**/*.tfvars'
+
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: '1.6.0'
+  TF_WORKING_DIR: finpulse-infra
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ============================================
+  # Terraform Format Check
+  # ============================================
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        continue-on-error: true
+
+      - name: Format Status
+        if: steps.fmt.outcome == 'failure'
+        run: |
+          echo "::error::Terraform files are not properly formatted. Run 'terraform fmt -recursive' locally."
+          exit 1
+
+  # ============================================
+  # Terraform Validate
+  # ============================================
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    needs: fmt
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+  # ============================================
+  # Terraform Plan (on PR or manual)
+  # ============================================
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'pull_request' || github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply'
+
+    outputs:
+      has_changes: ${{ steps.plan.outputs.has_changes }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -out=tfplan -detailed-exitcode 2>&1 | tee plan_output.txt || true
+
+          # Check if there are changes
+          if grep -q "No changes" plan_output.txt; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+          # Create plan summary
+          echo "## Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          grep -E "(Plan:|No changes|will be created|will be updated|will be destroyed|must be replaced)" plan_output.txt >> $GITHUB_STEP_SUMMARY || echo "See full plan output" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 5
+
+      - name: Comment PR with Plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('${{ env.TF_WORKING_DIR }}/plan_output.txt', 'utf8');
+
+            // Truncate if too long
+            const maxLength = 60000;
+            let output = planOutput.length > maxLength
+              ? planOutput.substring(0, maxLength) + '\n... (truncated)'
+              : planOutput;
+
+            const body = `## Terraform Plan
+
+            <details>
+            <summary>Click to expand plan output</summary>
+
+            \`\`\`hcl
+            ${output}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Workflow: \`${{ github.workflow }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  # ============================================
+  # Terraform Apply (manual only, with approval)
+  # ============================================
+  apply:
+    name: Apply
+    runs-on: ubuntu-latest
+    needs: plan
+    if: github.event.inputs.action == 'apply' && needs.plan.outputs.has_changes == 'true'
+    environment: production  # Requires manual approval
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Apply
+        run: |
+          echo "Applying Terraform changes..."
+          terraform apply -auto-approve tfplan
+
+          echo "## Terraform Apply Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Applied by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ env.TF_WORKING_DIR }}
