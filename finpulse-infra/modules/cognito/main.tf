@@ -79,15 +79,27 @@ resource "aws_cognito_user_pool" "main" {
     email_sending_account = "COGNITO_DEFAULT"
   }
 
-  # Advanced security
-  user_pool_add_ons {
-    advanced_security_mode = "ENFORCED"
-  }
+  # Advanced security - disabled for Essentials pricing tier
+  # Enable only if upgraded to Plus tier
+  # user_pool_add_ons {
+  #   advanced_security_mode = "ENFORCED"
+  # }
 
   # Deletion protection (prod only)
   deletion_protection = var.environment == "prod" ? "ACTIVE" : "INACTIVE"
 
   tags = var.tags
+
+  # Lifecycle: ignore changes to prevent recreation of imported resources
+  # The prod-v2 pool was imported with name "finpulse-users-prod-v2"
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      name,              # Imported resource has different name suffix
+      user_pool_add_ons, # Requires Plus tier, ignore if already set in AWS
+      schema             # Schema cannot be changed after pool creation
+    ]
+  }
 }
 
 # =============================================================================
@@ -137,7 +149,11 @@ resource "aws_cognito_user_pool_client" "frontend" {
   lifecycle {
     prevent_destroy = true
     ignore_changes = [
-      generate_secret
+      generate_secret,
+      name,                    # Imported resource has different name suffix
+      allowed_oauth_flows,     # Imported resource may have additional flows
+      access_token_validity,   # AWS returns 0 for default values
+      id_token_validity        # AWS returns 0 for default values
     ]
   }
 }
