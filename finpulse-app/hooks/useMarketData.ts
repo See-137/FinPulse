@@ -1,6 +1,7 @@
 // Real-time Market Data Hook
 // Fetches live data from AWS backend
 // Supports dynamic symbols based on user portfolio
+// Features: localStorage caching, retry with backoff, request deduplication
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { config } from '../config';
@@ -52,29 +53,108 @@ interface UseMarketDataReturn {
   lastUpdated: Date | null;
 }
 
+// Cache configuration
+const CACHE_KEYS = {
+  PRICES: 'finpulse_cache_prices',
+  FX_RATES: 'finpulse_cache_fx',
+  NEWS: 'finpulse_cache_news',
+};
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 1000;
+
+// In-flight request deduplication
+const inFlightRequests = new Map<string, Promise<any>>();
+
 // Get auth token from localStorage
 const getAuthToken = (): string | null => {
   return localStorage.getItem('finpulse_id_token');
 };
 
-// API helper with auth
-const fetchWithAuth = async (endpoint: string) => {
+// localStorage cache helpers
+const saveToCache = <T>(key: string, data: T): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      data,
+      timestamp: Date.now(),
+    }));
+  } catch (e) {
+    // localStorage full or unavailable - ignore
+  }
+};
+
+const loadFromCache = <T>(key: string): T | null => {
+  try {
+    const cached = localStorage.getItem(key);
+    if (!cached) return null;
+
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp > CACHE_TTL) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return data as T;
+  } catch {
+    return null;
+  }
+};
+
+// Retry with exponential backoff
+const fetchWithRetry = async (
+  endpoint: string,
+  retries = MAX_RETRIES,
+  backoff = INITIAL_BACKOFF_MS
+): Promise<any> => {
   const token = getAuthToken();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
-  const response = await fetch(`${config.apiUrl}${endpoint}`, { headers });
-  
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
+
+  try {
+    const response = await fetch(`${config.apiUrl}${endpoint}`, { headers });
+
+    if (!response.ok) {
+      // Don't retry 4xx errors (client errors)
+      if (response.status >= 400 && response.status < 500) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+      throw new Error(`API Error: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    if (retries > 0 && !(error instanceof Error && error.message.includes('4'))) {
+      // Wait with exponential backoff
+      await new Promise(resolve => setTimeout(resolve, backoff));
+      return fetchWithRetry(endpoint, retries - 1, backoff * 2);
+    }
+    throw error;
   }
-  
-  return response.json();
+};
+
+// Deduplicated fetch - prevents concurrent identical requests
+const fetchWithAuth = async (endpoint: string): Promise<any> => {
+  // Check if request is already in-flight
+  const existingRequest = inFlightRequests.get(endpoint);
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  // Create new request with retry logic
+  const request = fetchWithRetry(endpoint)
+    .finally(() => {
+      // Clean up after request completes
+      inFlightRequests.delete(endpoint);
+    });
+
+  inFlightRequests.set(endpoint, request);
+  return request;
 };
 
 /**
@@ -94,17 +174,25 @@ export const useMarketData = (options: UseMarketDataOptions | number = {}): UseM
     fetchFx: shouldFetchFx = true,
   } = opts;
 
-  const [prices, setPrices] = useState<MarketData | null>(null);
-  const [fxRates, setFxRates] = useState<FxRates | null>(null);
-  const [news, setNews] = useState<NewsItem[]>([]);
+  // Load initial state from cache for instant display
+  const [prices, setPrices] = useState<MarketData | null>(() => loadFromCache(CACHE_KEYS.PRICES));
+  const [fxRates, setFxRates] = useState<FxRates | null>(() => loadFromCache(CACHE_KEYS.FX_RATES));
+  const [news, setNews] = useState<NewsItem[]>(() => loadFromCache(CACHE_KEYS.NEWS) || []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  
-  // Track previous symbols to detect changes
+
+  // Track previous symbols and in-flight state to prevent duplicates
   const prevSymbolsRef = useRef<string>('');
+  const isFetchingRef = useRef<boolean>(false);
 
   const fetchData = useCallback(async (symbolsToFetch: string[]) => {
+    // Prevent duplicate concurrent fetches
+    if (isFetchingRef.current) {
+      return;
+    }
+    isFetchingRef.current = true;
+
     try {
       setLoading(true);
       setError(null);
@@ -119,17 +207,17 @@ export const useMarketData = (options: UseMarketDataOptions | number = {}): UseM
       const requests: Promise<any>[] = [
         fetchWithAuth(`/market/prices?type=all&symbols=${symbolsParam}`),
       ];
-      
+
       if (shouldFetchFx) {
         requests.push(fetchWithAuth('/fx/rates?base=USD'));
       }
-      
+
       if (shouldFetchNews) {
         requests.push(fetchWithAuth('/news/latest'));
       }
 
       const results = await Promise.allSettled(requests);
-      
+
       // Process prices (always first)
       const pricesRes = results[0];
       if (pricesRes.status === 'fulfilled' && pricesRes.value.success) {
@@ -145,6 +233,7 @@ export const useMarketData = (options: UseMarketDataOptions | number = {}): UseM
           };
         });
         setPrices(transformed);
+        saveToCache(CACHE_KEYS.PRICES, transformed);
       }
 
       // Process FX rates (second if enabled)
@@ -152,11 +241,13 @@ export const useMarketData = (options: UseMarketDataOptions | number = {}): UseM
       if (shouldFetchFx && results[resultIndex]) {
         const fxRes = results[resultIndex];
         if (fxRes.status === 'fulfilled' && fxRes.value.success) {
-          setFxRates({
+          const fxData = {
             base: fxRes.value.base,
             rates: fxRes.value.rates,
             timestamp: fxRes.value.timestamp,
-          });
+          };
+          setFxRates(fxData);
+          saveToCache(CACHE_KEYS.FX_RATES, fxData);
         }
         resultIndex++;
       }
@@ -165,7 +256,9 @@ export const useMarketData = (options: UseMarketDataOptions | number = {}): UseM
       if (shouldFetchNews && results[resultIndex]) {
         const newsRes = results[resultIndex];
         if (newsRes.status === 'fulfilled' && newsRes.value.success) {
-          setNews(newsRes.value.articles || newsRes.value.data || []);
+          const newsData = newsRes.value.articles || newsRes.value.data || [];
+          setNews(newsData);
+          saveToCache(CACHE_KEYS.NEWS, newsData);
         }
       }
 
@@ -174,6 +267,7 @@ export const useMarketData = (options: UseMarketDataOptions | number = {}): UseM
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   }, [shouldFetchNews, shouldFetchFx]);
 

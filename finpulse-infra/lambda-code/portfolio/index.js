@@ -583,17 +583,110 @@ exports.handler = async (event) => {
       };
     }
 
+    // POST /portfolio/batch - Batch sync holdings (10x faster than sequential)
+    if (path.includes('/batch') && method === 'POST') {
+      // Rate limit check
+      const rateLimit = await redisCache.checkRateLimit(`${userId}:batch_sync`, 10, 60);
+      if (!rateLimit.allowed) {
+        return {
+          statusCode: 429,
+          headers: { ...corsHeaders, 'Retry-After': String(rateLimit.resetIn) },
+          body: JSON.stringify({
+            success: false,
+            error: 'Rate limit exceeded. Please try again later.',
+            retryAfter: rateLimit.resetIn
+          })
+        };
+      }
+
+      const { holdings = [], operations = [] } = body;
+
+      if (!Array.isArray(holdings) || holdings.length === 0) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ success: false, error: 'Holdings array is required' })
+        };
+      }
+
+      // Limit batch size to prevent abuse
+      const MAX_BATCH_SIZE = 50;
+      if (holdings.length > MAX_BATCH_SIZE) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: false,
+            error: `Batch size exceeds maximum of ${MAX_BATCH_SIZE}`
+          })
+        };
+      }
+
+      console.log(`[Batch] Processing ${holdings.length} holdings for user ${userId}`);
+      const results = { added: [], updated: [], failed: [] };
+
+      // Process all holdings in parallel
+      await Promise.all(holdings.map(async (holding, index) => {
+        const operation = operations[index] || 'add';
+        const symbol = holding.symbol?.toUpperCase();
+
+        if (!symbol) {
+          results.failed.push({ index, error: 'Missing symbol' });
+          return;
+        }
+
+        try {
+          if (operation === 'add') {
+            const validationResult = validation.validateHolding(holding);
+            if (!validationResult.valid) {
+              results.failed.push({ symbol, error: 'Validation failed', details: validationResult.errors });
+              return;
+            }
+            const added = await addHolding(userId, validationResult.data);
+            results.added.push(added);
+          } else if (operation === 'update') {
+            const updated = await updateHolding(userId, symbol, holding);
+            results.updated.push(updated);
+          } else if (operation === 'remove') {
+            await removeHolding(userId, symbol);
+            results.added.push({ symbol, removed: true });
+          }
+        } catch (error) {
+          console.warn(`[Batch] Failed ${operation} for ${symbol}:`, error.message);
+          results.failed.push({ symbol, operation, error: error.message });
+        }
+      }));
+
+      console.log(`[Batch] Complete: ${results.added.length} added, ${results.updated.length} updated, ${results.failed.length} failed`);
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          data: results,
+          summary: {
+            total: holdings.length,
+            added: results.added.length,
+            updated: results.updated.length,
+            failed: results.failed.length
+          }
+        })
+      };
+    }
+
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
         service: 'FinPulse Portfolio Service',
-        version: '1.0.0',
+        version: '1.1.0',
         endpoints: [
           'GET /portfolio',
           'POST /portfolio/holdings',
           'PUT /portfolio/holdings/{id}',
           'DELETE /portfolio/holdings/{id}',
+          'POST /portfolio/batch',
           'POST /portfolio/prices',
           'GET /portfolio/analytics'
         ]
