@@ -71,6 +71,65 @@ const priceCache = new Map();
 const PRICE_CACHE_TTL = 60000; // 1 minute
 const MAX_CACHE_SIZE = 500; // Prevent unbounded memory growth
 
+// Alpaca Rate Limiter - Sliding Window
+// Alpaca allows 200 requests/minute, we'll be conservative at 180
+const ALPACA_RATE_LIMIT = 180;
+const RATE_WINDOW_MS = 60000; // 1 minute
+const alpacaRequestLog = [];
+
+/**
+ * Check if we can make an Alpaca API request
+ * Uses sliding window rate limiting
+ * @returns {boolean} true if request is allowed
+ */
+function checkAlpacaRateLimit() {
+  const now = Date.now();
+
+  // Remove requests outside the window
+  while (alpacaRequestLog.length > 0 && alpacaRequestLog[0] < now - RATE_WINDOW_MS) {
+    alpacaRequestLog.shift();
+  }
+
+  // Check if under limit
+  return alpacaRequestLog.length < ALPACA_RATE_LIMIT;
+}
+
+/**
+ * Record an Alpaca API request for rate limiting
+ * @param {number} count - Number of logical requests (e.g., symbols fetched)
+ */
+function recordAlpacaRequest(count = 1) {
+  const now = Date.now();
+  for (let i = 0; i < count; i++) {
+    alpacaRequestLog.push(now);
+  }
+}
+
+/**
+ * Get current rate limit status
+ * @returns {{ used: number, remaining: number, limit: number, resetsAt: number }}
+ */
+function getRateLimitStatus() {
+  const now = Date.now();
+
+  // Clean old entries
+  while (alpacaRequestLog.length > 0 && alpacaRequestLog[0] < now - RATE_WINDOW_MS) {
+    alpacaRequestLog.shift();
+  }
+
+  const used = alpacaRequestLog.length;
+  const oldestRequest = alpacaRequestLog[0];
+  const resetsAt = oldestRequest ? oldestRequest + RATE_WINDOW_MS : now;
+
+  return {
+    used,
+    remaining: Math.max(0, ALPACA_RATE_LIMIT - used),
+    limit: ALPACA_RATE_LIMIT,
+    resetsAt,
+    windowMs: RATE_WINDOW_MS,
+  };
+}
+
 /**
  * Add to memory cache with size limit (LRU-like eviction)
  */
@@ -133,13 +192,21 @@ async function getPricesWithCache(symbols, assetType = 'all') {
     return results;
   }
   
-  // Layer 3: Fetch from Alpaca
+  // Layer 3: Fetch from Alpaca (with rate limit enforcement)
   if (missingSymbols.length > 0) {
+    // Check rate limit before making API call
+    if (!checkAlpacaRateLimit()) {
+      const rateLimitStatus = getRateLimitStatus();
+      console.warn(`[RateLimit] Alpaca rate limit reached (${rateLimitStatus.used}/${rateLimitStatus.limit}). Returning cached data only.`);
+      // Return whatever we have from cache layers
+      return results;
+    }
+
     console.log(`[Alpaca] Fetching ${missingSymbols.length} symbols: ${missingSymbols.join(',')}`);
-    
+
     try {
       let alpacaPrices;
-      
+
       if (assetType === 'crypto') {
         alpacaPrices = await alpacaService.getCryptoQuotes(missingSymbols);
       } else if (assetType === 'stock') {
@@ -148,27 +215,30 @@ async function getPricesWithCache(symbols, assetType = 'all') {
         // Auto-detect: use getQuotes which routes automatically
         alpacaPrices = await alpacaService.getQuotes(missingSymbols);
       }
-      
+
+      // Record API usage for rate limiting (count as 1 request per batch)
+      recordAlpacaRequest(1);
+
       Object.assign(results, alpacaPrices);
-      
+
       // Track API usage
       if (cacheManager && cacheManager.recordApiRequest) {
         await cacheManager.recordApiRequest('alpaca', missingSymbols.length * 100);
       }
-      
+
       // Update caches with new data
       if (cacheManager && Object.keys(alpacaPrices).length > 0) {
         const cacheType = assetType === 'all' ? 'mixed' : assetType;
         await cacheManager.setBatchQuotes(alpacaPrices, cacheType, 'alpaca');
       }
-      
+
       // Update Redis cache
       if (redisCache && Object.keys(alpacaPrices).length > 0) {
-        const redisKey = redisCache.keys?.marketPrices ? 
-          redisCache.keys.marketPrices(`alpaca:${assetType}`) : 
+        const redisKey = redisCache.keys?.marketPrices ?
+          redisCache.keys.marketPrices(`alpaca:${assetType}`) :
           `market:alpaca:${assetType}`;
         const existingCache = await redisCache.get(redisKey) || {};
-        await redisCache.set(redisKey, { ...existingCache, ...alpacaPrices }, 
+        await redisCache.set(redisKey, { ...existingCache, ...alpacaPrices },
           redisCache.TTL?.MARKET_DATA || 300);
       }
     } catch (error) {
@@ -390,9 +460,10 @@ exports.handler = async (event) => {
     if (path.includes('/stats') && method === 'GET') {
       const stats = {
         service: 'FinPulse Market Data',
-        version: '3.0.0',
+        version: '3.0.1',
         provider: 'alpaca',
         memoryCacheSize: priceCache.size,
+        rateLimit: getRateLimitStatus(),
         timestamp: new Date().toISOString(),
       };
 

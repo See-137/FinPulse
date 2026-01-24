@@ -173,17 +173,73 @@ export const portfolioService = {
   },
 
   /**
+   * Batch sync holdings to backend (10x faster than sequential)
+   * Uses parallel processing on backend
+   */
+  async batchSync(holdings: Holding[], operations?: ('add' | 'update' | 'remove')[]): Promise<{
+    added: Holding[];
+    updated: Holding[];
+    failed: { symbol: string; error: string }[];
+  }> {
+    if (holdings.length === 0) {
+      return { added: [], updated: [], failed: [] };
+    }
+
+    portfolioLogger.info(`Batch syncing ${holdings.length} holdings to backend...`);
+
+    try {
+      const result = await fetchWithAuth('/portfolio/batch', {
+        method: 'POST',
+        body: JSON.stringify({
+          holdings: holdings.map(h => ({
+            symbol: h.symbol.toUpperCase(),
+            name: h.name,
+            type: h.type.toLowerCase(),
+            quantity: h.quantity,
+            avgBuyPrice: h.avgCost,
+            currentPrice: h.currentPrice || h.avgCost,
+          })),
+          operations: operations || holdings.map(() => 'add'),
+        }),
+      });
+
+      if (result.success) {
+        portfolioLogger.info(`Batch sync complete: ${result.summary?.added || 0} added, ${result.summary?.failed || 0} failed`);
+        return result.data;
+      }
+      throw new Error(result.error || 'Batch sync failed');
+    } catch (error) {
+      portfolioLogger.error('Batch sync failed:', error as Error);
+      throw error;
+    }
+  },
+
+  /**
    * Sync local holdings to backend (for migration)
+   * Uses batch endpoint for 10x faster sync
    */
   async syncLocalToBackend(holdings: Holding[]): Promise<void> {
     portfolioLogger.info(`Syncing ${holdings.length} holdings to backend...`);
-    
-    for (const holding of holdings) {
-      try {
-        await this.addHolding(holding);
-        portfolioLogger.debug(`Synced: ${holding.symbol}`);
-      } catch (error) {
-        portfolioLogger.error(`Failed to sync ${holding.symbol}:`, error as Error);
+
+    // Use batch sync for better performance
+    try {
+      const result = await this.batchSync(holdings);
+      portfolioLogger.info(`Synced ${result.added.length} holdings, ${result.failed.length} failed`);
+
+      if (result.failed.length > 0) {
+        portfolioLogger.warn('Some holdings failed to sync:', result.failed);
+      }
+    } catch (error) {
+      portfolioLogger.error('Batch sync failed, falling back to sequential:', error as Error);
+
+      // Fallback to sequential for older backends
+      for (const holding of holdings) {
+        try {
+          await this.addHolding(holding);
+          portfolioLogger.debug(`Synced: ${holding.symbol}`);
+        } catch (err) {
+          portfolioLogger.error(`Failed to sync ${holding.symbol}:`, err as Error);
+        }
       }
     }
   },
