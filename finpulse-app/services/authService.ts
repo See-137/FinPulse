@@ -150,7 +150,7 @@ export class AuthService {
         success: true,
         needsConfirmation: !data.UserConfirmed,
       };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error during sign up' };
     }
   }
@@ -177,7 +177,7 @@ export class AuthService {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error during confirmation' };
     }
   }
@@ -229,7 +229,7 @@ export class AuthService {
       this.scheduleRefresh(tokens.expiresIn, tokens.refreshToken);
 
       return { success: true, user, tokens };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error during sign in' };
     }
   }
@@ -282,7 +282,7 @@ export class AuthService {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error' };
     }
   }
@@ -310,7 +310,7 @@ export class AuthService {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error' };
     }
   }
@@ -336,7 +336,7 @@ export class AuthService {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error' };
     }
   }
@@ -415,7 +415,7 @@ export class AuthService {
     let storedStateData;
     try {
       storedStateData = JSON.parse(storedStateJson);
-    } catch (e) {
+    } catch {
       // Backwards compatibility: treat as plain string if not JSON
       storedStateData = { state: storedStateJson, expiresAt: Date.now() + 60000 };
     }
@@ -618,7 +618,7 @@ export class AuthService {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error during account linking' };
     }
   }
@@ -683,7 +683,7 @@ export class AuthService {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Network error during unlinking' };
     }
   }

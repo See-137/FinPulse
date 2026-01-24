@@ -2,8 +2,6 @@ import React, { memo } from 'react';
 import { Bell, BellOff, Trash2, TrendingUp, TrendingDown, ArrowRight, Bitcoin, Activity, Gem } from 'lucide-react';
 import { WatchlistItem, AssetType } from '../store/portfolioStore';
 import { useLanguage } from '../i18n';
-import { Currency } from '../types';
-import { CURRENCY_RATES } from '../constants';
 
 interface WatchlistItemCardProps {
   item: WatchlistItem;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import { User, PlanType } from '../types';
 import { SaaS_PLANS } from '../constants';
 import { createCheckoutSession, redirectToCustomerPortal } from '../services/lemonSqueezyService';
@@ -18,16 +18,16 @@ interface PricingModalProps {
  * Displays pricing tiers with upgrade/downgrade options
  * Uses PricingCard component for individual plan rendering
  */
-export const PricingModal: React.FC<PricingModalProps> = ({ 
-  user, 
-  isOpen, 
+export const PricingModal: React.FC<PricingModalProps> = ({
+  user,
+  isOpen,
   onClose,
-  onPlanChange 
+  onPlanChange
 }) => {
   const { t, isRTL } = useLanguage();
   const [loading, setLoading] = useState<PlanType | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [_isDemoMode, setIsDemoMode] = useState(false);
 
   const handleUpgrade = async (plan: PlanType) => {
     if (plan === 'FREE') {

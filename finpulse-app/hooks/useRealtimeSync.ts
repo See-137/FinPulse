@@ -7,7 +7,7 @@ import { usePortfolioStore } from '../store/portfolioStore';
  */
 export function useRealtimeSync(userId: string | null, accessToken: string | null) {
   const [isConnected, setIsConnected] = useState(false);
-  const { addHolding, updateHolding, removeHolding, setHoldings } = usePortfolioStore();
+  const { addHolding, updateHolding, removeHolding } = usePortfolioStore();
 
   useEffect(() => {
     if (!userId || !accessToken) return;
@@ -79,7 +79,7 @@ export function useDeviceManagement() {
     try {
       const deviceList = await syncService.getDevices();
       setDevices(deviceList);
-    } catch (err) {
+    } catch {
       setError('Failed to fetch devices');
     } finally {
       setLoading(false);
@@ -94,7 +94,7 @@ export function useDeviceManagement() {
         setDevices(prev => prev.filter(d => d.deviceId !== deviceId));
       }
       return success;
-    } catch (err) {
+    } catch {
       setError('Failed to revoke device');
       return false;
     } finally {
@@ -110,7 +110,7 @@ export function useDeviceManagement() {
         setDevices(prev => prev.filter(d => d.isCurrent));
       }
       return success;
-    } catch (err) {
+    } catch {
       setError('Failed to revoke devices');
       return false;
     } finally {

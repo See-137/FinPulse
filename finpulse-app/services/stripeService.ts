@@ -63,7 +63,7 @@ export const createCheckoutSession = async (
     }
 
     return response.json();
-  } catch (_error) {
+  } catch {
     // Fallback: Demo mode for development
     // In production, you would have a real Stripe backend
     console.warn('Payment backend unavailable, using demo mode for plan upgrade');
@@ -119,7 +119,7 @@ export const getCustomerPortalUrl = async (userId: string): Promise<string> => {
 
     const data: CustomerPortalResponse = await response.json();
     return data.url;
-  } catch (_error) {
+  } catch {
     // Fallback: Return to current page (demo mode)
     console.warn('Payment portal unavailable, returning to home page');
     return window.location.origin;

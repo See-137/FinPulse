@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Eye, Plus, Search, Trash2, Bell, BellOff, TrendingUp, TrendingDown,
-  Bitcoin, Activity, Gem, Star, ArrowRight, X, Loader2, Wifi, WifiOff
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import {
+  Eye, Plus, Search, Bell,
+  Bitcoin, Activity, Gem, Star, X, Wifi, WifiOff
 } from 'lucide-react';
-import { usePortfolioStore, WatchlistItem, AssetType } from '../store/portfolioStore';
+import { usePortfolioStore, AssetType } from '../store/portfolioStore';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
 import { useMarketData } from '../hooks/useMarketData';
 import { useLanguage } from '../i18n';
@@ -105,26 +105,26 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
   const currencySymbol = currency === 'USD' ? '$' : '₪';
 
   // Get price for a symbol - prefers WebSocket for crypto, REST API for stocks
-  const getPrice = (symbol: string): { price: number; change24h: number } => {
+  const getPrice = useCallback((symbol: string): { price: number; change24h: number } => {
     const upperSymbol = symbol.toUpperCase();
-    
+
     // Try WebSocket prices first (best for crypto)
     const wsPrice = wsPrices.get(upperSymbol);
     if (wsPrice) {
       return { price: wsPrice.price, change24h: wsPrice.change24h };
     }
-    
+
     // Try REST API prices (works for both stocks and crypto)
     if (marketPrices && marketPrices[upperSymbol]) {
-      return { 
-        price: marketPrices[upperSymbol].price, 
-        change24h: marketPrices[upperSymbol].change24h 
+      return {
+        price: marketPrices[upperSymbol].price,
+        change24h: marketPrices[upperSymbol].change24h
       };
     }
-    
+
     // Fallback to static prices
     return FALLBACK_PRICES[upperSymbol] || { price: 0, change24h: 0 };
-  };
+  }, [wsPrices, marketPrices]);
 
   // Filter assets for search
   const filteredAssets = POPULAR_ASSETS.filter(asset => 
@@ -217,7 +217,7 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
         console.log(`[Alert] ${item.symbol} triggered: ${item.alertType} $${item.alertPrice}`);
       }
     });
-  }, [watchlist, wsPrices, marketPrices, triggeredAlerts]);
+  }, [watchlist, triggeredAlerts, getPrice]);
 
   return (
     <div className="space-y-6">

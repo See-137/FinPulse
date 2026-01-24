@@ -56,7 +56,7 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
         if (fxRes.success && fxRes.rates) {
           setFxRate(currency === 'ILS' ? fxRes.rates.ILS : 1);
         }
-      } catch (err) {
+      } catch {
         // Keep default rate
       }
     };

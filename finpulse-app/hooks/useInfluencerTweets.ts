@@ -65,8 +65,8 @@ export function useInfluencerTweets(
     return influencerService.getAccessibleInfluencers(userPlan);
   }, [userPlan]);
 
-  // Build search keywords from holdings
-  const searchKeywords = useMemo(() => {
+  // Build search keywords from holdings (reserved for future use)
+  const _searchKeywords = useMemo(() => {
     const keywords: string[] = [];
     holdingSymbols.forEach(symbol => {
       const upperSymbol = symbol.toUpperCase();
