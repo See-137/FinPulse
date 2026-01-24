@@ -1,0 +1,92 @@
+# Dependabot configuration
+# Automated dependency updates for security and maintenance
+
+version: 2
+updates:
+  # Frontend (React/Vite)
+  - package-ecosystem: "npm"
+    directory: "/finpulse-app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "See-137"
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "deps(frontend)"
+    groups:
+      react:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      vite:
+        patterns:
+          - "vite*"
+          - "@vitejs/*"
+      testing:
+        patterns:
+          - "vitest*"
+          - "@testing-library/*"
+      linting:
+        patterns:
+          - "eslint*"
+          - "@typescript-eslint/*"
+          - "prettier*"
+
+  # Lambda functions
+  - package-ecosystem: "npm"
+    directory: "/finpulse-infra/lambda-code"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "See-137"
+    labels:
+      - "dependencies"
+      - "backend"
+      - "lambda"
+    commit-message:
+      prefix: "deps(lambda)"
+
+  # Terraform providers
+  - package-ecosystem: "terraform"
+    directory: "/finpulse-infra"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "See-137"
+    labels:
+      - "dependencies"
+      - "infrastructure"
+    commit-message:
+      prefix: "deps(terraform)"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "See-137"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "deps(actions)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

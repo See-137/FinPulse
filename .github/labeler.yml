@@ -1,0 +1,39 @@
+# PR Labeler configuration
+# Automatically labels PRs based on file paths
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'finpulse-app/**/*'
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: 'finpulse-infra/lambda-code/**/*'
+
+infrastructure:
+  - changed-files:
+      - any-glob-to-any-file: 'finpulse-infra/**/*.tf'
+      - any-glob-to-any-file: 'finpulse-infra/**/*.tfvars'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**/*'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: '**/*.md'
+      - any-glob-to-any-file: 'docs/**/*'
+
+auth:
+  - changed-files:
+      - any-glob-to-any-file: '**/auth/**/*'
+      - any-glob-to-any-file: '**/cognito/**/*'
+
+market-data:
+  - changed-files:
+      - any-glob-to-any-file: '**/market-data/**/*'
+      - any-glob-to-any-file: '**/portfolio/**/*'
+
+ai:
+  - changed-files:
+      - any-glob-to-any-file: '**/ai/**/*'
+      - any-glob-to-any-file: '**/*gemini*'
