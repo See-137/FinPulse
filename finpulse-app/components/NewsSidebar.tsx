@@ -40,7 +40,7 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan: _userPlan, u
   const [activeFilter, setActiveFilter] = useState<'Holdings' | 'Watchlist' | 'Whales' | 'All'>('All');
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isLive, setIsLive] = useState(false);
+  const [newsSource, setNewsSource] = useState<'live' | 'cached' | 'offline'>('offline');
   const { getHoldings } = usePortfolioStore();
   const holdings = getHoldings();
 
@@ -70,7 +70,7 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan: _userPlan, u
     setLoading(true);
     try {
       const result = await fetchNews();
-      
+
       // API returns articles field, not data
       const newsData = result.articles || result.data || [];
       if (result.success && newsData.length > 0) {
@@ -85,44 +85,21 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan: _userPlan, u
           publishedAt: item.publishedAt
         }));
         setArticles(parsedArticles);
-        setIsLive(result.source === 'gnews');
+        // Determine source based on API response
+        if (result.source === 'static') {
+          setNewsSource('offline');
+        } else if (result.cached) {
+          setNewsSource('cached');
+        } else {
+          setNewsSource('live');
+        }
+      } else {
+        setNewsSource('offline');
       }
     } catch (error) {
-      // Fallback news with proper source links
-      setArticles([
-        { 
-          id: '1', 
-          source: 'CoinGecko', 
-          title: 'Markets Update: Crypto holds steady', 
-          summary: 'Bitcoin and major cryptocurrencies maintain positions amid market uncertainty.', 
-          tags: ['CRYPTO'],
-          url: 'https://www.coingecko.com/en/news'
-        },
-        { 
-          id: '2', 
-          source: 'TechCrunch', 
-          title: 'Tech stocks rally on AI optimism', 
-          summary: 'NVDA, PLTR lead gains in tech sector with strong quarterly earnings.', 
-          tags: ['STOCKS', 'AI'],
-          url: 'https://techcrunch.com'
-        },
-        {
-          id: '3',
-          source: 'Financial Times',
-          title: 'Market Commentary: Fed Policy Impact',
-          summary: 'Analysis of recent monetary policy decisions and market implications.',
-          tags: ['MARKET'],
-          url: 'https://www.ft.com/markets'
-        },
-        {
-          id: '4',
-          source: 'MarketWatch',
-          title: 'Investment Opportunities in 2026',
-          summary: 'Analysts identify key sectors poised for growth in the coming year.',
-          tags: ['ANALYSIS'],
-          url: 'https://www.marketwatch.com'
-        }
-      ]);
+      // Show empty state instead of fake news
+      setArticles([]);
+      setNewsSource('offline');
     }
     setLoading(false);
   };
@@ -158,8 +135,14 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ userPlan: _userPlan, u
               </svg>
             </div>
             <h2 className="font-black text-lg tracking-tight text-white">Market News</h2>
-            {isLive && (
+            {newsSource === 'live' && (
               <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-black rounded-full animate-pulse">LIVE</span>
+            )}
+            {newsSource === 'cached' && (
+              <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-[9px] font-black rounded-full">CACHED</span>
+            )}
+            {newsSource === 'offline' && articles.length > 0 && (
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] font-black rounded-full">OFFLINE</span>
             )}
           </div>
           <button 

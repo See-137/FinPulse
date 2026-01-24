@@ -4,54 +4,7 @@ import { getPosts, createPost, likePost, type Post } from '../services/community
 import { useLanguage } from '../i18n';
 import { componentLogger } from '../services/logger';
 
-// Fallback mock data when API is unavailable
-const MOCK_POSTS: Post[] = [
-  { 
-    postId: '1',
-    authorId: 'user1',
-    authorName: 'AlphaCapital',
-    content: 'Monitoring the 140.50 level closely on $NVDA. Volume profile suggests significant institutional interest at this range. Thoughts on the Q3 guidance? #stocks #AI',
-    type: 'analysis',
-    likes: 124,
-    likedBy: [],
-    commentCount: 42,
-    comments: [],
-    tags: ['stocks', 'ai'],
-    tickers: ['NVDA'],
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-  },
-  { 
-    postId: '2',
-    authorId: 'user2',
-    authorName: 'CryptoWhale_01',
-    content: 'Tracking an additional 2.5 $BTC today. The volatility is providing a perfect accumulation zone before the monthly close. #crypto #bitcoin',
-    type: 'trade_idea',
-    likes: 89,
-    likedBy: [],
-    commentCount: 12,
-    comments: [],
-    tags: ['crypto', 'bitcoin'],
-    tickers: ['BTC'],
-    createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
-  },
-  { 
-    postId: '3',
-    authorId: 'user3',
-    authorName: 'GoldStandard',
-    content: 'Rotating 15% of equity portfolio into physical gold certificates (GLD ETF). The hedge against currency devaluation remains paramount. #gold #hedge',
-    type: 'discussion',
-    likes: 215,
-    likedBy: [],
-    commentCount: 56,
-    comments: [],
-    tags: ['gold', 'hedge'],
-    tickers: ['GLD'],
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  },
-];
+// No mock data - show real posts or empty state
 
 function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString);
@@ -91,7 +44,6 @@ export const Community: React.FC = () => {
   const [newPostType, setNewPostType] = useState('discussion');
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [usingMockData, setUsingMockData] = useState(false);
   
   // Comment state
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
@@ -122,55 +74,30 @@ export const Community: React.FC = () => {
     setLoading(true);
     setApiError(null);
     try {
-      const response = await getPosts({ 
-        limit: 20, 
-        type: filterType || undefined 
+      const response = await getPosts({
+        limit: 20,
+        type: filterType || undefined
       });
-      
-      if (response.success && response.data.length > 0) {
+
+      if (response.success) {
         setPosts(response.data);
-        setUsingMockData(false);
-      } else {
-        // Use mock data if no posts returned
-        setPosts(MOCK_POSTS);
-        setUsingMockData(true);
-      }
+              } else {
+        // API returned error
+        setPosts([]);
+        setApiError('Unable to load community posts.');
+              }
     } catch (error) {
       componentLogger.error('Failed to fetch posts:', error);
-      setApiError('Unable to connect to community server. Showing sample posts.');
-      setPosts(MOCK_POSTS);
-      setUsingMockData(true);
-    } finally {
+      setApiError('Unable to connect to community server. Please try again.');
+      setPosts([]);
+          } finally {
       setLoading(false);
     }
   };
 
   const handleCreatePost = async () => {
     if (!newPostContent.trim()) return;
-    
-    if (usingMockData) {
-      // Create local mock post when API is unavailable
-      const mockPost: Post = {
-        postId: `local-${Date.now()}`,
-        authorId: 'current-user',
-        authorName: 'You',
-        content: newPostContent,
-        type: newPostType as Post['type'],
-        likes: 0,
-        likedBy: [],
-        commentCount: 0,
-        comments: [],
-        tags: (newPostContent.match(/#(\w+)/g) || []).map(t => t.substring(1).toLowerCase()),
-        tickers: (newPostContent.match(/\$([A-Z]{1,5})/g) || []).map(t => t.substring(1)),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      setPosts([mockPost, ...posts]);
-      setNewPostContent('');
-      setIsCreateModalOpen(false);
-      return;
-    }
-    
+
     setSubmitting(true);
     try {
       const newPost = await createPost(newPostContent, newPostType);
@@ -178,6 +105,9 @@ export const Community: React.FC = () => {
         setPosts([newPost, ...posts]);
         setNewPostContent('');
         setIsCreateModalOpen(false);
+        setApiError(null);
+      } else {
+        setApiError('Failed to create post. Please try again.');
       }
     } catch (error) {
       componentLogger.error('Failed to create post:', error);
@@ -206,8 +136,8 @@ export const Community: React.FC = () => {
         : p
     ));
     
-    // Skip API call for mock posts
-    if (usingMockData || postId.startsWith('local-')) {
+    // Skip API call for local-only posts
+    if (postId.startsWith('local-')) {
       return;
     }
     
@@ -255,8 +185,8 @@ export const Community: React.FC = () => {
     
     setSubmittingComment(postId);
     
-    // For mock/local posts, add comment locally
-    if (usingMockData || postId.startsWith('local-')) {
+    // For local-only posts, add comment locally
+    if (postId.startsWith('local-')) {
       const newComment = {
         id: `comment-${Date.now()}`,
         authorId: 'current-user',
@@ -490,8 +420,23 @@ export const Community: React.FC = () => {
             </div>
           ))}
 
-          {/* No Posts */}
-          {!loading && filteredPosts.length === 0 && (
+          {/* Empty State */}
+          {!loading && filteredPosts.length === 0 && !apiError && (
+            <div className="card-surface p-12 rounded-[40px] text-center bg-gradient-to-br from-[#151921] to-[#0b0e14]">
+              <MessageSquare className="w-16 h-16 text-slate-600 mx-auto mb-6" />
+              <h3 className="text-xl font-black text-white mb-2">No posts yet</h3>
+              <p className="text-slate-500 font-medium mb-6">Be the first to share your market insights with the community!</p>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-8 py-4 bg-[#00e5ff] text-[#0b0e14] font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-white transition-colors"
+              >
+                Create First Post
+              </button>
+            </div>
+          )}
+
+          {/* No Search Results */}
+          {!loading && filteredPosts.length === 0 && searchQuery && posts.length > 0 && (
             <div className="text-center py-20">
               <p className="text-slate-500 font-medium">{t('community.noPosts')}</p>
             </div>

@@ -54,6 +54,16 @@ async function getBearerToken() {
             bearerToken = secretValue.trim();
         }
 
+        // URL-decode the token if it contains encoded characters (e.g., %3D for =)
+        if (bearerToken && bearerToken.includes('%')) {
+            try {
+                bearerToken = decodeURIComponent(bearerToken);
+                console.log('Bearer token was URL-decoded');
+            } catch (decodeErr) {
+                console.log('Bearer token decode not needed or failed:', decodeErr.message);
+            }
+        }
+
         tokenCacheTime = now;
         return bearerToken;
     } catch (error) {
@@ -63,15 +73,19 @@ async function getBearerToken() {
 }
 
 /**
- * Search tweets from multiple users with keywords
+ * Search tweets from multiple users with optional keywords
  */
 async function searchTweets(usernames, keywords, maxResults = 20) {
     const token = await getBearerToken();
 
-    // Build query: (from:user1 OR from:user2) (keyword1 OR keyword2)
+    // Build query: (from:user1 OR from:user2) optionally with (keyword1 OR keyword2)
+    // If no keywords provided, just fetch recent tweets from these users
     const userPart = usernames.map(u => `from:${u}`).join(' OR ');
     const keywordPart = keywords.length > 0 ? ` (${keywords.join(' OR ')})` : '';
     const query = `(${userPart})${keywordPart} -is:retweet`;
+
+    console.log('Twitter search query:', query);
+    console.log('Query length:', query.length, '(max 512)');
 
     // Check cache
     const cacheKey = `search:${query}:${maxResults}`;
