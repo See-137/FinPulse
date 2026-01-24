@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+/* eslint-env node */
 /**
  * Test Script: Sentiment Analysis
  *

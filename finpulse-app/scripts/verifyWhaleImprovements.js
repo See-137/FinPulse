@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+/* eslint-env node */
 /**
  * Verification Script: Whale Feature Quick Wins
  *
