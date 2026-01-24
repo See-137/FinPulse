@@ -101,6 +101,6 @@ export default [
     },
   },
   {
-    ignores: ['dist/', 'node_modules/', 'coverage/', 'playwright-report/', '*.config.js', '*.config.ts'],
+    ignores: ['dist/', 'node_modules/', 'coverage/', 'playwright-report/', '*.config.js', '*.config.ts', 'scripts/'],
   },
 ];
