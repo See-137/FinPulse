@@ -74,59 +74,105 @@ async function getBearerToken() {
 
 /**
  * Search tweets from multiple users with optional keywords
+ * Handles Twitter's 512 character query limit by batching users
  */
 async function searchTweets(usernames, keywords, maxResults = 20) {
     const token = await getBearerToken();
 
-    // Build query: (from:user1 OR from:user2) optionally with (keyword1 OR keyword2)
-    // If no keywords provided, just fetch recent tweets from these users
-    const userPart = usernames.map(u => `from:${u}`).join(' OR ');
+    // Twitter API has 512 char query limit
+    // We need to batch usernames to stay under the limit
+    const MAX_QUERY_LENGTH = 512;
+    const SUFFIX = ' -is:retweet';
     const keywordPart = keywords.length > 0 ? ` (${keywords.join(' OR ')})` : '';
-    const query = `(${userPart})${keywordPart} -is:retweet`;
 
-    console.log('Twitter search query:', query);
-    console.log('Query length:', query.length, '(max 512)');
+    // Calculate how many usernames we can fit per batch
+    // Each username takes ~"from:username OR " = ~20-30 chars average
+    // Reserve space for parentheses, keywords, and suffix
+    const reservedLength = 2 + keywordPart.length + SUFFIX.length + 10; // 10 for safety margin
+    const availableLength = MAX_QUERY_LENGTH - reservedLength;
 
-    // Check cache
-    const cacheKey = `search:${query}:${maxResults}`;
+    // Split usernames into batches that fit within query limit
+    const batches = [];
+    let currentBatch = [];
+    let currentLength = 0;
+
+    for (const username of usernames) {
+        const addition = currentBatch.length === 0
+            ? `from:${username}`.length
+            : ` OR from:${username}`.length;
+
+        if (currentLength + addition > availableLength && currentBatch.length > 0) {
+            batches.push(currentBatch);
+            currentBatch = [username];
+            currentLength = `from:${username}`.length;
+        } else {
+            currentBatch.push(username);
+            currentLength += addition;
+        }
+    }
+    if (currentBatch.length > 0) {
+        batches.push(currentBatch);
+    }
+
+    console.log(`Split ${usernames.length} usernames into ${batches.length} batches`);
+
+    // Check cache for full request
+    const cacheKey = `search:${usernames.sort().join(',')}:${keywords.join(',')}:${maxResults}`;
     const cached = tweetsCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < TWEETS_CACHE_TTL) {
         console.log('Returning cached search results');
         return cached.data;
     }
 
-    const url = new URL(`${TWITTER_API_BASE}/tweets/search/recent`);
-    url.searchParams.append('query', query);
-    // Twitter API requires max_results between 10 and 100
-    url.searchParams.append('max_results', Math.max(10, Math.min(maxResults, 100)).toString());
-    url.searchParams.append('tweet.fields', 'created_at,public_metrics,author_id');
-    url.searchParams.append('expansions', 'author_id');
-    url.searchParams.append('user.fields', 'username,name');
+    // Fetch tweets from each batch (max 2 batches to avoid rate limits)
+    const batchesToFetch = batches.slice(0, 2);
+    const allTweets = [];
 
-    const response = await fetch(url.toString(), {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-        },
-    });
+    for (const batch of batchesToFetch) {
+        const userPart = batch.map(u => `from:${u}`).join(' OR ');
+        const query = `(${userPart})${keywordPart}${SUFFIX}`;
 
-    if (!response.ok) {
-        if (response.status === 429) {
-            throw new Error('Twitter rate limit exceeded');
+        console.log('Twitter search query:', query);
+        console.log('Query length:', query.length, '(max 512)');
+
+        const url = new URL(`${TWITTER_API_BASE}/tweets/search/recent`);
+        url.searchParams.append('query', query);
+        // Twitter API requires max_results between 10 and 100
+        url.searchParams.append('max_results', Math.max(10, Math.min(maxResults, 100)).toString());
+        url.searchParams.append('tweet.fields', 'created_at,public_metrics,author_id');
+        url.searchParams.append('expansions', 'author_id');
+        url.searchParams.append('user.fields', 'username,name');
+
+        const response = await fetch(url.toString(), {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            if (response.status === 429) {
+                console.warn('Twitter rate limit hit, returning partial results');
+                break; // Return what we have so far
+            }
+            const errorText = await response.text();
+            console.error('Twitter API error:', response.status, errorText);
+            continue; // Try next batch
         }
-        const errorText = await response.text();
-        console.error('Twitter API error:', response.status, errorText);
-        throw new Error(`Twitter API error: ${response.status}`);
+
+        const data = await response.json();
+        const tweets = transformTweets(data);
+        allTweets.push(...tweets);
     }
 
-    const data = await response.json();
-
-    // Transform response
-    const tweets = transformTweets(data);
+    // Sort by created date and deduplicate
+    const uniqueTweets = [...new Map(allTweets.map(t => [t.id, t])).values()]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, maxResults);
 
     // Cache results
-    tweetsCache.set(cacheKey, { data: tweets, timestamp: Date.now() });
+    tweetsCache.set(cacheKey, { data: uniqueTweets, timestamp: Date.now() });
 
-    return tweets;
+    return uniqueTweets;
 }
 
 /**
