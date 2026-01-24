@@ -72,10 +72,10 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
     }
   }, []);
 
-  // Handle WebSocket errors
+  // Handle WebSocket errors (silently - fallback polling handles it)
   const handleError = useCallback((err: Error) => {
     if (!isMountedRef.current) return;
-    console.error('WebSocket error:', err);
+    // Don't log to console - the fallback REST API will handle pricing
     setError(err);
   }, []);
 
