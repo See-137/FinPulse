@@ -5,7 +5,134 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FinPulse | Precision Financial Pulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              background: "var(--bg-body)",
+              surface: "var(--bg-card)",
+            }
+          }
+        }
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #f8fafc;
+            --text-body: #0f172a;
+            --bg-card: #ffffff;
+            --border-card: #e2e8f0;
+        }
+        .dark {
+            --bg-body: #0b0e14;
+            --text-body: #ffffff;
+            --bg-card: #151921;
+            --border-card: #1f242d;
+        }
+
+        html, body, #root {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Critical for fixed layout apps */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-body);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .mono {
+            font-family: 'JetBrains+Mono', monospace;
+        }
+        .glass-sidebar {
+            background: rgba(21, 25, 33, 0.85);
+            backdrop-filter: blur(16px);
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .card-surface {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-card);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        /* Refined Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.5);
+            border-radius: 10px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(31, 41, 55, 0.5);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.8);
+        }
+
+        @keyframes ticker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-ticker {
+          display: flex;
+          width: max-content;
+          animation: ticker 40s linear infinite;
+        }
+        .animate-ticker:hover {
+          animation-play-state: paused;
+        }
+
+        /* WCAG AA - Focus Indicators */
+        button:focus-visible,
+        a:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        [role="button"]:focus-visible {
+          outline: 2px solid #00e5ff;
+          outline-offset: 2px;
+        }
+
+        /* High Contrast Text for Accessibility */
+        body {
+          letter-spacing: 0.3px;
+        }
+
+        /* Link Focus for keyboard navigation */
+        a:focus {
+          outline: 2px solid #00e5ff;
+          outline-offset: 2px;
+        }
+
+        /* Skip to main content link (for screen readers) */
+        .skip-to-main {
+          position: absolute;
+          top: -40px;
+          left: 0;
+          background: #00e5ff;
+          color: #0b0e14;
+          padding: 8px;
+          text-decoration: none;
+          border-radius: 0 0 4px 0;
+          font-weight: bold;
+        }
+
+        .skip-to-main:focus {
+          top: 0;
+          outline: none;
+        }
+    </style>
 <script type="importmap">
 {
   "imports": {
