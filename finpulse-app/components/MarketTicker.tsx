@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MOCK_STOCKS, CURRENCY_RATES } from '../constants';
-import { TrendingUp, TrendingDown, Wifi, WifiOff } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import { Currency } from '../types';
-import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
 import { fetchFxRates } from '../hooks/useMarketData';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { config } from '../config';
@@ -20,15 +19,17 @@ interface StockData {
   type: 'CRYPTO' | 'STOCK' | 'COMMODITY';
 }
 
-// Stock price polling interval (10 seconds for responsive updates)
-const STOCK_POLL_INTERVAL = 10000;
+// Unified polling interval (30 seconds for all assets - CoinGecko + Alpaca)
+const POLL_INTERVAL = 30000;
 
 export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
   const [fxRate, setFxRate] = useState<number>(CURRENCY_RATES[currency]);
-  const [stockPrices, setStockPrices] = useState<Map<string, StockData>>(new Map());
+  const [allPrices, setAllPrices] = useState<Map<string, StockData>>(new Map());
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [secondsAgo, setSecondsAgo] = useState<number>(0);
   const getHoldings = usePortfolioStore((state) => state.getHoldings);
 
-  // Separate portfolio into crypto and non-crypto for different data sources
+  // Get all portfolio symbols (crypto + stocks)
   const { cryptoSymbols, stockSymbols } = useMemo(() => {
     const holdings = getHoldings();
 
@@ -49,71 +50,98 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
     };
   }, [getHoldings]);
 
-  // Real-time WebSocket prices for crypto only
-  const { prices: cryptoPrices, isConnected } = useWebSocketPrices({
-    symbols: cryptoSymbols,
-    enabled: cryptoSymbols.length > 0,
-  });
+  // Unified fetch for all prices (crypto via CoinGecko + stocks via Alpaca)
+  const fetchAllPrices = useCallback(async () => {
+    const newPrices = new Map<string, StockData>();
 
-  // Fetch stock prices via REST API (polling) - pass specific symbols
-  const fetchStockPrices = useCallback(async () => {
-    if (stockSymbols.length === 0) return;
+    // Fetch crypto prices (CoinGecko via backend)
+    if (cryptoSymbols.length > 0) {
+      try {
+        const cryptoParam = cryptoSymbols.join(',');
+        const response = await fetch(
+          `${config.apiUrl}/market/prices?symbols=${cryptoParam}&type=crypto`
+        );
+        const data = await response.json();
 
-    try {
-      // Fetch specific stock symbols from API
-      const symbolsParam = stockSymbols.join(',');
-      const response = await fetch(
-        `${config.apiUrl}/market/prices?symbols=${symbolsParam}&type=stock`
-      );
-      const data = await response.json();
-
-      if (data.success && data.data) {
-        const newStockPrices = new Map<string, StockData>();
-
-        for (const symbol of stockSymbols) {
-          const priceData = data.data[symbol];
-          if (priceData) {
-            newStockPrices.set(symbol, {
-              symbol,
-              price: priceData.price || 0,
-              change: (priceData.price || 0) * ((priceData.change24h || 0) / 100),
-              changePercent: priceData.change24h || 0,
-              type: 'STOCK',
-            });
+        if (data.success && data.data) {
+          for (const symbol of cryptoSymbols) {
+            const priceData = data.data[symbol];
+            if (priceData) {
+              newPrices.set(symbol, {
+                symbol,
+                price: priceData.price || 0,
+                change: (priceData.price || 0) * ((priceData.change24h || 0) / 100),
+                changePercent: priceData.change24h || 0,
+                type: 'CRYPTO',
+              });
+            }
           }
         }
-
-        setStockPrices(newStockPrices);
+      } catch {
+        // Keep existing crypto prices on error
       }
-    } catch {
-      // Keep existing prices on error
     }
-  }, [stockSymbols]);
 
-  // Poll stock prices
+    // Fetch stock prices (Alpaca via backend)
+    if (stockSymbols.length > 0) {
+      try {
+        const stockParam = stockSymbols.join(',');
+        const response = await fetch(
+          `${config.apiUrl}/market/prices?symbols=${stockParam}&type=stock`
+        );
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          for (const symbol of stockSymbols) {
+            const priceData = data.data[symbol];
+            if (priceData) {
+              newPrices.set(symbol, {
+                symbol,
+                price: priceData.price || 0,
+                change: (priceData.price || 0) * ((priceData.change24h || 0) / 100),
+                changePercent: priceData.change24h || 0,
+                type: 'STOCK',
+              });
+            }
+          }
+        }
+      } catch {
+        // Keep existing stock prices on error
+      }
+    }
+
+    if (newPrices.size > 0) {
+      setAllPrices(prev => {
+        const merged = new Map(prev);
+        newPrices.forEach((value, key) => merged.set(key, value));
+        return merged;
+      });
+      setLastUpdate(new Date());
+      setSecondsAgo(0);
+    }
+  }, [cryptoSymbols, stockSymbols]);
+
+  // Unified polling for all assets (30 second interval)
   useEffect(() => {
-    fetchStockPrices();
-    const interval = setInterval(fetchStockPrices, STOCK_POLL_INTERVAL);
+    fetchAllPrices();
+    const interval = setInterval(fetchAllPrices, POLL_INTERVAL);
     return () => clearInterval(interval);
-  }, [fetchStockPrices]);
+  }, [fetchAllPrices]);
 
-  // Combine crypto (WebSocket) and stock (REST) prices
+  // Update "seconds ago" counter every second
+  useEffect(() => {
+    if (!lastUpdate) return;
+    const timer = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastUpdate.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lastUpdate]);
+
+  // Convert prices map to array for display
   const liveStocks = useMemo((): StockData[] => {
     const combined: StockData[] = [];
 
-    // Add crypto prices from WebSocket
-    cryptoPrices.forEach((data, symbol) => {
-      combined.push({
-        symbol,
-        price: data.price,
-        change: data.price * (data.change24h / 100),
-        changePercent: data.change24h,
-        type: 'CRYPTO',
-      });
-    });
-
-    // Add stock prices from REST polling
-    stockPrices.forEach((data) => {
+    allPrices.forEach((data) => {
       combined.push(data);
     });
 
@@ -123,7 +151,7 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
     }
 
     return combined;
-  }, [cryptoPrices, stockPrices]);
+  }, [allPrices]);
 
   // Fetch FX rates separately
   useEffect(() => {
@@ -145,24 +173,24 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
   const rate = fxRate;
   const currencySymbol = currency === 'USD' ? '$' : '₪';
 
-  // Show connected if WebSocket is live OR we have stock data
-  const hasLiveData = isConnected || stockPrices.size > 0;
+  // Format seconds ago for display
+  const getUpdateText = () => {
+    if (!lastUpdate) return 'Loading...';
+    if (secondsAgo < 5) return 'Just now';
+    if (secondsAgo < 60) return `${secondsAgo}s ago`;
+    return `${Math.floor(secondsAgo / 60)}m ago`;
+  };
 
   return (
     <div className="bg-[#0b0e14] text-white py-3 overflow-hidden border-b border-white/5 relative z-30">
-      {/* Live indicator */}
+      {/* Update indicator */}
       <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
-        {hasLiveData ? (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-            <Wifi className="w-3 h-3 text-emerald-400" />
-            <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider">Live</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-500/10 rounded-full border border-amber-500/20">
-            <WifiOff className="w-3 h-3 text-amber-400" />
-            <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider">Delayed</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-500/10 rounded-full border border-slate-500/20">
+          <RefreshCw className={`w-3 h-3 text-slate-400 ${lastUpdate ? '' : 'animate-spin'}`} />
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+            {getUpdateText()}
+          </span>
+        </div>
       </div>
 
       <div className="flex animate-ticker whitespace-nowrap ml-20">
