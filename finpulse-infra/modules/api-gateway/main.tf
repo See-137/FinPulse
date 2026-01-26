@@ -130,6 +130,13 @@ resource "aws_api_gateway_resource" "fx_rates" {
   path_part   = "rates"
 }
 
+# /fx/{proxy+} - catch-all for other FX routes (convert, currencies)
+resource "aws_api_gateway_resource" "fx_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.fx.id
+  path_part   = "{proxy+}"
+}
+
 # /ai (optional)
 resource "aws_api_gateway_resource" "ai" {
   count       = var.enable_ai_service ? 1 : 0
@@ -212,6 +219,24 @@ resource "aws_api_gateway_integration" "fx_rates_get" {
 }
 
 # Note: Lambda permission already granted via market_prices (source_arn uses /*/*/*)
+
+# ANY /fx/{proxy+} - catch-all for other FX routes (convert, currencies)
+resource "aws_api_gateway_method" "fx_proxy_any" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.fx_proxy.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "fx_proxy_any" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.fx_proxy.id
+  http_method             = aws_api_gateway_method.fx_proxy_any.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  # FX is now handled by market-data Lambda
+  uri = var.lambda_invoke_arns["market_data"]
+}
 
 # =============================================================================
 # Portfolio endpoints (GET, PUT, DELETE)
@@ -473,6 +498,7 @@ resource "aws_api_gateway_deployment" "main" {
     redeployment = sha1(jsonencode([
       aws_api_gateway_method.market_prices_get,
       aws_api_gateway_method.fx_rates_get,
+      aws_api_gateway_method.fx_proxy_any,
       aws_api_gateway_method.portfolio_any,
       aws_api_gateway_method.auth_any,
       aws_api_gateway_method.auth_proxy_any,
@@ -489,6 +515,7 @@ resource "aws_api_gateway_deployment" "main" {
   depends_on = [
     aws_api_gateway_integration.market_prices_get,
     aws_api_gateway_integration.fx_rates_get,
+    aws_api_gateway_integration.fx_proxy_any,
     aws_api_gateway_integration.portfolio_any,
     aws_api_gateway_integration.auth_any,
     aws_api_gateway_integration.admin_any,
