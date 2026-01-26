@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { marketWebSocket, LivePrice } from '../services/websocketService';
-import { fetchMarketPrices } from './useMarketData';
+import { config } from '../config';
 
 interface UseWebSocketPricesOptions {
   symbols?: string[];
@@ -80,27 +80,33 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
   }, []);
 
   // Fallback to REST API polling when WebSocket disconnects
+  // IMPORTANT: Pass specific symbols so DN, LAVA and other non-Binance cryptos get fetched
   const fetchFallbackPrices = useCallback(async () => {
-    if (!isMountedRef.current) return;
-    
+    if (!isMountedRef.current || symbols.length === 0) return;
+
     try {
-      // Fetch from AWS backend API (handles all price sources server-side)
-      const response = await fetchMarketPrices();
-      if (response.success && response.data && isMountedRef.current) {
+      // Fetch specific symbols from AWS backend API (handles CoinGecko fallback for non-Binance)
+      const symbolsParam = symbols.join(',');
+      const response = await fetch(
+        `${config.apiUrl}/market/prices?symbols=${symbolsParam}&type=crypto`
+      );
+      const data = await response.json();
+
+      if (data.success && data.data && isMountedRef.current) {
         const newPrices = new Map<string, LivePrice>();
-        
-        Object.entries(response.data).forEach(([symbol, data]: [string, any]) => {
+
+        Object.entries(data.data).forEach(([symbol, priceData]: [string, any]) => {
           newPrices.set(symbol.toUpperCase(), {
             symbol: symbol.toUpperCase(),
-            price: data.price,
-            change24h: data.change24h || 0,
-            high24h: data.high24h || data.price,
-            low24h: data.low24h || data.price,
-            volume24h: data.volume || 0,
-            timestamp: data.timestamp || Date.now(),
+            price: priceData.price,
+            change24h: priceData.change24h || 0,
+            high24h: priceData.high24h || priceData.price,
+            low24h: priceData.low24h || priceData.price,
+            volume24h: priceData.volume || 0,
+            timestamp: priceData.timestamp || Date.now(),
           });
         });
-        
+
         setPrices(prev => {
           const merged = new Map(prev);
           newPrices.forEach((value, key) => merged.set(key, value));
@@ -112,7 +118,7 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
     } catch (err) {
       console.error('Backend API fetch failed:', err);
     }
-  }, []);
+  }, [symbols]);
 
   const startFallbackPolling = useCallback(() => {
     if (fallbackTimerRef.current) return;
