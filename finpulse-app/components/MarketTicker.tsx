@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MOCK_STOCKS, CURRENCY_RATES } from '../constants';
 import { TrendingUp, TrendingDown, Wifi, WifiOff } from 'lucide-react';
 import { Currency } from '../types';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
-import { fetchFxRates } from '../hooks/useMarketData';
+import { fetchFxRates, fetchMarketPrices } from '../hooks/useMarketData';
+import { usePortfolioStore } from '../store/portfolioStore';
 
 interface MarketTickerProps {
   currency: Currency;
@@ -15,40 +16,109 @@ interface StockData {
   price: number;
   change: number;
   changePercent: number;
+  type: 'CRYPTO' | 'STOCK' | 'COMMODITY';
 }
 
-const CRYPTO_SYMBOLS = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'AVAX', 'MATIC', 'LINK', 'DOGE', 'BNB'];
+// Stock price polling interval (30 seconds - stocks don't need real-time)
+const STOCK_POLL_INTERVAL = 30000;
 
 export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
   const [fxRate, setFxRate] = useState<number>(CURRENCY_RATES[currency]);
-  
-  // Real-time WebSocket prices
-  const { prices, isConnected } = useWebSocketPrices({
-    symbols: CRYPTO_SYMBOLS,
-    enabled: true,
+  const [stockPrices, setStockPrices] = useState<Map<string, StockData>>(new Map());
+  const getHoldings = usePortfolioStore((state) => state.getHoldings);
+
+  // Separate portfolio into crypto and non-crypto for different data sources
+  const { cryptoSymbols, stockSymbols } = useMemo(() => {
+    const holdings = getHoldings();
+
+    if (holdings.length === 0) {
+      // Default view when no portfolio
+      return {
+        cryptoSymbols: ['BTC', 'ETH', 'SOL'],
+        stockSymbols: ['AAPL', 'MSFT'],
+      };
+    }
+
+    const crypto = holdings.filter(h => h.type === 'CRYPTO').map(h => h.symbol);
+    const stocks = holdings.filter(h => h.type === 'STOCK' || h.type === 'COMMODITY').map(h => h.symbol);
+
+    return {
+      cryptoSymbols: crypto,
+      stockSymbols: stocks,
+    };
+  }, [getHoldings]);
+
+  // Real-time WebSocket prices for crypto only
+  const { prices: cryptoPrices, isConnected } = useWebSocketPrices({
+    symbols: cryptoSymbols,
+    enabled: cryptoSymbols.length > 0,
   });
 
-  // Transform WebSocket prices to StockData format
+  // Fetch stock prices via REST API (polling)
+  const fetchStockPrices = useCallback(async () => {
+    if (stockSymbols.length === 0) return;
+
+    try {
+      const response = await fetchMarketPrices();
+      if (response.success && response.data) {
+        const newStockPrices = new Map<string, StockData>();
+
+        for (const symbol of stockSymbols) {
+          const priceData = response.data[symbol];
+          if (priceData) {
+            newStockPrices.set(symbol, {
+              symbol,
+              price: priceData.price || 0,
+              change: (priceData.price || 0) * ((priceData.change24h || 0) / 100),
+              changePercent: priceData.change24h || 0,
+              type: 'STOCK',
+            });
+          }
+        }
+
+        setStockPrices(newStockPrices);
+      }
+    } catch {
+      // Keep existing prices on error
+    }
+  }, [stockSymbols]);
+
+  // Poll stock prices
+  useEffect(() => {
+    fetchStockPrices();
+    const interval = setInterval(fetchStockPrices, STOCK_POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchStockPrices]);
+
+  // Combine crypto (WebSocket) and stock (REST) prices
   const liveStocks = useMemo((): StockData[] => {
-    if (prices.size === 0) return MOCK_STOCKS;
-    
-    const wsStocks: StockData[] = [];
-    prices.forEach((data, symbol) => {
-      wsStocks.push({
+    const combined: StockData[] = [];
+
+    // Add crypto prices from WebSocket
+    cryptoPrices.forEach((data, symbol) => {
+      combined.push({
         symbol,
         price: data.price,
         change: data.price * (data.change24h / 100),
         changePercent: data.change24h,
+        type: 'CRYPTO',
       });
     });
-    
-    // Combine with remaining mock stocks for variety
-    return wsStocks.length > 0 
-      ? [...wsStocks, ...MOCK_STOCKS.slice(wsStocks.length)]
-      : MOCK_STOCKS;
-  }, [prices]);
 
-  // Fetch FX rates separately (doesn't need real-time)
+    // Add stock prices from REST polling
+    stockPrices.forEach((data) => {
+      combined.push(data);
+    });
+
+    // If no live data yet, use mock stocks
+    if (combined.length === 0) {
+      return MOCK_STOCKS.map(s => ({ ...s, type: 'STOCK' as const }));
+    }
+
+    return combined;
+  }, [cryptoPrices, stockPrices]);
+
+  // Fetch FX rates separately
   useEffect(() => {
     const fetchFx = async () => {
       try {
@@ -68,11 +138,14 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
   const rate = fxRate;
   const currencySymbol = currency === 'USD' ? '$' : '₪';
 
+  // Show connected if WebSocket is live OR we have stock data
+  const hasLiveData = isConnected || stockPrices.size > 0;
+
   return (
     <div className="bg-[#0b0e14] text-white py-3 overflow-hidden border-b border-white/5 relative z-30">
       {/* Live indicator */}
       <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
-        {isConnected ? (
+        {hasLiveData ? (
           <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
             <Wifi className="w-3 h-3 text-emerald-400" />
             <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider">Live</span>
@@ -84,11 +157,11 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
           </div>
         )}
       </div>
-      
+
       <div className="flex animate-ticker whitespace-nowrap ml-20">
         {stocks.map((stock, i) => (
-          <div 
-            key={`${stock.symbol}-${i}`} 
+          <div
+            key={`${stock.symbol}-${i}`}
             className="flex items-center gap-6 px-10 border-r border-white/5 group cursor-default hover:bg-white/[0.02] transition-colors"
           >
             <div className="flex flex-col">
