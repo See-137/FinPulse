@@ -82,10 +82,10 @@ export class BinanceAPI {
 
       // Fallback: try direct Binance API (may fail due to CORS)
       return await this.getKlinesDirect(symbol, interval, limit);
-    } catch (error) {
-      console.warn('[Binance] Proxy failed, trying direct:', error);
-      // Fallback to direct API call (will likely fail in production due to CORS)
-      return await this.getKlinesDirect(symbol, interval, limit);
+    } catch {
+      // Proxy unavailable (451 geo-blocked or network error) - silently return empty
+      // Technical analysis will use mock data instead
+      return [];
     }
   }
 
