@@ -50,13 +50,13 @@ export class TechnicalAnalysisService {
     timeframe: string,
     limit: number
   ): Promise<OHLCV[]> {
-    try {
-      const client = getBinanceClient();
-      return await client.getKlines(symbol, timeframe, limit);
-    } catch (error) {
-      console.error(`Error fetching OHLCV for ${symbol}:`, error);
+    const client = getBinanceClient();
+    const data = await client.getKlines(symbol, timeframe, limit);
+    // If Binance returns empty (CORS blocked or non-crypto symbol), use mock data
+    if (data.length === 0) {
       return this.generateMockOHLCV(symbol, limit);
     }
+    return data;
   }
 
   /**
