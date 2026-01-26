@@ -191,6 +191,7 @@ resource "aws_lambda_permission" "market_prices" {
 
 # =============================================================================
 # GET /fx/rates (PUBLIC - no auth required for FX rates)
+# Now routed to market-data Lambda (FX consolidated into market-data service)
 # =============================================================================
 
 resource "aws_api_gateway_method" "fx_rates_get" {
@@ -206,16 +207,11 @@ resource "aws_api_gateway_integration" "fx_rates_get" {
   http_method             = aws_api_gateway_method.fx_rates_get.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = var.lambda_invoke_arns["fx"]
+  # FX is now handled by market-data Lambda
+  uri = var.lambda_invoke_arns["market_data"]
 }
 
-resource "aws_lambda_permission" "fx_rates" {
-  statement_id  = "AllowAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = var.lambda_function_names["fx"]
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*/*"
-}
+# Note: Lambda permission already granted via market_prices (source_arn uses /*/*/*)
 
 # =============================================================================
 # Portfolio endpoints (GET, PUT, DELETE)

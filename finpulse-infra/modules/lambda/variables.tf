@@ -85,17 +85,17 @@ variable "tags" {
 variable "auth_reserved_concurrency" {
   description = "Reserved concurrent executions for auth service (0 = disabled)"
   type        = number
-  default     = 0  # Disabled - account limit too low
+  default     = 0 # Disabled - account limit too low
 }
 
 variable "market_data_reserved_concurrency" {
   description = "Reserved concurrent executions for market data service (0 = disabled)"
   type        = number
-  default     = 0  # Disabled - account limit too low
+  default     = 0 # Disabled - account limit too low
 }
 
 variable "portfolio_reserved_concurrency" {
   description = "Reserved concurrent executions for portfolio service (0 = disabled)"
   type        = number
-  default     = 0  # Disabled - account limit too low
+  default     = 0 # Disabled - account limit too low
 }

@@ -4,18 +4,22 @@
 locals {
   staging_suffix = "-staging"
 
-  # Staging functions - now including news and payments
-  lambda_functions_staging = {
-    auth        = "finpulse-auth-staging"
-    portfolio   = "finpulse-portfolio-staging"
-    market-data = "finpulse-market-data-staging"
-    news        = "finpulse-news-staging"
-    fx          = "finpulse-fx-staging"
-    community   = "finpulse-community-staging"
-    admin       = "finpulse-admin-staging"
-    ai          = "finpulse-ai-staging"
-    payments    = "finpulse-payments-staging"
-  }
+  # Staging Lambda functions DISABLED to maximize production concurrency
+  # AWS account has 10 concurrent execution limit - need all for production
+  # Re-enable when Lambda quota is increased via Service Quotas
+  lambda_functions_staging = {}
+
+  # Original staging functions (kept for reference):
+  # lambda_functions_staging = {
+  #   auth        = "finpulse-auth-staging"
+  #   portfolio   = "finpulse-portfolio-staging"
+  #   market-data = "finpulse-market-data-staging"
+  #   news        = "finpulse-news-staging"
+  #   community   = "finpulse-community-staging"
+  #   admin       = "finpulse-admin-staging"
+  #   ai          = "finpulse-ai-staging"
+  #   payments    = "finpulse-payments-staging"
+  # }
 }
 
 # ==============================================================
@@ -527,6 +531,8 @@ resource "aws_api_gateway_method" "market_prices_get_staging" {
 }
 
 resource "aws_api_gateway_integration" "market_prices_staging" {
+  count = length(local.lambda_functions_staging) > 0 ? 1 : 0
+
   rest_api_id             = aws_api_gateway_rest_api.staging.id
   resource_id             = aws_api_gateway_resource.market_prices_staging.id
   http_method             = aws_api_gateway_method.market_prices_get_staging.http_method
@@ -557,6 +563,8 @@ resource "aws_api_gateway_method" "ai_query_post_staging" {
 }
 
 resource "aws_api_gateway_integration" "ai_query_staging" {
+  count = length(local.lambda_functions_staging) > 0 ? 1 : 0
+
   rest_api_id             = aws_api_gateway_rest_api.staging.id
   resource_id             = aws_api_gateway_resource.ai_query_staging.id
   http_method             = aws_api_gateway_method.ai_query_post_staging.http_method
@@ -590,6 +598,7 @@ resource "aws_api_gateway_deployment" "staging" {
     redeployment = sha1(jsonencode([
       aws_api_gateway_resource.market_staging.id,
       aws_api_gateway_resource.ai_staging.id,
+      length(local.lambda_functions_staging),
     ]))
   }
 
@@ -597,10 +606,8 @@ resource "aws_api_gateway_deployment" "staging" {
     create_before_destroy = true
   }
 
-  depends_on = [
-    aws_api_gateway_integration.market_prices_staging,
-    aws_api_gateway_integration.ai_query_staging,
-  ]
+  # Only depend on integrations if Lambdas are enabled
+  depends_on = []
 }
 
 resource "aws_api_gateway_stage" "staging" {

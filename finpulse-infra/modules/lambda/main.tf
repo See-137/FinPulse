@@ -280,43 +280,9 @@ resource "aws_lambda_function" "portfolio_service" {
 }
 
 
-# 4. FX Service
-resource "aws_lambda_function" "fx_service" {
-  function_name = "${var.project_name}-fx-${var.environment}"
-  role          = aws_iam_role.lambda_execution.arn
-  handler       = "index.handler"
-  runtime       = "nodejs20.x"
-  architectures = [var.lambda_architecture]
-  timeout       = 15
-  memory_size   = 128
-
-  filename         = data.archive_file.placeholder.output_path
-  source_code_hash = data.archive_file.placeholder.output_base64sha256
-
-  vpc_config {
-    subnet_ids         = var.private_subnet_ids
-    security_group_ids = [var.lambda_security_group_id]
-  }
-
-  environment {
-    variables = {
-      ENVIRONMENT    = var.environment
-      REDIS_ENDPOINT = var.redis_endpoint
-      # FX service now uses static rates - no external API needed
-    }
-  }
-
-  tags = var.tags
-
-  lifecycle {
-    ignore_changes = [
-      filename,
-      source_code_hash,
-      environment,
-    ]
-  }
-}
-
+# 4. FX Service - REMOVED (merged into market-data service)
+# FX functionality is now handled by market-data Lambda
+# See: lambda-code/market-data/index.js - handleFxRoutes()
 
 # 5. AI Service (optional)
 resource "aws_lambda_function" "ai_service" {
@@ -501,11 +467,7 @@ resource "aws_cloudwatch_log_group" "portfolio" {
   tags              = var.tags
 }
 
-resource "aws_cloudwatch_log_group" "fx" {
-  name              = "/aws/lambda/${aws_lambda_function.fx_service.function_name}"
-  retention_in_days = var.log_retention_days
-  tags              = var.tags
-}
+# FX log group removed - FX service merged into market-data
 
 resource "aws_cloudwatch_log_group" "admin" {
   name              = "/aws/lambda/${aws_lambda_function.admin_service.function_name}"
