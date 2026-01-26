@@ -37,10 +37,10 @@ resource "aws_elasticache_cluster" "main" {
   subnet_group_name  = aws_elasticache_subnet_group.main.name
   security_group_ids = var.security_group_ids
 
-  # Transit encryption enabled for security (Phase 4 improvement)
-  # WARNING: Enabling forces cluster REPLACEMENT (causes downtime ~5-10 min)
-  # User approved this change for scheduled maintenance window
-  transit_encryption_enabled = true
+  # Transit encryption NOT supported for standalone clusters
+  # Would require migration to aws_elasticache_replication_group
+  # Keeping disabled for now - data is internal VPC only
+  transit_encryption_enabled = false
 
   # Maintenance window (Sunday 3-4 AM UTC)
   maintenance_window = "sun:03:00-sun:04:00"
