@@ -714,24 +714,26 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                 </div>
               ) : (
                 <div className="card-surface rounded-[24px] overflow-hidden border border-slate-200 dark:border-white/5">
-                  <table className="w-full text-left table-fixed">
+                  <div className="overflow-x-auto">
+                  <table className="w-full text-left" style={{ minWidth: '700px' }}>
                       <thead>
                         <tr className="border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
                           {[
-                            { label: 'Asset', key: 'name', width: 'w-[18%]' },
-                            { label: 'Cost', key: 'avgCost', width: 'w-[10%]' },
-                            { label: 'Price', key: 'marketPrice', width: 'w-[10%]' },
-                            { label: 'Qty', key: 'quantity', width: 'w-[7%]' },
-                            { label: 'Value', key: 'value', width: 'w-[10%]' },
-                            { label: 'P/L $', key: 'totalReturnDollar', width: 'w-[10%]' },
-                            { label: 'P/L %', key: 'totalReturnPercent', width: 'w-[8%]' },
-                            { label: '24h', key: 'dayPL', width: 'w-[8%]' },
-                            { label: 'Signal', key: 'signal', width: 'w-[12%]' }
+                            { label: 'Asset', key: 'name', minWidth: '120px' },
+                            { label: 'Cost', key: 'avgCost', minWidth: '70px' },
+                            { label: 'Price', key: 'marketPrice', minWidth: '70px' },
+                            { label: 'Qty', key: 'quantity', minWidth: '50px' },
+                            { label: 'Value', key: 'value', minWidth: '70px' },
+                            { label: 'P/L $', key: 'totalReturnDollar', minWidth: '70px' },
+                            { label: 'P/L %', key: 'totalReturnPercent', minWidth: '55px' },
+                            { label: '24h', key: 'dayPL', minWidth: '55px' },
+                            { label: 'Signal', key: 'signal', minWidth: '80px' }
                           ].map((header) => (
                             <th
                               key={header.key}
                               onClick={() => header.key !== 'signal' && handleSort(header.key)}
-                              className={`px-3 py-3 text-[8px] font-black uppercase text-slate-500 tracking-wider whitespace-nowrap ${header.key !== 'signal' ? 'cursor-pointer hover:text-[#00e5ff] transition-colors' : ''} ${header.width}`}
+                              style={{ minWidth: header.minWidth }}
+                              className={`px-3 py-3 text-[8px] font-black uppercase text-slate-500 tracking-wider whitespace-nowrap ${header.key !== 'signal' ? 'cursor-pointer hover:text-[#00e5ff] transition-colors' : ''}`}
                             >
                               <div className="flex items-center gap-1">
                                 {header.label}
@@ -835,6 +837,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                         })}
                       </tbody>
                     </table>
+                  </div>
                 </div>
               )}
            </div>
@@ -878,31 +881,29 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
               <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-8">Allocation</h3>
               {data.length > 0 && totalValue > 0 ? (
                 <>
-                  <div className="h-[200px] w-full relative">
-                     <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                           <Pie
-                            data={data}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                            stroke="none"
-                            onClick={(entry) => setFilterType(filterType === entry.type ? null : entry.type)}
-                            className="cursor-pointer outline-none"
-                           >
-                              {data.map((entry, index) => (
-                                 <Cell
-                                    key={`cell-${index}`}
-                                    fill={entry.color}
-                                    opacity={filterType && filterType !== entry.type ? 0.3 : 1}
-                                 />
-                              ))}
-                           </Pie>
-                        </PieChart>
-                     </ResponsiveContainer>
+                  <div className="relative flex items-center justify-center" style={{ minHeight: '200px' }}>
+                     <PieChart width={180} height={180}>
+                        <Pie
+                         data={data}
+                         cx={90}
+                         cy={90}
+                         innerRadius={55}
+                         outerRadius={75}
+                         paddingAngle={5}
+                         dataKey="value"
+                         stroke="none"
+                         onClick={(entry) => setFilterType(filterType === entry.type ? null : entry.type)}
+                         className="cursor-pointer outline-none"
+                        >
+                           {data.map((entry, index) => (
+                              <Cell
+                                 key={`cell-${index}`}
+                                 fill={entry.color}
+                                 opacity={filterType && filterType !== entry.type ? 0.3 : 1}
+                              />
+                           ))}
+                        </Pie>
+                     </PieChart>
                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
                         <p className="text-xs font-black text-slate-400 uppercase">Total</p>
                         <p className="text-lg font-black dark:text-white">
