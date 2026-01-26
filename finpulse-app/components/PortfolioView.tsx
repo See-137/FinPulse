@@ -16,6 +16,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { AssetSelector } from './AssetSelector';
 import { PremiumAnalytics } from './PremiumAnalytics';
 import { SignalCard } from './SignalCard';
+import { DataFreshnessIndicator, getDataFreshnessStatus } from './DataFreshnessIndicator';
 import signalService from '../services/signalService';
 
 interface PortfolioViewProps {
@@ -52,17 +53,20 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   });
   
   // Real-time WebSocket prices for crypto - subscribes to user's actual crypto holdings
-  const cryptoSymbols = useMemo(() => 
+  const cryptoSymbols = useMemo(() =>
     holdings.filter(h => h.type === 'CRYPTO').map(h => h.symbol),
     [holdings]
   );
-  const { prices: wsPrices } = useWebSocketPrices({
+  const { prices: wsPrices, isConnected: wsConnected } = useWebSocketPrices({
     symbols: cryptoSymbols, // Only subscribe to user's actual crypto holdings
     enabled: cryptoSymbols.length > 0, // Disable if no crypto in portfolio
   });
-  
+
   // Additional CoinGecko prices for non-Binance cryptos
   const [coinGeckoPrices, setCoinGeckoPrices] = useState<Record<string, { price: number; change24h: number }>>({});
+
+  // Track last price update timestamp for freshness indicator
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<number | null>(null);
   
   // Stable key for cryptoSymbols to avoid complex dependency expression
   const cryptoSymbolsKey = useMemo(() => cryptoSymbols.join(','), [cryptoSymbols]);
@@ -78,6 +82,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
       const cached = await cacheService.get<Record<string, { price: number; change24h: number }>>(cacheKey);
       if (cached) {
         setCoinGeckoPrices(cached);
+        setLastPriceUpdate(Date.now());
         return;
       }
 
@@ -85,6 +90,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
       const prices = await fetchCoinGeckoPrices(cryptoSymbols);
       if (Object.keys(prices).length > 0) {
         await cacheService.set(cacheKey, prices, 120); // 2 minute TTL
+        setLastPriceUpdate(Date.now());
       }
       setCoinGeckoPrices(prices);
     };
@@ -94,6 +100,32 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     const interval = setInterval(fetchPrices, 60000);
     return () => clearInterval(interval);
   }, [cryptoSymbols, cryptoSymbolsKey]);
+
+  // Update last price time when WebSocket prices update
+  useEffect(() => {
+    if (wsPrices.size > 0) {
+      setLastPriceUpdate(Date.now());
+    }
+  }, [wsPrices]);
+
+  // Determine data freshness status
+  const dataFreshnessStatus = useMemo(() => {
+    const hasCrypto = cryptoSymbols.length > 0;
+    const hasData = wsPrices.size > 0 || Object.keys(coinGeckoPrices).length > 0 || Object.keys(marketPrices || {}).length > 0;
+
+    // If no holdings, show demo
+    if (holdings.length === 0) return 'demo';
+
+    // If WebSocket connected and has data, show live
+    if (hasCrypto && wsConnected && wsPrices.size > 0) return 'live';
+
+    // If we have price data but no WebSocket, check freshness
+    if (hasData) {
+      return getDataFreshnessStatus(lastPriceUpdate, 300); // 5 min stale threshold
+    }
+
+    return 'loading';
+  }, [cryptoSymbols.length, wsConnected, wsPrices.size, coinGeckoPrices, marketPrices, holdings.length, lastPriceUpdate]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Holding | null>(null);
@@ -953,8 +985,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                 </div>
               )}
 
-              <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 space-y-1">
-                 <p className="text-[9px] font-bold text-slate-500 text-center">Prices as of {timeString} UTC</p>
+              <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 space-y-3">
+                 <div className="flex justify-center">
+                   <DataFreshnessIndicator
+                     status={dataFreshnessStatus}
+                     lastUpdated={lastPriceUpdate}
+                     showTimestamp={true}
+                   />
+                 </div>
                  <p className="text-[9px] font-bold text-slate-500 text-center">FX as of {timeString} UTC</p>
               </div>
            </div>
