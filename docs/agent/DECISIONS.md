@@ -1,7 +1,7 @@
 # FinPulse Architecture Decision Records
 
 > Short ADR-style decisions with rationale.
-> Last updated: 2026-01-25
+> Last updated: 2026-01-27
 
 ---
 
@@ -160,6 +160,43 @@
 **Consequences:**
 - Version-specific test assertions should be avoided (use content-agnostic patterns)
 - NotificationCoordinator manages channel priority: modal > banner > bell
+
+---
+
+## ADR-008: Unified REST Polling for Market Data (Remove Binance WebSocket)
+
+**Date:** 2026-01-27
+**Status:** Accepted
+
+**Context:** MarketTicker was using Binance WebSocket for real-time crypto prices, but portfolio contained coins not listed on Binance (DN/DeepNode, LAVA/Lava Network).
+
+**Decision:** Remove Binance WebSocket dependency and use unified 30-second REST polling for all assets via AWS Lambda `/market/prices` endpoint.
+
+**Rationale:**
+
+- Binance WebSocket only supports Binance-listed coins (~500)
+- CoinGecko API supports 15,000+ coins including all portfolio altcoins
+- Simpler architecture with synchronized updates for crypto and stocks
+- No more desync between different asset types
+
+**Data Flow:**
+
+- Crypto: MarketTicker.tsx -> `/market/prices?type=crypto` -> Lambda -> CoinGecko API
+- Stocks: MarketTicker.tsx -> `/market/prices?type=stock` -> Lambda -> Alpaca API
+
+**Files Modified:**
+
+- `finpulse-app/components/MarketTicker.tsx` - Unified polling, removed WebSocket
+- `finpulse-app/hooks/useWebSocketPrices.ts` - Fixed fallback to pass symbols
+- `finpulse-infra/lambda-code/market-data/index.js` - Graceful 451 handling
+- `finpulse-app/services/dataProviders/binanceAPI.ts` - Silent error handling
+
+**Consequences:**
+
+- UI shows "Updated Xs ago" instead of "Live/Delayed" indicator
+- All assets update together every 30 seconds
+- Lambda requires `COINGECKO_ID_MAP` for non-standard symbol mappings (DN->deepnode, LAVA->lava-network)
+- Slightly higher latency (30s vs real-time) but acceptable for portfolio tracking use case
 
 ---
 

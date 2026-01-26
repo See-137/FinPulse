@@ -1,7 +1,7 @@
 # FinPulse Agent Memory
 
 > Stable project facts, commands, and invariants. Updated automatically.
-> Last updated: 2026-01-25
+> Last updated: 2026-01-27
 
 ---
 
@@ -57,6 +57,7 @@ aws lambda update-function-code --function-name finpulse-auth-prod --zip-file fi
 4. **State**: Zustand (frontend), DynamoDB (backend)
 5. **Tiers**: FREE (10 assets), PROPULSE, SUPERPULSE
 6. **Holding Type**: Includes `addedAt` timestamp for tracking time in portfolio. Used for Holding Age and Total Return metrics.
+7. **Market Data**: REST polling (30s interval), no WebSockets. CoinGecko for crypto, Alpaca for stocks.
 
 ---
 
@@ -80,6 +81,8 @@ aws lambda update-function-code --function-name finpulse-auth-prod --zip-file fi
 | Premium analytics | `finpulse-app/components/PremiumAnalytics.tsx` |
 | Auth Lambda | `finpulse-infra/lambda-code/auth/index.js` |
 | Main Terraform | `finpulse-infra/main.tf` |
+| MarketTicker | `finpulse-app/components/MarketTicker.tsx` |
+| Market Lambda | `finpulse-infra/lambda-code/market-data/index.js` |
 
 ---
 
@@ -127,6 +130,46 @@ GitHub Actions workflows (must be in root `.github/workflows/`, NOT in subfolder
 - Use **content-agnostic** test assertions when possible
 - Avoid hardcoding version-specific text (e.g., "V2 is Live!")
 - Use `it.skip()` for flaky tests that need investigation
+
+---
+
+## Market Data Architecture
+
+**Data Flow:**
+
+```text
+MarketTicker.tsx → AWS Lambda /market/prices → CoinGecko (crypto) / Alpaca (stocks)
+```
+
+**Polling:** Unified 30-second REST polling for all assets (no WebSockets)
+
+**CoinGecko ID Mappings** (non-standard symbols in Lambda `COINGECKO_ID_MAP`):
+
+| Symbol | CoinGecko ID |
+|--------|--------------|
+| DN     | deepnode     |
+| LAVA   | lava-network |
+
+**Why no WebSocket:**
+
+- Binance WebSocket only supports Binance-listed coins
+- CoinGecko supports 15,000+ coins including altcoins (DN, LAVA, etc.)
+- Simpler architecture with synchronized updates for all assets
+
+---
+
+## Infrastructure Updates (2026-01-27)
+
+| Change | Description |
+|--------|-------------|
+| Lambda Consolidation | FX Lambda merged into market-data Lambda, staging env removed |
+| Redis Replication | Migrated to replication group with encryption at rest/transit |
+| FX Proxy Routes | Added `/fx/convert` and `/fx/currencies` to Terraform API Gateway |
+| Alpaca Fix | Handle missing `latestTrade` in stock quotes gracefully |
+| Data Freshness | Added indicators showing data source and last update time |
+| Binance 451 | Lambda returns empty data gracefully when geo-blocked |
+
+**Note:** Phase 4 infra changes were reverted due to AWS limitations.
 
 ---
 
