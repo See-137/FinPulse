@@ -4,9 +4,8 @@
  * Integrates with Binance public API for OHLCV (candlestick) data
  * https://binance-docs.github.io/apidocs/spot/en/
  *
- * NOTE: Direct browser calls are blocked by CORS in production.
- * This service silently returns empty data when API calls fail.
- * The technical analysis service will fall back to mock data.
+ * CORS Solution: Uses backend proxy at /market/binance/klines
+ * Direct browser calls are blocked by CORS in production.
  *
  * Rate Limit: 1200 requests/min (no auth required for public endpoints)
  */
@@ -14,10 +13,15 @@
 import { throttle } from '../rateLimiter';
 import type { OHLCV } from '../../types';
 
+// Backend proxy endpoint (avoids CORS issues)
+const API_BASE = import.meta.env.VITE_API_URL || 'https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod';
+const BINANCE_PROXY = `${API_BASE}/market/binance`;
+
+// Direct Binance API (fallback for development/testing)
 const BINANCE_API_BASE = 'https://api.binance.com/api/v3';
 
-// Suppress repeated CORS error logging (only log once per session)
-let corsErrorLogged = false;
+// Track whether we're using proxy or direct
+let usingProxy = true;
 
 interface BinanceKline {
   0: number;  // Open time
@@ -40,6 +44,7 @@ interface BinanceKline {
 export class BinanceAPI {
   /**
    * Fetch OHLCV candlestick data
+   * Uses backend proxy to avoid CORS issues in production
    * @param symbol Trading pair (e.g., 'BTCUSDT')
    * @param interval Timeframe ('1m', '5m', '15m', '1h', '4h', '1d')
    * @param limit Number of candles (default: 100, max: 1000)
@@ -50,34 +55,66 @@ export class BinanceAPI {
     limit: number = 100
   ): Promise<OHLCV[]> {
     try {
-      const url = new URL(`${BINANCE_API_BASE}/klines`);
-      url.searchParams.append('symbol', this.formatSymbol(symbol));
-      url.searchParams.append('interval', interval);
-      url.searchParams.append('limit', Math.min(limit, 1000).toString());
+      // Use backend proxy (avoids CORS issues)
+      const proxyUrl = new URL(`${BINANCE_PROXY}/klines`);
+      proxyUrl.searchParams.append('symbol', this.formatSymbol(symbol));
+      proxyUrl.searchParams.append('interval', interval);
+      proxyUrl.searchParams.append('limit', Math.min(limit, 1000).toString());
 
       const response = await throttle('binance', async () => {
-        const res = await fetch(url.toString());
+        const res = await fetch(proxyUrl.toString());
 
         if (!res.ok) {
           if (res.status === 429) {
             throw new Error('Binance rate limit exceeded');
           }
-          throw new Error(`Binance API error: ${res.status} ${res.statusText}`);
+          throw new Error(`Binance proxy error: ${res.status} ${res.statusText}`);
         }
 
         return res.json();
       });
 
-      const klines = response as BinanceKline[];
+      // Backend returns { success: true, data: OHLCV[] }
+      if (response.success && response.data) {
+        usingProxy = true;
+        return response.data as OHLCV[];
+      }
+
+      // Fallback: try direct Binance API (may fail due to CORS)
+      return await this.getKlinesDirect(symbol, interval, limit);
+    } catch (error) {
+      console.warn('[Binance] Proxy failed, trying direct:', error);
+      // Fallback to direct API call (will likely fail in production due to CORS)
+      return await this.getKlinesDirect(symbol, interval, limit);
+    }
+  }
+
+  /**
+   * Direct Binance API call (fallback, blocked by CORS in production)
+   */
+  private async getKlinesDirect(
+    symbol: string,
+    interval: string,
+    limit: number
+  ): Promise<OHLCV[]> {
+    try {
+      const url = new URL(`${BINANCE_API_BASE}/klines`);
+      url.searchParams.append('symbol', this.formatSymbol(symbol));
+      url.searchParams.append('interval', interval);
+      url.searchParams.append('limit', Math.min(limit, 1000).toString());
+
+      const res = await fetch(url.toString());
+      if (!res.ok) {
+        throw new Error(`Binance API error: ${res.status}`);
+      }
+
+      const klines = await res.json() as BinanceKline[];
+      usingProxy = false;
       return klines.map(this.transformKline);
     } catch {
-      // Silently fail - CORS blocks direct browser calls in production
-      // Log only once per session to avoid console spam
-      if (!corsErrorLogged) {
-        console.debug('[Binance] Direct API calls blocked by CORS - using fallback data');
-        corsErrorLogged = true;
-      }
-      return []; // Return empty array - technical analysis will use mock data
+      // CORS or network error - return empty array
+      console.debug('[Binance] Direct API calls blocked - using fallback data');
+      return [];
     }
   }
 

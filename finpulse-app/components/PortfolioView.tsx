@@ -11,6 +11,7 @@ import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { useMarketData, fetchCoinGeckoPrices } from '../hooks/useMarketData';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
+import { cacheService } from '../services/cacheService';
 import { useDebounce } from '../hooks/useDebounce';
 import { AssetSelector } from './AssetSelector';
 import { PremiumAnalytics } from './PremiumAnalytics';
@@ -66,17 +67,30 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   // Stable key for cryptoSymbols to avoid complex dependency expression
   const cryptoSymbolsKey = useMemo(() => cryptoSymbols.join(','), [cryptoSymbols]);
 
-  // Fetch CoinGecko prices for all cryptos (catches non-Binance coins)
+  // Fetch CoinGecko prices for all cryptos (with caching to reduce API calls)
   useEffect(() => {
     if (cryptoSymbols.length === 0) return;
 
     const fetchPrices = async () => {
+      const cacheKey = `coingecko:${cryptoSymbolsKey}`;
+
+      // Try cache first (2 minute TTL)
+      const cached = await cacheService.get<Record<string, { price: number; change24h: number }>>(cacheKey);
+      if (cached) {
+        setCoinGeckoPrices(cached);
+        return;
+      }
+
+      // Fetch fresh data and cache it
       const prices = await fetchCoinGeckoPrices(cryptoSymbols);
+      if (Object.keys(prices).length > 0) {
+        await cacheService.set(cacheKey, prices, 120); // 2 minute TTL
+      }
       setCoinGeckoPrices(prices);
     };
 
     fetchPrices();
-    // Refresh every 60 seconds
+    // Refresh every 60 seconds (cache will prevent unnecessary API calls)
     const interval = setInterval(fetchPrices, 60000);
     return () => clearInterval(interval);
   }, [cryptoSymbols, cryptoSymbolsKey]);

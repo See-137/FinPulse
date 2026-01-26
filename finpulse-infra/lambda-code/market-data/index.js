@@ -482,6 +482,103 @@ exports.handler = async (event) => {
       };
     }
 
+    // GET /market/binance/klines - Proxy for Binance candlestick data (avoids CORS)
+    if (path.includes('/binance/klines') && method === 'GET') {
+      const symbol = queryParams.symbol;
+      const interval = queryParams.interval || '1h';
+      const limit = Math.min(parseInt(queryParams.limit) || 100, 1000);
+
+      if (!symbol) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ success: false, error: 'Symbol parameter is required' })
+        };
+      }
+
+      try {
+        // Format symbol for Binance (add USDT if not present)
+        const binanceSymbol = symbol.includes('USDT') ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+
+        // Check cache first
+        const cacheKey = `binance:klines:${binanceSymbol}:${interval}:${limit}`;
+        const memCached = priceCache.get(cacheKey);
+        if (memCached && (Date.now() - memCached.timestamp) < 30000) { // 30 second cache
+          console.log(`[Binance Proxy] Cache hit for ${binanceSymbol}`);
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({
+              success: true,
+              data: memCached.data,
+              cached: true,
+              timestamp: new Date().toISOString()
+            })
+          };
+        }
+
+        // Fetch from Binance (server-side - no CORS issues)
+        const binanceUrl = `https://api.binance.com/api/v3/klines?symbol=${binanceSymbol}&interval=${interval}&limit=${limit}`;
+        console.log(`[Binance Proxy] Fetching: ${binanceUrl}`);
+
+        const response = await fetch(binanceUrl);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[Binance Proxy] API error: ${response.status} - ${errorText}`);
+          return {
+            statusCode: response.status,
+            headers: corsHeaders,
+            body: JSON.stringify({
+              success: false,
+              error: `Binance API error: ${response.status}`,
+              details: errorText
+            })
+          };
+        }
+
+        const klines = await response.json();
+
+        // Transform to OHLCV format
+        const ohlcvData = klines.map(k => ({
+          timestamp: k[0],
+          open: parseFloat(k[1]),
+          high: parseFloat(k[2]),
+          low: parseFloat(k[3]),
+          close: parseFloat(k[4]),
+          volume: parseFloat(k[5])
+        }));
+
+        // Cache the result
+        setCacheWithLimit(cacheKey, { data: ohlcvData, timestamp: Date.now() });
+
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: true,
+            data: ohlcvData,
+            symbol: binanceSymbol,
+            interval,
+            count: ohlcvData.length,
+            cached: false,
+            timestamp: new Date().toISOString()
+          })
+        };
+      } catch (error) {
+        console.error('[Binance Proxy] Error:', error);
+        return {
+          statusCode: 500,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: false,
+            error: 'Failed to fetch Binance data',
+            message: process.env.ENVIRONMENT !== 'prod' ? error.message : undefined
+          })
+        };
+      }
+    }
+
     // GET /market/search - Search for stocks by symbol or name
     if (path.includes('/search') && method === 'GET') {
       const query = queryParams.q || queryParams.query || '';

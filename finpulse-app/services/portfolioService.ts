@@ -1,6 +1,11 @@
 /**
  * Portfolio API Service
  * Handles backend persistence of user holdings and watchlist
+ *
+ * Features:
+ * - Request deduplication (prevents duplicate concurrent API calls)
+ * - Batch sync for bulk operations
+ * - Error handling with detailed logging
  */
 
 import { config } from '../config';
@@ -8,6 +13,10 @@ import { Holding } from '../types';
 import { createLogger } from './logger';
 
 const portfolioLogger = createLogger('Portfolio');
+
+// In-flight request deduplication map
+// Prevents duplicate concurrent calls to the same endpoint
+const inFlightRequests = new Map<string, Promise<any>>();
 
 export type { Holding };
 
@@ -53,34 +62,53 @@ const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
 export const portfolioService = {
   /**
    * Get user's portfolio from backend
+   * Uses request deduplication to prevent duplicate concurrent calls
    */
   async getPortfolio(): Promise<PortfolioData> {
-    try {
-      const result = await fetchWithAuth('/portfolio');
-      if (result.success) {
-        // Lambda returns { success: true, data: { holdings: [...], ... } }
-        const data = result.data || result;
-        const holdings = data.holdings || [];
-        return {
-          holdings: holdings.map((h: any) => ({
-            symbol: h.symbol,
-            name: h.name || h.symbol,
-            type: h.type?.toUpperCase() || 'CRYPTO',
-            quantity: h.quantity,
-            avgCost: h.avgBuyPrice || h.avgCost || 0,
-            currentPrice: h.currentPrice || 0,
-            notes: h.notes || '',
-            addedAt: h.addedAt,
-          })),
-          totalValue: data.totalValue,
-          lastUpdated: data.lastUpdated,
-        };
-      }
-      throw new Error(result.error || 'Failed to get portfolio');
-    } catch (error) {
-      portfolioLogger.error('Failed to fetch portfolio:', error as Error);
-      throw error;
+    const cacheKey = 'portfolio:get';
+
+    // Return existing in-flight request if one exists (deduplication)
+    const existingRequest = inFlightRequests.get(cacheKey);
+    if (existingRequest) {
+      portfolioLogger.debug('Returning existing in-flight request for getPortfolio');
+      return existingRequest;
     }
+
+    // Create new request and track it
+    const request = (async (): Promise<PortfolioData> => {
+      try {
+        const result = await fetchWithAuth('/portfolio');
+        if (result.success) {
+          // Lambda returns { success: true, data: { holdings: [...], ... } }
+          const data = result.data || result;
+          const holdings = data.holdings || [];
+          return {
+            holdings: holdings.map((h: any) => ({
+              symbol: h.symbol,
+              name: h.name || h.symbol,
+              type: h.type?.toUpperCase() || 'CRYPTO',
+              quantity: h.quantity,
+              avgCost: h.avgBuyPrice || h.avgCost || 0,
+              currentPrice: h.currentPrice || 0,
+              notes: h.notes || '',
+              addedAt: h.addedAt,
+            })),
+            totalValue: data.totalValue,
+            lastUpdated: data.lastUpdated,
+          };
+        }
+        throw new Error(result.error || 'Failed to get portfolio');
+      } catch (error) {
+        portfolioLogger.error('Failed to fetch portfolio:', error as Error);
+        throw error;
+      } finally {
+        // Clean up the in-flight request when done
+        inFlightRequests.delete(cacheKey);
+      }
+    })();
+
+    inFlightRequests.set(cacheKey, request);
+    return request;
   },
 
   /**

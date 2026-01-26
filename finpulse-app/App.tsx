@@ -713,17 +713,22 @@ const AppContent: React.FC = () => {
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
           <div className="max-w-[1200px] mx-auto w-full">
-            <ErrorBoundary fallback={<div className="p-8 text-center text-red-400">Failed to load view. <button onClick={() => window.location.reload()} className="underline">Reload</button></div>}>
-              <Suspense fallback={<LoadingSpinner size="lg" />}>
-                {activeTab === 'portfolio' ? (
-                  <PortfolioView 
-                    user={user!} 
-                    onUpdateUser={setUser} 
-                    currency={currency} 
+            {activeTab === 'portfolio' && (
+              <ErrorBoundary fallback={<div className="p-8 text-center text-red-400">Portfolio failed to load. <button onClick={() => window.location.reload()} className="underline">Reload</button></div>}>
+                <Suspense fallback={<LoadingSpinner size="lg" />}>
+                  <PortfolioView
+                    user={user!}
+                    onUpdateUser={setUser}
+                    currency={currency}
                     onCurrencyChange={setCurrency}
                     onUpgradeClick={() => setIsPricingOpen(true)}
                   />
-                ) : activeTab === 'watchlist' ? (
+                </Suspense>
+              </ErrorBoundary>
+            )}
+            {activeTab === 'watchlist' && (
+              <ErrorBoundary fallback={<div className="p-8 text-center text-red-400">Watchlist failed to load. <button onClick={() => window.location.reload()} className="underline">Reload</button></div>}>
+                <Suspense fallback={<LoadingSpinner size="lg" />}>
                   <Watchlist
                     currency={currency}
                     onAddToPortfolio={(_symbol, _name, _type) => {
@@ -732,11 +737,16 @@ const AppContent: React.FC = () => {
                       // The add modal will be handled by PortfolioView
                     }}
                   />
-                ) : (
+                </Suspense>
+              </ErrorBoundary>
+            )}
+            {activeTab === 'community' && (
+              <ErrorBoundary fallback={<div className="p-8 text-center text-red-400">Community failed to load. <button onClick={() => window.location.reload()} className="underline">Reload</button></div>}>
+                <Suspense fallback={<LoadingSpinner size="lg" />}>
                   <Community />
-                )}
-              </Suspense>
-            </ErrorBoundary>
+                </Suspense>
+              </ErrorBoundary>
+            )}
           </div>
           <Footer onNavigate={handleNavigate} />
         </div>
