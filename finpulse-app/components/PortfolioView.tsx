@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell } from 'recharts';
 import {
   Plus, Download, Upload, Lock, Search, Trash2, Pencil, ShieldCheck,
   TrendingUp, TrendingDown, Bitcoin, Activity, Gem, Eye, EyeOff,
