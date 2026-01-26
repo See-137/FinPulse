@@ -80,20 +80,22 @@ variable "tags" {
 }
 
 # Reserved Concurrency (prevents runaway costs and throttling)
+# NOTE: Requires AWS Lambda quota > 70. Current account limit is 10.
+# Request increase via: Service Quotas > Lambda > Concurrent executions
 variable "auth_reserved_concurrency" {
   description = "Reserved concurrent executions for auth service (0 = disabled)"
   type        = number
-  default     = 10
+  default     = 0  # Disabled - account limit too low
 }
 
 variable "market_data_reserved_concurrency" {
   description = "Reserved concurrent executions for market data service (0 = disabled)"
   type        = number
-  default     = 30
+  default     = 0  # Disabled - account limit too low
 }
 
 variable "portfolio_reserved_concurrency" {
   description = "Reserved concurrent executions for portfolio service (0 = disabled)"
   type        = number
-  default     = 20
+  default     = 0  # Disabled - account limit too low
 }
