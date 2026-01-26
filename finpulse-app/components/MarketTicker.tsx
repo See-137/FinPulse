@@ -4,8 +4,9 @@ import { MOCK_STOCKS, CURRENCY_RATES } from '../constants';
 import { TrendingUp, TrendingDown, Wifi, WifiOff } from 'lucide-react';
 import { Currency } from '../types';
 import { useWebSocketPrices } from '../hooks/useWebSocketPrices';
-import { fetchFxRates, fetchMarketPrices } from '../hooks/useMarketData';
+import { fetchFxRates } from '../hooks/useMarketData';
 import { usePortfolioStore } from '../store/portfolioStore';
+import { config } from '../config';
 
 interface MarketTickerProps {
   currency: Currency;
@@ -19,8 +20,8 @@ interface StockData {
   type: 'CRYPTO' | 'STOCK' | 'COMMODITY';
 }
 
-// Stock price polling interval (30 seconds - stocks don't need real-time)
-const STOCK_POLL_INTERVAL = 30000;
+// Stock price polling interval (10 seconds for responsive updates)
+const STOCK_POLL_INTERVAL = 10000;
 
 export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
   const [fxRate, setFxRate] = useState<number>(CURRENCY_RATES[currency]);
@@ -54,17 +55,23 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({ currency }) => {
     enabled: cryptoSymbols.length > 0,
   });
 
-  // Fetch stock prices via REST API (polling)
+  // Fetch stock prices via REST API (polling) - pass specific symbols
   const fetchStockPrices = useCallback(async () => {
     if (stockSymbols.length === 0) return;
 
     try {
-      const response = await fetchMarketPrices();
-      if (response.success && response.data) {
+      // Fetch specific stock symbols from API
+      const symbolsParam = stockSymbols.join(',');
+      const response = await fetch(
+        `${config.apiUrl}/market/prices?symbols=${symbolsParam}&type=stock`
+      );
+      const data = await response.json();
+
+      if (data.success && data.data) {
         const newStockPrices = new Map<string, StockData>();
 
         for (const symbol of stockSymbols) {
-          const priceData = response.data[symbol];
+          const priceData = data.data[symbol];
           if (priceData) {
             newStockPrices.set(symbol, {
               symbol,
