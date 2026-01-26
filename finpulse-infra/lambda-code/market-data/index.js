@@ -758,15 +758,20 @@ exports.handler = async (event) => {
         const response = await fetch(binanceUrl);
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`[Binance Proxy] API error: ${response.status} - ${errorText}`);
+          // Binance returns 451 (geo-blocked) or other errors
+          // Return empty data gracefully instead of propagating error
+          console.warn(`[Binance Proxy] API returned ${response.status} for ${binanceSymbol} - returning empty data`);
           return {
-            statusCode: response.status,
+            statusCode: 200,
             headers: corsHeaders,
             body: JSON.stringify({
-              success: false,
-              error: `Binance API error: ${response.status}`,
-              details: errorText
+              success: true,
+              data: [],
+              symbol: binanceSymbol,
+              interval,
+              count: 0,
+              note: 'Binance data unavailable - using fallback',
+              timestamp: new Date().toISOString()
             })
           };
         }
@@ -800,14 +805,19 @@ exports.handler = async (event) => {
           })
         };
       } catch (error) {
-        console.error('[Binance Proxy] Error:', error);
+        // Network error or other failure - return empty data gracefully
+        console.warn('[Binance Proxy] Error:', error.message);
         return {
-          statusCode: 500,
+          statusCode: 200,
           headers: corsHeaders,
           body: JSON.stringify({
-            success: false,
-            error: 'Failed to fetch Binance data',
-            message: process.env.ENVIRONMENT !== 'prod' ? error.message : undefined
+            success: true,
+            data: [],
+            symbol: queryParams.symbol?.toUpperCase() || 'UNKNOWN',
+            interval: queryParams.interval || '1h',
+            count: 0,
+            note: 'Binance data unavailable - using fallback',
+            timestamp: new Date().toISOString()
           })
         };
       }
