@@ -215,24 +215,32 @@ async function getStockQuotes(symbols) {
     
     const results = {};
     for (const [symbol, snapshot] of Object.entries(data)) {
-      if (snapshot && snapshot.latestTrade) {
-        const latestTrade = snapshot.latestTrade;
-        const prevClose = snapshot.prevDailyBar?.c || latestTrade.p;
-        const change = latestTrade.p - prevClose;
-        const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
-        
-        results[symbol] = {
-          symbol,
-          price: latestTrade.p,
-          change24h: changePercent,
-          volume: snapshot.dailyBar?.v || 0,
-          high: snapshot.dailyBar?.h || latestTrade.p,
-          low: snapshot.dailyBar?.l || latestTrade.p,
-          previousClose: prevClose,
-          timestamp: new Date(latestTrade.t).getTime(),
-          provider: 'alpaca',
-        };
-      }
+      if (!snapshot) continue;
+
+      // Get price from best available source: latestTrade > dailyBar > prevDailyBar
+      const latestTrade = snapshot.latestTrade;
+      const dailyBar = snapshot.dailyBar;
+      const prevDailyBar = snapshot.prevDailyBar;
+
+      // Determine current price (prioritize real-time trade, then daily bar close)
+      const price = latestTrade?.p || dailyBar?.c || prevDailyBar?.c || 0;
+      if (price === 0) continue; // Skip if no price data available
+
+      const prevClose = prevDailyBar?.c || price;
+      const change = price - prevClose;
+      const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
+
+      results[symbol] = {
+        symbol,
+        price: price,
+        change24h: changePercent,
+        volume: dailyBar?.v || 0,
+        high: dailyBar?.h || price,
+        low: dailyBar?.l || price,
+        previousClose: prevClose,
+        timestamp: latestTrade?.t ? new Date(latestTrade.t).getTime() : Date.now(),
+        provider: 'alpaca',
+      };
     }
     
     console.log(`[Alpaca] Fetched ${Object.keys(results).length}/${symbols.length} stock quotes`);
