@@ -30,3 +30,13 @@ coverage/
 
 # Temp files
 tmpclaude-*
+
+# Claude Code
+.claude/
+
+# AWS SAM build artifacts
+finpulse-infra/sam/
+.aws-sam/
+
+# Windows artifacts
+nul
