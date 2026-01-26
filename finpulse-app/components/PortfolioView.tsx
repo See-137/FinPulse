@@ -883,6 +883,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                         <PieChart>
                            <Pie
                             data={data}
+                            cx="50%"
+                            cy="50%"
                             innerRadius={60}
                             outerRadius={80}
                             paddingAngle={5}
