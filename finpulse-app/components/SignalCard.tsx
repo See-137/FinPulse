@@ -166,11 +166,26 @@ const FullSignalCard: React.FC<SignalCardProps> = ({ signal, showComponents = tr
   );
 };
 
-export const SignalCard: React.FC<SignalCardProps> = (props) => {
+/**
+ * SignalCard with memoization to prevent unnecessary re-renders
+ * Only re-renders when signal data actually changes
+ */
+export const SignalCard: React.FC<SignalCardProps> = React.memo((props) => {
   if (props.compact) {
     return <CompactSignalCard {...props} />;
   }
   return <FullSignalCard {...props} />;
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison - only re-render if signal data changed
+  return (
+    prevProps.signal.symbol === nextProps.signal.symbol &&
+    prevProps.signal.direction === nextProps.signal.direction &&
+    prevProps.signal.confidenceScore === nextProps.signal.confidenceScore &&
+    prevProps.compact === nextProps.compact &&
+    prevProps.showComponents === nextProps.showComponents
+  );
+});
+
+SignalCard.displayName = 'SignalCard';
 
 export default SignalCard;

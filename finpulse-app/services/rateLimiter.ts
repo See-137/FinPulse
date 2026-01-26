@@ -159,8 +159,8 @@ function getRateLimiter(service: string, config: RateLimitConfig): RateLimiter {
  */
 export const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
   whaleAlert: {
-    maxRequests: 25,
-    windowMs: 60000, // 25 requests per minute
+    maxRequests: 20, // 20% safety buffer below free tier limit of 25/min
+    windowMs: 60000,
     queueEnabled: true,
   },
   twitter: {
@@ -170,8 +170,8 @@ export const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
   },
   openai: {
     maxRequests: 500,
-    windowMs: 60000, // 500 requests per minute
-    queueEnabled: false, // Don't queue GPT requests
+    windowMs: 60000,
+    queueEnabled: true, // Queue AI requests during traffic spikes instead of rejecting
   },
   binance: {
     maxRequests: 1000,
