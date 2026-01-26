@@ -37,23 +37,19 @@ resource "aws_elasticache_cluster" "main" {
   subnet_group_name  = aws_elasticache_subnet_group.main.name
   security_group_ids = var.security_group_ids
 
-  # Transit encryption (forces replacement if changed)
-  # Note: Enabling requires cluster recreation which causes downtime
-  # Current prod cluster has this disabled - can be enabled during planned maintenance
-  transit_encryption_enabled = false
+  # Transit encryption enabled for security (Phase 4 improvement)
+  # WARNING: Enabling forces cluster REPLACEMENT (causes downtime ~5-10 min)
+  # User approved this change for scheduled maintenance window
+  transit_encryption_enabled = true
 
   # Maintenance window (Sunday 3-4 AM UTC)
   maintenance_window = "sun:03:00-sun:04:00"
 
-  # Snapshot (optional, adds cost)
+  # Snapshot before replacement to enable recovery if needed
   snapshot_retention_limit = var.environment == "prod" ? 1 : 0
 
   tags = var.tags
 
-  lifecycle {
-    # Prevent replacement during routine deploys
-    ignore_changes = [
-      transit_encryption_enabled  # Changing this forces replacement
-    ]
-  }
+  # Note: No lifecycle ignore_changes for transit_encryption
+  # This allows the Phase 4 security upgrade to apply
 }

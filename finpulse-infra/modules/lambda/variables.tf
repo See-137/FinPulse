@@ -78,3 +78,22 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# Reserved Concurrency (prevents runaway costs and throttling)
+variable "auth_reserved_concurrency" {
+  description = "Reserved concurrent executions for auth service (0 = disabled)"
+  type        = number
+  default     = 10
+}
+
+variable "market_data_reserved_concurrency" {
+  description = "Reserved concurrent executions for market data service (0 = disabled)"
+  type        = number
+  default     = 30
+}
+
+variable "portfolio_reserved_concurrency" {
+  description = "Reserved concurrent executions for portfolio service (0 = disabled)"
+  type        = number
+  default     = 20
+}
