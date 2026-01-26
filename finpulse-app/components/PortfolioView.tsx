@@ -99,6 +99,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     quantity: '',
     avgCost: ''
   });
+
+  // Live signals state (fetched asynchronously from APIs)
+  const [signals, setSignals] = useState<Record<string, CombinedSignal>>({});
   
   const [selectedAsset, setSelectedAsset] = useState<{ symbol: string; name: string; type: AssetType }>(
     { symbol: '', name: '', type: 'STOCK' }
@@ -148,8 +151,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
       type: formData.type,
       quantity: parseFloat(formData.quantity),
       avgCost: parseFloat(formData.avgCost) || 0,
-      currentPrice: parseFloat(formData.avgCost) || 100, 
-      dayPL: (Math.random() * 10) - 4 
+      currentPrice: parseFloat(formData.avgCost) || 0,
+      dayPL: 0 
     };
 
     if (editingAsset) {
@@ -308,8 +311,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
         type,
         quantity,
         avgCost: avgCost || 0,
-        currentPrice: avgCost || 100,
-        dayPL: 0
+        currentPrice: 0,  // Real value fetched via getMarketPrice() on render
+        dayPL: 0  // Real value fetched via getMarketChange() on render
       });
     }
 
@@ -456,11 +459,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     return { dollarChange, percentChange };
   }, [holdings, getMarketPrice, getMarketChange]);
   
-  const data = [
+  // Memoized allocation data for pie chart - prevents recalculation on every render
+  const data = useMemo(() => [
     { name: 'Crypto', type: 'CRYPTO', value: holdings.filter(h => h.type === 'CRYPTO').reduce((sum, h) => sum + h.quantity * getMarketPrice(h.symbol, h.currentPrice), 0), color: '#00e5ff' },
     { name: 'Stocks', type: 'STOCK', value: holdings.filter(h => h.type === 'STOCK').reduce((sum, h) => sum + h.quantity * getMarketPrice(h.symbol, h.currentPrice), 0), color: '#3b82f6' },
     { name: 'Commodities', type: 'COMMODITY', value: holdings.filter(h => h.type === 'COMMODITY').reduce((sum, h) => sum + h.quantity * getMarketPrice(h.symbol, h.currentPrice), 0), color: '#fbbf24' },
-  ].filter(d => d.value > 0);
+  ].filter(d => d.value > 0), [holdings, getMarketPrice]);
 
   // Debounced search for better performance with large portfolios
   const debouncedSearch = useDebounce(search, 300);
@@ -505,10 +509,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
             aValue = a.avgCost > 0 ? (getMarketPrice(a.symbol, a.avgCost) - a.avgCost) / a.avgCost : 0;
             bValue = b.avgCost > 0 ? (getMarketPrice(b.symbol, b.avgCost) - b.avgCost) / b.avgCost : 0;
             break;
-          case 'holdingAge':
-            aValue = a.addedAt ? (Date.now() - new Date(a.addedAt).getTime()) : 0;
-            bValue = b.addedAt ? (Date.now() - new Date(b.addedAt).getTime()) : 0;
-            break;
           default:
             // For other columns, get value from holding object
             aValue = a[sortConfig.key as keyof Holding] as number;
@@ -529,30 +529,49 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     return sortableItems;
   }, [filteredHoldings, sortConfig, getMarketPrice, getMarketChange]);
 
-  // Generate signals for each holding (influenced by 24h price change for realism)
-  const signals = useMemo<Record<string, CombinedSignal>>(() => {
-    const signalMap: Record<string, CombinedSignal> = {};
-    
-    sortedHoldings.forEach(holding => {
-      // Get 24h change to influence signal direction
-      const change24h = getMarketChange(holding.symbol, holding.dayPL);
-      
-      // Generate mock signals for this symbol with price context
-      const mockSignals = signalService.createMockSignals(holding.symbol, change24h);
-      
-      // Combine the signals
-      const combined = signalService.combineSignals(
-        holding.symbol,
-        mockSignals.whale,
-        mockSignals.trade,
-        mockSignals.sentiment
-      );
-      
-      signalMap[holding.symbol] = combined;
-    });
-    
-    return signalMap;
-  }, [sortedHoldings, getMarketChange]);
+  // Fetch live signals from APIs (whale, technical, sentiment)
+  // Stable key for holdings to prevent excessive re-fetches
+  const holdingsSymbolsKey = useMemo(() => holdings.map(h => h.symbol).sort().join(','), [holdings]);
+
+  useEffect(() => {
+    const symbols = holdings.map(h => h.symbol);
+    if (symbols.length === 0) {
+      setSignals({});
+      return;
+    }
+
+    let isCancelled = false;
+
+    const fetchSignals = async () => {
+      try {
+        const signalMap = await signalService.generateLiveSignalsBatch(symbols);
+        if (!isCancelled) {
+          // Convert Map to Record
+          const signalRecord: Record<string, CombinedSignal> = {};
+          signalMap.forEach((signal, symbol) => {
+            signalRecord[symbol] = signal;
+          });
+          setSignals(signalRecord);
+        }
+      } catch (error) {
+        console.error('Failed to fetch live signals:', error);
+        // On error, keep existing signals or set empty
+        if (!isCancelled) {
+          setSignals({});
+        }
+      }
+    };
+
+    fetchSignals();
+
+    // Refresh signals every 5 minutes
+    const interval = setInterval(fetchSignals, 5 * 60 * 1000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [holdings, holdingsSymbolsKey]); // Re-fetch when holdings change
 
   const renderSortIcon = (key: string) => {
     if (sortConfig?.key !== key) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
@@ -699,21 +718,20 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                       <thead>
                         <tr className="border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
                           {[
-                            { label: 'Asset', key: 'name', width: 'w-[16%]' },
-                            { label: 'Avg Cost', key: 'avgCost', width: 'w-[9%]' },
-                            { label: 'Price', key: 'marketPrice', width: 'w-[9%]' },
-                            { label: 'Qty', key: 'quantity', width: 'w-[6%]' },
-                            { label: 'Value', key: 'value', width: 'w-[9%]' },
-                            { label: 'Return $', key: 'totalReturnDollar', width: 'w-[10%]' },
-                            { label: 'Return %', key: 'totalReturnPercent', width: 'w-[8%]' },
-                            { label: 'Age', key: 'holdingAge', width: 'w-[6%]' },
-                            { label: '24h', key: 'dayPL', width: 'w-[7%]' },
+                            { label: 'Asset', key: 'name', width: 'w-[18%]' },
+                            { label: 'Cost', key: 'avgCost', width: 'w-[10%]' },
+                            { label: 'Price', key: 'marketPrice', width: 'w-[10%]' },
+                            { label: 'Qty', key: 'quantity', width: 'w-[7%]' },
+                            { label: 'Value', key: 'value', width: 'w-[10%]' },
+                            { label: 'P/L $', key: 'totalReturnDollar', width: 'w-[10%]' },
+                            { label: 'P/L %', key: 'totalReturnPercent', width: 'w-[8%]' },
+                            { label: '24h', key: 'dayPL', width: 'w-[8%]' },
                             { label: 'Signal', key: 'signal', width: 'w-[12%]' }
                           ].map((header) => (
-                            <th 
+                            <th
                               key={header.key}
                               onClick={() => header.key !== 'signal' && handleSort(header.key)}
-                              className={`px-3 py-3 text-[8px] font-black uppercase text-slate-500 tracking-wider ${header.key !== 'signal' ? 'cursor-pointer hover:text-[#00e5ff] transition-colors' : ''} ${header.width}`}
+                              className={`px-3 py-3 text-[8px] font-black uppercase text-slate-500 tracking-wider whitespace-nowrap ${header.key !== 'signal' ? 'cursor-pointer hover:text-[#00e5ff] transition-colors' : ''} ${header.width}`}
                             >
                               <div className="flex items-center gap-1">
                                 {header.label}
@@ -736,19 +754,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                           const totalReturnPercent = asset.avgCost > 0
                             ? ((livePrice - asset.avgCost) / asset.avgCost) * 100
                             : 0;
-
-                          // Holding Age calculation
-                          const holdingAgeDays = asset.addedAt
-                            ? Math.max(0, Math.floor((Date.now() - new Date(asset.addedAt).getTime()) / (1000 * 60 * 60 * 24)))
-                            : null;
-
-                          const formatHoldingAge = (days: number | null): string => {
-                            if (days === null) return 'N/A';
-                            if (days < 7) return `${days}d`;
-                            if (days < 30) return `${Math.floor(days / 7)}w ${days % 7}d`;
-                            if (days < 365) return `${Math.floor(days / 30)}mo`;
-                            return `${(days / 365).toFixed(1)}y`;
-                          };
 
                           return (
                           <tr key={idx} className="border-b border-slate-200 dark:border-white/5 last:border-0 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors group">
@@ -793,9 +798,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                               <span className={`font-bold text-xs ${totalReturnPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {totalReturnPercent >= 0 ? '+' : ''}{totalReturnPercent.toFixed(1)}%
                               </span>
-                            </td>
-                            <td className="px-3 py-3 font-medium text-xs text-slate-400">
-                              {formatHoldingAge(holdingAgeDays)}
                             </td>
                             <td className="px-3 py-3">
                               <span className={`font-bold text-xs ${liveChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -874,52 +876,66 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
 
            <div className="card-surface p-8 rounded-[40px] bg-gradient-to-br from-slate-50 to-white dark:from-[#151921] dark:to-[#0b0e14]">
               <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-8">Allocation</h3>
-              <div className="h-[200px] w-full relative">
-                 <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                       <Pie 
-                        data={data} 
-                        innerRadius={60} 
-                        outerRadius={80} 
-                        paddingAngle={5} 
-                        dataKey="value" 
-                        stroke="none"
-                        onClick={(data) => setFilterType(filterType === data.type ? null : data.type)}
-                        className="cursor-pointer outline-none"
-                       >
-                          {data.map((entry, index) => (
-                             <Cell 
-                                key={`cell-${index}`} 
-                                fill={entry.color} 
-                                opacity={filterType && filterType !== entry.type ? 0.3 : 1}
-                             />
-                          ))}
-                       </Pie>
-                    </PieChart>
-                 </ResponsiveContainer>
-                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                    <p className="text-xs font-black text-slate-400 uppercase">Total</p>
-                    <p className="text-lg font-black dark:text-white">
-                      {isPrivate ? '••••' : `${currencySymbol}${(totalValue * rate / 1000).toFixed(1)}k`}
-                    </p>
-                 </div>
-              </div>
-              <div className="space-y-3 mt-4">
-                 {data.map(d => (
-                    <div 
-                      key={d.name} 
-                      onClick={() => setFilterType(filterType === d.type ? null : d.type)}
-                      className={`flex justify-between items-center text-xs cursor-pointer p-2 rounded-lg transition-colors ${filterType === d.type ? 'bg-white/5' : 'hover:bg-white/5'}`}
-                    >
-                       <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }}></div>
-                          <span className="font-bold text-slate-600 dark:text-slate-400">{d.name}</span>
-                       </div>
-                       <span className="font-black dark:text-white">{((d.value / totalValue) * 100).toFixed(1)}%</span>
+              {data.length > 0 && totalValue > 0 ? (
+                <>
+                  <div className="h-[200px] w-full relative">
+                     <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                           <Pie
+                            data={data}
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                            stroke="none"
+                            onClick={(entry) => setFilterType(filterType === entry.type ? null : entry.type)}
+                            className="cursor-pointer outline-none"
+                           >
+                              {data.map((entry, index) => (
+                                 <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.color}
+                                    opacity={filterType && filterType !== entry.type ? 0.3 : 1}
+                                 />
+                              ))}
+                           </Pie>
+                        </PieChart>
+                     </ResponsiveContainer>
+                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                        <p className="text-xs font-black text-slate-400 uppercase">Total</p>
+                        <p className="text-lg font-black dark:text-white">
+                          {isPrivate ? '••••' : `${currencySymbol}${(totalValue * rate / 1000).toFixed(1)}k`}
+                        </p>
+                     </div>
+                  </div>
+                  <div className="space-y-3 mt-4">
+                     {data.map(d => (
+                        <div
+                          key={d.name}
+                          onClick={() => setFilterType(filterType === d.type ? null : d.type)}
+                          className={`flex justify-between items-center text-xs cursor-pointer p-2 rounded-lg transition-colors ${filterType === d.type ? 'bg-white/5' : 'hover:bg-white/5'}`}
+                        >
+                           <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }}></div>
+                              <span className="font-bold text-slate-600 dark:text-slate-400">{d.name}</span>
+                           </div>
+                           <span className="font-black dark:text-white">{((d.value / totalValue) * 100).toFixed(1)}%</span>
+                        </div>
+                     ))}
+                  </div>
+                </>
+              ) : (
+                <div className="h-[200px] w-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                      <Activity className="w-8 h-8 text-slate-400" />
                     </div>
-                 ))}
-              </div>
-              
+                    <p className="text-sm font-medium text-slate-500">No allocation data</p>
+                    <p className="text-xs text-slate-400 mt-1">Add assets to see your portfolio breakdown</p>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 space-y-1">
                  <p className="text-[9px] font-bold text-slate-500 text-center">Prices as of {timeString} UTC</p>
                  <p className="text-[9px] font-bold text-slate-500 text-center">FX as of {timeString} UTC</p>
