@@ -164,6 +164,9 @@ resource "aws_lambda_function" "auth_service" {
   timeout       = 30
   memory_size   = 256
 
+  # Reserved concurrency to prevent runaway costs and ensure availability
+  reserved_concurrent_executions = var.auth_reserved_concurrency > 0 ? var.auth_reserved_concurrency : -1
+
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
 
@@ -193,7 +196,6 @@ resource "aws_lambda_function" "auth_service" {
   }
 }
 
-# Reserved concurrency for auth service to prevent runaway costs
 
 # 2. Market Data Service
 resource "aws_lambda_function" "market_data_service" {
@@ -204,6 +206,9 @@ resource "aws_lambda_function" "market_data_service" {
   architectures = [var.lambda_architecture]
   timeout       = 30
   memory_size   = 256
+
+  # Reserved concurrency for high-traffic market data endpoint
+  reserved_concurrent_executions = var.market_data_reserved_concurrency > 0 ? var.market_data_reserved_concurrency : -1
 
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
@@ -233,7 +238,6 @@ resource "aws_lambda_function" "market_data_service" {
   }
 }
 
-# Reserved concurrency for market data service
 
 # 3. Portfolio Service
 resource "aws_lambda_function" "portfolio_service" {
@@ -244,6 +248,9 @@ resource "aws_lambda_function" "portfolio_service" {
   architectures = [var.lambda_architecture]
   timeout       = 30
   memory_size   = 256
+
+  # Reserved concurrency for portfolio operations
+  reserved_concurrent_executions = var.portfolio_reserved_concurrency > 0 ? var.portfolio_reserved_concurrency : -1
 
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
@@ -272,7 +279,6 @@ resource "aws_lambda_function" "portfolio_service" {
   }
 }
 
-# Reserved concurrency for portfolio service
 
 # 4. FX Service
 resource "aws_lambda_function" "fx_service" {
@@ -311,7 +317,6 @@ resource "aws_lambda_function" "fx_service" {
   }
 }
 
-# Reserved concurrency for FX service
 
 # 5. AI Service (optional)
 resource "aws_lambda_function" "ai_service" {
@@ -353,7 +358,6 @@ resource "aws_lambda_function" "ai_service" {
   }
 }
 
-# Reserved concurrency for AI service (limited due to cost)
 
 # 6. News Service
 resource "aws_lambda_function" "news_service" {
@@ -395,7 +399,6 @@ resource "aws_lambda_function" "news_service" {
   }
 }
 
-# Reserved concurrency for news service
 
 # 7. Community Service
 resource "aws_lambda_function" "community_service" {
@@ -436,7 +439,6 @@ resource "aws_lambda_function" "community_service" {
   }
 }
 
-# Reserved concurrency for community service
 
 # 8. Admin Service
 resource "aws_lambda_function" "admin_service" {
@@ -476,7 +478,6 @@ resource "aws_lambda_function" "admin_service" {
   }
 }
 
-# Reserved concurrency for admin service
 
 # =============================================================================
 # CloudWatch Log Groups (with retention)

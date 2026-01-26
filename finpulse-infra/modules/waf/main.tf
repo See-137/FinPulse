@@ -271,7 +271,7 @@ resource "aws_wafv2_web_acl" "cloudfront" {
 # ============================================================
 
 resource "aws_wafv2_web_acl_logging_configuration" "cloudfront" {
-  resource_arn            = aws_wafv2_web_acl.cloudfront.arn
+  resource_arn = aws_wafv2_web_acl.cloudfront.arn
   # WAF logging requires just the log group ARN (without :* suffix)
   log_destination_configs = [aws_cloudwatch_log_group.waf.arn]
 

@@ -150,10 +150,10 @@ resource "aws_cognito_user_pool_client" "frontend" {
     prevent_destroy = true
     ignore_changes = [
       generate_secret,
-      name,                    # Imported resource has different name suffix
-      allowed_oauth_flows,     # Imported resource may have additional flows
-      access_token_validity,   # AWS returns 0 for default values
-      id_token_validity        # AWS returns 0 for default values
+      name,                  # Imported resource has different name suffix
+      allowed_oauth_flows,   # Imported resource may have additional flows
+      access_token_validity, # AWS returns 0 for default values
+      id_token_validity      # AWS returns 0 for default values
     ]
   }
 }
