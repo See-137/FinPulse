@@ -1,5 +1,5 @@
 # FinPulse Redis Module
-# ElastiCache Redis for caching
+# ElastiCache Redis Replication Group with encryption
 
 terraform {
   required_providers {
@@ -22,34 +22,37 @@ resource "aws_elasticache_subnet_group" "main" {
 }
 
 # =============================================================================
-# Redis Cluster
+# Redis Replication Group (supports encryption)
 # =============================================================================
 
-resource "aws_elasticache_cluster" "main" {
-  cluster_id           = "${var.project_name}-cache-${var.environment}"
+resource "aws_elasticache_replication_group" "main" {
+  replication_group_id = "${var.project_name}-redis-${var.environment}"
+  description          = "FinPulse Redis cache with encryption"
+
   engine               = "redis"
   engine_version       = "7.1"
   node_type            = var.node_type
-  num_cache_nodes      = var.num_cache_nodes
+  num_cache_clusters   = var.num_cache_nodes
   parameter_group_name = "default.redis7"
   port                 = 6379
 
   subnet_group_name  = aws_elasticache_subnet_group.main.name
   security_group_ids = var.security_group_ids
 
-  # Transit encryption NOT supported for standalone clusters
-  # Would require migration to aws_elasticache_replication_group
-  # Keeping disabled for now - data is internal VPC only
-  transit_encryption_enabled = false
+  # Encryption enabled (Phase 4 security improvement)
+  transit_encryption_enabled = true
+  at_rest_encryption_enabled = true
+
+  # Automatic failover requires multi-AZ (disabled for single node)
+  automatic_failover_enabled = var.num_cache_nodes > 1 ? true : false
+  multi_az_enabled           = var.num_cache_nodes > 1 ? true : false
 
   # Maintenance window (Sunday 3-4 AM UTC)
   maintenance_window = "sun:03:00-sun:04:00"
 
-  # Snapshot before replacement to enable recovery if needed
+  # Snapshot for recovery
   snapshot_retention_limit = var.environment == "prod" ? 1 : 0
+  snapshot_window          = "05:00-06:00"
 
   tags = var.tags
-
-  # Note: No lifecycle ignore_changes for transit_encryption
-  # This allows the Phase 4 security upgrade to apply
 }
