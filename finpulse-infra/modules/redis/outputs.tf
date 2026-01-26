@@ -34,7 +34,7 @@ output "reader_endpoint" {
 output "encryption_enabled" {
   description = "Whether encryption is enabled"
   value = {
-    transit  = aws_elasticache_replication_group.main.transit_encryption_enabled
-    at_rest  = aws_elasticache_replication_group.main.at_rest_encryption_enabled
+    transit = aws_elasticache_replication_group.main.transit_encryption_enabled
+    at_rest = aws_elasticache_replication_group.main.at_rest_encryption_enabled
   }
 }

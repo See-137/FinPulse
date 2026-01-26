@@ -1,18 +1,22 @@
 /**
- * FinPulse Market Data Service v3.0
+ * FinPulse Market Data Service v3.1
  * Single data source: Alpaca Markets
- * 
+ * Now includes FX service (merged from standalone fx-service)
+ *
  * Migration from CoinGecko + Alpha Vantage → Alpaca
  * - Unified API for stocks and crypto
  * - Better rate limits (200 req/min vs 5 req/min)
  * - Real-time WebSocket support
- * 
+ *
  * Endpoints:
  * - GET /market/prices?symbols=BTC,ETH,AAPL - Get quotes
  * - GET /market/prices?type=crypto&symbols=BTC,ETH - Get crypto only
  * - GET /market/prices?type=stock&symbols=AAPL,GOOGL - Get stocks only
  * - GET /market/history?symbol=AAPL&timeframe=1Day&limit=30 - Historical data
  * - GET /market/stats - Service statistics
+ * - GET /market/fx/rates?base=USD - FX rates
+ * - GET /market/fx/convert?amount=100&from=USD&to=ILS - Currency conversion
+ * - GET /fx/rates, /fx/convert, /fx/currencies - Backward compatibility routes
  */
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
@@ -127,6 +131,230 @@ function getRateLimitStatus() {
     limit: ALPACA_RATE_LIMIT,
     resetsAt,
     windowMs: RATE_WINDOW_MS,
+  };
+}
+
+// =============================================================================
+// FX Service (merged from standalone fx-service)
+// Static exchange rates (updated periodically)
+// =============================================================================
+
+// Static rates (as of last update - refresh manually or via scheduled job)
+// Base: USD - Last updated: 2026-01-09
+const FX_STATIC_RATES = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  ILS: 3.65,
+  JPY: 157.5,
+  CHF: 0.90,
+  CAD: 1.44,
+  AUD: 1.60,
+  CNY: 7.30,
+  INR: 85.50,
+  BRL: 6.18,
+  MXN: 20.50,
+  SGD: 1.36,
+  HKD: 7.79,
+  NOK: 11.40,
+  SEK: 11.05,
+  DKK: 7.10,
+  NZD: 1.78,
+  ZAR: 18.70,
+  RUB: 101.5,
+  KRW: 1450,
+  THB: 34.5,
+  PLN: 4.05,
+  TRY: 35.5,
+  PHP: 58.5,
+  MYR: 4.45,
+  IDR: 16200,
+  TWD: 32.5,
+  AED: 3.67,
+  SAR: 3.75,
+};
+
+const FX_LAST_UPDATED = '2026-01-09T00:00:00Z';
+const FX_SUPPORTED_CURRENCIES = Object.keys(FX_STATIC_RATES);
+
+// Cache for converted FX rates
+const fxRatesCache = new Map();
+const FX_CACHE_TTL = 3600000; // 1 hour
+
+/**
+ * Get exchange rates for a given base currency
+ * @param {string} baseCurrency - Base currency code (e.g., 'USD', 'EUR')
+ * @returns {object} - Exchange rates relative to base
+ */
+function getExchangeRates(baseCurrency = 'USD') {
+  const cacheKey = `fx:${baseCurrency}`;
+  const cached = fxRatesCache.get(cacheKey);
+
+  if (cached && (Date.now() - cached.timestamp) < FX_CACHE_TTL) {
+    return cached.rates;
+  }
+
+  const baseRate = FX_STATIC_RATES[baseCurrency];
+  if (!baseRate) {
+    throw new Error(`Unsupported base currency: ${baseCurrency}`);
+  }
+
+  // Convert all rates relative to requested base
+  const rates = {};
+  for (const [currency, rate] of Object.entries(FX_STATIC_RATES)) {
+    rates[currency] = rate / baseRate;
+  }
+
+  fxRatesCache.set(cacheKey, { rates, timestamp: Date.now() });
+  return rates;
+}
+
+/**
+ * Handle FX-related routes
+ * @param {string} path - Request path
+ * @param {object} queryParams - Query parameters
+ * @param {object} corsHeaders - CORS headers to use
+ * @returns {object|null} - Response object or null if not an FX route
+ */
+function handleFxRoutes(path, queryParams, corsHeaders) {
+  // Match both /fx/* and /market/fx/* paths
+  const isFxRoute = path.includes('/fx/') || path.endsWith('/fx');
+  if (!isFxRoute) return null;
+
+  // GET /fx/rates or /market/fx/rates
+  if (path.includes('/rates') || path.endsWith('/fx')) {
+    const base = (queryParams.base || 'USD').toUpperCase();
+
+    try {
+      const rates = getExchangeRates(base);
+
+      // Filter to supported currencies
+      const filteredRates = {};
+      FX_SUPPORTED_CURRENCIES.forEach(currency => {
+        if (rates[currency]) filteredRates[currency] = rates[currency];
+      });
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          base: base,
+          rates: filteredRates,
+          timestamp: FX_LAST_UPDATED,
+          source: 'static',
+          note: 'Rates are approximate and updated weekly. For real-time FX, upgrade to premium.'
+        })
+      };
+    } catch (error) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: false,
+          error: error.message,
+          supported: FX_SUPPORTED_CURRENCIES
+        })
+      };
+    }
+  }
+
+  // GET /fx/convert or /market/fx/convert
+  if (path.includes('/convert')) {
+    const { amount, from = 'USD', to = 'ILS' } = queryParams;
+
+    if (!amount) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ success: false, error: 'amount parameter required' })
+      };
+    }
+
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount < 0) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ success: false, error: 'Invalid amount - must be a positive number' })
+      };
+    }
+
+    try {
+      const fromCurrency = from.toUpperCase();
+      const toCurrency = to.toUpperCase();
+      const rates = getExchangeRates(fromCurrency);
+      const rate = rates[toCurrency];
+
+      if (!rate) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: false,
+            error: `Currency ${toCurrency} not supported`,
+            supported: FX_SUPPORTED_CURRENCIES
+          })
+        };
+      }
+
+      const converted = numericAmount * rate;
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          from: fromCurrency,
+          to: toCurrency,
+          amount: numericAmount,
+          rate: rate,
+          converted: Math.round(converted * 100) / 100,
+          timestamp: FX_LAST_UPDATED,
+          source: 'static'
+        })
+      };
+    } catch (error) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ success: false, error: error.message })
+      };
+    }
+  }
+
+  // GET /fx/currencies or /market/fx/currencies
+  if (path.includes('/currencies')) {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        success: true,
+        currencies: FX_SUPPORTED_CURRENCIES,
+        count: FX_SUPPORTED_CURRENCIES.length,
+        lastUpdated: FX_LAST_UPDATED
+      })
+    };
+  }
+
+  // FX service info endpoint
+  return {
+    statusCode: 200,
+    headers: corsHeaders,
+    body: JSON.stringify({
+      service: 'FinPulse FX Service (integrated)',
+      version: '2.1.0',
+      source: 'static',
+      note: 'Using static rates (Alpaca does not provide FX data)',
+      lastUpdated: FX_LAST_UPDATED,
+      endpoints: [
+        'GET /fx/rates?base=USD',
+        'GET /fx/convert?amount=100&from=USD&to=ILS',
+        'GET /fx/currencies',
+        'GET /market/fx/rates?base=USD',
+        'GET /market/fx/convert?amount=100&from=USD&to=ILS',
+      ]
+    })
   };
 }
 
@@ -382,6 +610,12 @@ exports.handler = async (event) => {
     const path = event.path || '';
     const method = event.httpMethod || 'GET';
     const queryParams = event.queryStringParameters || {};
+
+    // Handle FX routes (both /fx/* and /market/fx/*)
+    const fxResponse = handleFxRoutes(path, queryParams, corsHeaders);
+    if (fxResponse) {
+      return fxResponse;
+    }
 
     // GET /market/prices - Get current prices
     if (path.includes('/prices') && method === 'GET') {
