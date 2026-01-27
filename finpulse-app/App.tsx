@@ -756,7 +756,7 @@ const AppContent: React.FC = () => {
         <div className="h-full relative w-[85vw] sm:w-[380px] lg:w-[380px]">
            <ErrorBoundary fallback={<div className="p-4 text-center text-slate-400">News unavailable</div>}>
              <Suspense fallback={<LoadingSpinner />}>
-               <NewsSidebar userPlan={user?.plan || 'FREE'} user={user} onUpgradeClick={() => setIsPricingOpen(true)} />
+               <NewsSidebar user={user} onUpgradeClick={() => setIsPricingOpen(true)} />
              </Suspense>
            </ErrorBoundary>
            <button onClick={() => setIsNewsSidebarOpen(false)} aria-label="Close news sidebar" className="absolute top-6 left-[-3rem] lg:hidden p-3 text-white bg-[#00e5ff] rounded-full">
