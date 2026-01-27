@@ -326,6 +326,7 @@ function fromAlpacaCryptoSymbol(alpacaSymbol) {
 
 /**
  * Get latest quotes for multiple cryptocurrencies
+ * Uses parallel fetching: Alpaca for supported symbols, CoinGecko for others
  * @param {string[]} symbols - Array of crypto symbols (e.g., ['BTC', 'ETH'])
  * @returns {Promise<object>} - Map of symbol to price data
  */
@@ -333,30 +334,67 @@ async function getCryptoQuotes(symbols) {
   if (!symbols || symbols.length === 0) {
     return {};
   }
-  
-  // Convert to Alpaca format and encode for URL safety
+
+  // Split symbols: CoinGecko-only vs Alpaca-supported
+  const coingeckoSymbols = symbols.filter(s => COINGECKO_ONLY.has(s.toUpperCase()));
+  const alpacaSymbols = symbols.filter(s => !COINGECKO_ONLY.has(s.toUpperCase()));
+
+  console.log(`[Crypto] Routing: ${alpacaSymbols.length} to Alpaca, ${coingeckoSymbols.length} to CoinGecko`);
+
+  // Fetch in parallel for faster response
+  const [alpacaResults, coingeckoResults] = await Promise.all([
+    alpacaSymbols.length > 0 ? fetchFromAlpaca(alpacaSymbols) : Promise.resolve({}),
+    coingeckoSymbols.length > 0 && coingeckoService
+      ? coingeckoService.getCryptoQuotes(coingeckoSymbols).catch(err => {
+          console.warn('[CoinGecko] Direct fetch failed:', err.message);
+          return {};
+        })
+      : Promise.resolve({}),
+  ]);
+
+  // Merge results
+  const results = { ...alpacaResults, ...coingeckoResults };
+
+  // Check if any Alpaca symbols are still missing (fallback to CoinGecko)
+  const stillMissing = alpacaSymbols.filter(s => !results[s.toUpperCase()]);
+  if (stillMissing.length > 0 && coingeckoService) {
+    console.log(`[Alpaca] ${stillMissing.length} symbols missing, trying CoinGecko fallback`);
+    try {
+      const fallbackResults = await coingeckoService.getCryptoQuotes(stillMissing);
+      Object.assign(results, fallbackResults);
+    } catch (cgError) {
+      console.warn('[CoinGecko] Fallback failed:', cgError.message);
+    }
+  }
+
+  console.log(`[Crypto] Total: ${Object.keys(results).length}/${symbols.length} quotes fetched`);
+  return results;
+}
+
+/**
+ * Internal: Fetch crypto quotes from Alpaca
+ */
+async function fetchFromAlpaca(symbols) {
   const alpacaSymbols = symbols.map(toAlpacaCryptoSymbol);
   const symbolsParam = encodeURIComponent(alpacaSymbols.join(','));
-  
+
   try {
-    // Use crypto snapshots endpoint for comprehensive data
     const data = await alpacaFetch(`/v1beta3/crypto/us/snapshots?symbols=${symbolsParam}`);
-    
+
     const results = {};
     if (data.snapshots) {
       for (const [alpacaSymbol, snapshot] of Object.entries(data.snapshots)) {
         const ourSymbol = fromAlpacaCryptoSymbol(alpacaSymbol);
-        
+
         if (snapshot) {
-          // Get latest trade price
           const latestTrade = snapshot.latestTrade;
           const dailyBar = snapshot.dailyBar;
           const prevDailyBar = snapshot.prevDailyBar;
-          
+
           const price = latestTrade?.p || dailyBar?.c || 0;
           const prevClose = prevDailyBar?.c || price;
           const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
-          
+
           results[ourSymbol] = {
             symbol: ourSymbol,
             price: price,
@@ -371,37 +409,12 @@ async function getCryptoQuotes(symbols) {
         }
       }
     }
-    
+
     console.log(`[Alpaca] Fetched ${Object.keys(results).length}/${symbols.length} crypto quotes`);
-    
-    // Check for missing symbols and try CoinGecko fallback
-    const missingSymbols = symbols.filter(s => !results[s.toUpperCase()]);
-    if (missingSymbols.length > 0 && coingeckoService) {
-      console.log(`[Alpaca] Missing ${missingSymbols.length} symbols, trying CoinGecko fallback: ${missingSymbols.join(',')}`);
-      try {
-        const coingeckoResults = await coingeckoService.getCryptoQuotes(missingSymbols);
-        Object.assign(results, coingeckoResults);
-        console.log(`[CoinGecko] Fallback fetched ${Object.keys(coingeckoResults).length} additional quotes`);
-      } catch (cgError) {
-        console.warn('[CoinGecko] Fallback failed:', cgError.message);
-      }
-    }
-    
     return results;
   } catch (error) {
     console.error('[Alpaca] Failed to fetch crypto quotes:', error.message);
-    
-    // If Alpaca fails completely, try CoinGecko for all symbols
-    if (coingeckoService) {
-      console.log('[Alpaca] Trying CoinGecko as primary fallback');
-      try {
-        return await coingeckoService.getCryptoQuotes(symbols);
-      } catch (cgError) {
-        console.error('[CoinGecko] Primary fallback also failed:', cgError.message);
-      }
-    }
-    
-    throw error;
+    return {};
   }
 }
 
@@ -437,6 +450,18 @@ const KNOWN_CRYPTO = new Set([
   'EGLD', 'XDC', 'MINA', 'NEO', 'KAVA', 'ZEC', 'CAKE', 'CHZ', 'CFX', 'XEC',
   'IOTA', 'BTT', 'WLD', 'BLUR', 'FLOKI', 'ROSE', 'KLAY', 'ZIL', 'GMT', 'APE',
   'AGIX', '1INCH', 'DYDX', 'GMX', 'OSMO', 'OCEAN', 'AKT',
+]);
+
+/**
+ * Symbols that should go directly to CoinGecko (not available on Alpaca)
+ * These are fetched in parallel with Alpaca symbols to avoid serial fallback delay
+ */
+const COINGECKO_ONLY = new Set([
+  'DN', 'LAVA', 'ICP', 'QNT', 'XMR', 'CRO', 'OKB', 'MNT', 'RNDR', 'ASTR',
+  'EGLD', 'XDC', 'MINA', 'NEO', 'KAVA', 'ZEC', 'CAKE', 'CHZ', 'CFX', 'XEC',
+  'IOTA', 'BTT', 'WLD', 'BLUR', 'FLOKI', 'ROSE', 'KLAY', 'ZIL', 'GMT', 'APE',
+  'AGIX', '1INCH', 'DYDX', 'GMX', 'OSMO', 'OCEAN', 'AKT', 'TON', 'TRX', 'KAS',
+  'BNB',
 ]);
 
 /**

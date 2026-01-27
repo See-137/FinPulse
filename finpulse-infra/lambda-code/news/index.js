@@ -15,8 +15,31 @@ let keysCacheTime = 0;
 const KEYS_CACHE_TTL = 300000; // 5 minutes
 
 // News response cache (critical for avoiding rate limits)
-let newsCache = {};
+// LRU cache with max 100 entries to prevent unbounded memory growth
 const NEWS_CACHE_TTL = 600000; // 10 minutes - cache news responses
+const NEWS_CACHE_MAX_SIZE = 100;
+let newsCache = {};
+let newsCacheOrder = []; // Track insertion order for LRU eviction
+
+// LRU cache helper: add entry and evict oldest if needed
+function setCacheEntry(key, value) {
+    // Remove key from order if it exists (will be re-added at end)
+    const existingIndex = newsCacheOrder.indexOf(key);
+    if (existingIndex !== -1) {
+        newsCacheOrder.splice(existingIndex, 1);
+    }
+
+    // Add to cache and order
+    newsCache[key] = value;
+    newsCacheOrder.push(key);
+
+    // Evict oldest entries if over limit
+    while (newsCacheOrder.length > NEWS_CACHE_MAX_SIZE) {
+        const oldestKey = newsCacheOrder.shift();
+        delete newsCache[oldestKey];
+        console.log('LRU evicted cache key:', oldestKey);
+    }
+}
 
 async function getApiKeys() {
     const now = Date.now();
@@ -169,9 +192,9 @@ async function fetchNews(category = 'business', limit = 10) {
         source = 'static';
     }
     
-    // Cache the result
-    newsCache[cacheKey] = { articles, source, timestamp: Date.now() };
-    
+    // Cache the result (with LRU eviction)
+    setCacheEntry(cacheKey, { articles, source, timestamp: Date.now() });
+
     return { articles, source, fromCache: false };
 }
 
@@ -225,7 +248,7 @@ async function searchNews(query, limit = 10) {
         source = 'static';
     }
     
-    newsCache[cacheKey] = { articles, source, timestamp: Date.now() };
+    setCacheEntry(cacheKey, { articles, source, timestamp: Date.now() });
     return { articles, source, fromCache: false };
 }
 
