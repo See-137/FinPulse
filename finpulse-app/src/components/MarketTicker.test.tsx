@@ -59,7 +59,8 @@ vi.mock('../../hooks/useMarketData', () => ({
 
 // Mock portfolioStore - usePortfolioStore is a Zustand selector hook
 vi.mock('../../store/portfolioStore', () => ({
-  usePortfolioStore: (selector: (state: { getHoldings: () => [] }) => unknown) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  usePortfolioStore: (selector: any) => {
     const mockState = {
       getHoldings: () => [],
     };
