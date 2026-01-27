@@ -81,6 +81,7 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
 
   // Fallback to REST API polling when WebSocket disconnects
   // IMPORTANT: Pass specific symbols so DN, LAVA and other non-Binance cryptos get fetched
+  // CRITICAL: Only update prices that have valid data - don't overwrite existing valid prices with empty/zero
   const fetchFallbackPrices = useCallback(async () => {
     if (!isMountedRef.current || symbols.length === 0) return;
 
@@ -93,23 +94,30 @@ export function useWebSocketPrices(options: UseWebSocketPricesOptions = {}): Use
       const data = await response.json();
 
       if (data.success && data.data && isMountedRef.current) {
-        const newPrices = new Map<string, LivePrice>();
-
-        Object.entries(data.data).forEach(([symbol, priceData]: [string, any]) => {
-          newPrices.set(symbol.toUpperCase(), {
-            symbol: symbol.toUpperCase(),
-            price: priceData.price,
-            change24h: priceData.change24h || 0,
-            high24h: priceData.high24h || priceData.price,
-            low24h: priceData.low24h || priceData.price,
-            volume24h: priceData.volume || 0,
-            timestamp: priceData.timestamp || Date.now(),
-          });
-        });
-
         setPrices(prev => {
           const merged = new Map(prev);
-          newPrices.forEach((value, key) => merged.set(key, value));
+
+          // Only update symbols that have valid price data (price > 0)
+          // This prevents overwriting existing valid CoinGecko prices with empty backend responses
+          Object.entries(data.data).forEach(([symbol, priceData]: [string, any]) => {
+            const upperSymbol = symbol.toUpperCase();
+            const price = priceData.price;
+
+            // Only update if we got a valid price
+            if (price && price > 0) {
+              merged.set(upperSymbol, {
+                symbol: upperSymbol,
+                price: price,
+                change24h: priceData.change24h || 0,
+                high24h: priceData.high24h || price,
+                low24h: priceData.low24h || price,
+                volume24h: priceData.volume || 0,
+                timestamp: priceData.timestamp || Date.now(),
+              });
+            }
+            // If price is 0 or missing, keep the existing value (if any)
+          });
+
           return merged;
         });
         setLastUpdate(new Date());

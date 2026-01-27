@@ -46,11 +46,16 @@ class MarketWebSocketService {
   private prices: Map<string, LivePrice> = new Map();
   private isConnecting = false;
   private callbacks: Set<WebSocketCallback> = new Set();
-  
+
   // Subscriber tracking - allows multiple components to share one connection
   private subscribers: Map<string, Subscriber> = new Map();
   private subscriberIdCounter = 0;
   private currentSymbols: Set<string> = new Set();
+
+  // Throttling: batch updates to reduce re-renders (update subscribers max once per interval)
+  private readonly UPDATE_THROTTLE_MS = 2000; // 2 seconds between UI updates
+  private pendingUpdate = false;
+  private throttleTimer: NodeJS.Timeout | null = null;
 
   // Binance WebSocket streams for crypto
   private readonly BINANCE_WS_BASE = 'wss://stream.binance.com:9443/ws';
@@ -235,6 +240,7 @@ class MarketWebSocketService {
 
   /**
    * Handle incoming WebSocket messages
+   * Uses throttling to batch updates and reduce UI re-renders
    */
   private handleMessage(data: any): void {
     // Binance ticker format
@@ -250,18 +256,41 @@ class MarketWebSocketService {
         volume24h: parseFloat(data.v),
         timestamp: data.E,
       };
-      
+
       this.prices.set(symbol, livePrice);
-      
-      // Create a fresh copy of all prices
-      const allPrices = new Map(this.prices);
-      
-      // Notify ALL subscribers with current prices
-      this.subscribers.forEach(sub => sub.onPriceUpdate(allPrices));
-      
-      // Also notify legacy callbacks
+
+      // Legacy callbacks get immediate updates (for backward compatibility)
       this.callbacks.forEach(cb => cb(livePrice));
+
+      // Throttle subscriber updates to reduce re-renders
+      // Instead of notifying on every tick, batch updates every UPDATE_THROTTLE_MS
+      this.scheduleSubscriberUpdate();
     }
+  }
+
+  /**
+   * Schedule a throttled update to subscribers
+   * Batches rapid WebSocket updates into periodic UI refreshes
+   */
+  private scheduleSubscriberUpdate(): void {
+    // Mark that we have pending updates
+    this.pendingUpdate = true;
+
+    // If timer already running, let it handle the update
+    if (this.throttleTimer) return;
+
+    // Start throttle timer
+    this.throttleTimer = setTimeout(() => {
+      this.throttleTimer = null;
+
+      if (this.pendingUpdate) {
+        this.pendingUpdate = false;
+        // Create a fresh copy of all prices
+        const allPrices = new Map(this.prices);
+        // Notify ALL subscribers with batched prices
+        this.subscribers.forEach(sub => sub.onPriceUpdate(allPrices));
+      }
+    }, this.UPDATE_THROTTLE_MS);
   }
 
   /**
@@ -343,6 +372,12 @@ class MarketWebSocketService {
    */
   disconnect(): void {
     this.stopHeartbeat();
+    // Clear throttle timer
+    if (this.throttleTimer) {
+      clearTimeout(this.throttleTimer);
+      this.throttleTimer = null;
+    }
+    this.pendingUpdate = false;
     if (this.ws) {
       this.ws.close(1000, 'Client disconnect');
       this.ws = null;
