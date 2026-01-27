@@ -1,7 +1,7 @@
 # FinPulse Agent Memory
 
 > Stable project facts, commands, and invariants. Updated automatically.
-> Last updated: 2026-01-27
+> Last updated: 2026-01-27 (session 2)
 
 ---
 
@@ -83,6 +83,11 @@ aws lambda update-function-code --function-name finpulse-auth-prod --zip-file fi
 | Main Terraform | `finpulse-infra/main.tf` |
 | MarketTicker | `finpulse-app/components/MarketTicker.tsx` |
 | Market Lambda | `finpulse-infra/lambda-code/market-data/index.js` |
+| WebSocket Service | `finpulse-app/services/websocketService.ts` |
+| WS Prices Hook | `finpulse-app/hooks/useWebSocketPrices.ts` |
+| Alpaca Service | `finpulse-infra/lambda-code/market-data/shared/alpaca-service.js` |
+| CoinGecko Service | `finpulse-infra/lambda-code/market-data/shared/coingecko-service.js` |
+| Cache Manager | `finpulse-infra/lambda-code/market-data/shared/cache-manager.js` |
 
 ---
 
@@ -141,9 +146,28 @@ GitHub Actions workflows (must be in root `.github/workflows/`, NOT in subfolder
 MarketTicker.tsx → AWS Lambda /market/prices → CoinGecko (crypto) / Alpaca (stocks)
 ```
 
+**Backend Crypto Routing** (alpaca-service.js):
+
+- `COINGECKO_ONLY` set: DN, LAVA, ICP, QNT, XMR, BNB, TON, TRX, KAS, etc.
+- These symbols go directly to CoinGecko in parallel with Alpaca
+- Prevents serial Alpaca→CoinGecko fallback delay
+
+**Frontend Price Sources** (PortfolioView.tsx priority):
+
+1. WebSocket prices (Binance - real-time for BTC, ETH, etc.)
+2. CoinGecko prices (non-Binance cryptos)
+3. REST API prices (fallback)
+4. Stored holding price (last known)
+
 **Polling:** Unified 30-second REST polling for all assets (no WebSockets)
 
-**CoinGecko ID Mappings** (non-standard symbols in Lambda `COINGECKO_ID_MAP`):
+**WebSocket Throttling:**
+
+- Binance WebSocket sends ticks continuously (multiple per second)
+- `websocketService.ts` throttles subscriber updates to every 2 seconds
+- Prevents portfolio value flickering from rapid updates
+
+**CoinGecko ID Mappings** (non-standard symbols in Lambda `coingecko-service.js`):
 
 | Symbol | CoinGecko ID |
 |--------|--------------|
@@ -168,6 +192,10 @@ MarketTicker.tsx → AWS Lambda /market/prices → CoinGecko (crypto) / Alpaca (
 | Alpaca Fix | Handle missing `latestTrade` in stock quotes gracefully |
 | Data Freshness | Added indicators showing data source and last update time |
 | Binance 451 | Lambda returns empty data gracefully when geo-blocked |
+| Parallel Cache | `getBatchQuotes()` now uses `Promise.all()` instead of sequential loop |
+| Parallel Crypto | Alpaca + CoinGecko fetched in parallel for faster DN/LAVA loading |
+| WS Throttle | WebSocket updates throttled to 2s intervals to prevent UI flickering |
+| Price Preservation | WebSocket fallback won't overwrite valid prices with zeros |
 
 **Note:** Phase 4 infra changes were reverted due to AWS limitations.
 
