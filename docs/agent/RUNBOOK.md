@@ -1,7 +1,7 @@
 # FinPulse Operational Runbook
 
 > Deployment, rollback, and incident procedures.
-> Last updated: 2026-01-19
+> Last updated: 2026-02-11
 
 ---
 
@@ -153,3 +153,75 @@ aws cloudwatch get-metric-statistics `
 - Always invalidate after S3 deploy
 - Use `/*` for full invalidation
 - Wait ~60s for propagation
+
+---
+
+## 6. GitHub Actions Deploy (Primary Method)
+
+### Frontend Deployment
+Push to `main` triggers `deploy.yml` → builds Vite app → syncs to S3 → invalidates CloudFront.
+```bash
+# Monitor
+gh run list --limit 5
+gh run watch <run-id> --exit-status
+```
+
+### Lambda Deployment
+Push to `main` with changes in `finpulse-infra/lambda-code/**` triggers `deploy-lambdas.yml`.
+- Auto-detects which Lambdas changed
+- Runs lint → deploy to production → smoke test → E2E verify
+```bash
+gh run watch <run-id> --exit-status
+```
+
+### Managing GitHub Secrets
+```bash
+gh secret set VITE_WHALE_ALERT_API_KEY --body "the-key-value"
+gh secret list
+```
+
+**Environment variables in deploy.yml:**
+- `VITE_WHALE_ALERT_API_KEY: ${{ secrets.VITE_WHALE_ALERT_API_KEY }}`
+- `VITE_ENABLE_LIVE_WHALE_DATA: true`
+- `VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}`
+
+---
+
+## 7. Whale Feature Troubleshooting
+
+### "Demo" Badge Showing on Signals
+1. Check GitHub Secret exists: `gh secret list | grep WHALE`
+2. Verify deploy.yml passes `VITE_WHALE_ALERT_API_KEY` in build env
+3. Trigger redeploy: push any change to main
+
+### Whale Alert API Errors
+- **429 (rate limit)**: Built-in 3-retry with exponential backoff handles this
+- **Free tier limit**: 10 requests/minute on whale-alert.io
+- **API key format**: Plain string (not `wak_*` prefix)
+
+### Mock Data Verification
+- Mock data is deterministic (hash-based): same symbol = same values across renders
+- Check `wasMockData` getter on `whaleWalletService` instance
+- CloudWatch: look for `[Whale] Using mock metrics` log
+
+---
+
+## 8. Auth 401 Debugging
+
+### All Auth Endpoints Return 401
+1. Check Lambda Layer attachment:
+```bash
+aws lambda get-function-configuration --function-name finpulse-auth-prod --query "Layers" --region us-east-1
+```
+2. If `Layers: null` → decode-only fallback is active (expected until Layer deployed)
+3. If Layers present but still 401 → check CloudWatch for `[Auth] CRITICAL: JWT verifier` errors
+
+### Login Not Responding (No Error, No Success)
+- Check browser console for `/auth/me` 401 errors
+- `AuthContext.tsx` calls `clearAuthData()` on 401 → silently logs user out
+- If `/auth/me` returns 401 with valid token: Lambda code is broken, check CloudWatch
+
+### JWT Verification Status
+- **Current (2026-02-11)**: Decode-only fallback (`decodeJwt()`) — no signature verification
+- **Target**: Deploy Lambda Layer → `verifyJwtSecure()` uses `aws-jwt-verify` with real signature check
+- **How to deploy Layer**: `terraform apply` with layer zip (Level C — requires explicit approval)

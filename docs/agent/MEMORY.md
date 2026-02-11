@@ -1,7 +1,7 @@
 # FinPulse Agent Memory
 
 > Stable project facts, commands, and invariants. Updated automatically.
-> Last updated: 2026-02-11 (session 5 — production readiness audit)
+> Last updated: 2026-02-11 (session 6 — whale hardening + auth fix + analytics audit)
 
 ---
 
@@ -104,12 +104,14 @@ aws lambda update-function-code --function-name finpulse-auth-prod --zip-file fi
 
 ## Current Version
 
-**V3.0.0** (Released 2026-01-25)
-- Whale Watch feature
+**V3.0.0** (Released 2026-01-25, hardened 2026-02-11)
+- Whale Watch feature (hardened: live API, deterministic mocks, per-symbol thresholds, retry)
 - Total Return Tracking
-- Enhanced Security (httpOnly cookies, Redis rate limiting)
+- Enhanced Security (httpOnly cookies, Redis rate limiting, input validation, webhook idempotency)
 - GDPR Compliance
 - Browser push notifications
+- Production readiness audit: 14 fixes (3 critical security, 5 high)
+- Auth fix: decode-only JWT fallback until Lambda Layer deployed
 
 ---
 
@@ -258,7 +260,7 @@ terraform apply -var="lambda_layer_zip_path=./lambda-layers/shared-utils.zip"
 | Fix | Description |
 |-----|-------------|
 | JWT Verification | Auth Lambda now verifies JWT signatures with `aws-jwt-verify` library |
-| JWT Fail-Closed | `verifyJwtSecure()` returns null when verifier unavailable (no decode-only fallback) |
+| JWT Fallback (Temporary) | `verifyJwtSecure()` falls back to `decodeJwt()` when Lambda Layer not deployed (`Layers: null`). Re-enable fail-closed once Layer attached via Terraform. See ADR-013. |
 | Distributed Rate Limiting | Redis-based sliding window replaces per-instance memory |
 | Env Validation | Fail-fast on missing required env vars at cold start |
 | Request Tracing | All requests tagged with X-Request-ID for correlation |
@@ -278,6 +280,73 @@ terraform apply -var="lambda_layer_zip_path=./lambda-layers/shared-utils.zip"
 | Hardcoded testers | HIGH | `tester@finpulse.internal` and personal email hardcoded in auth Lambda |
 | Error leakage | HIGH | Several catch blocks return `error.message` to client without env check |
 | Token in localStorage | INFO | ID tokens stored in localStorage even in cookie mode |
+
+---
+
+## Whale Feature (Hardened Feb 2026)
+
+| Aspect | Detail |
+|--------|--------|
+| API | whale-alert.io (free tier: 10 req/min) |
+| API Key | GitHub Secret `VITE_WHALE_ALERT_API_KEY` (plain string, not `wak_*`) |
+| Live toggle | `VITE_ENABLE_LIVE_WHALE_DATA: true` in `.github/workflows/deploy.yml` |
+| Mock fallback | Deterministic hash-based (`hashSymbol()`) — stable across renders |
+| isMock flag | `CombinedSignal.isMock` → "Demo" badge in `SignalCard.tsx` |
+| Thresholds | Per-symbol in `constants.tsx`: BTC $50M, ETH $30M, BNB $15M, SOL/XRP $10M, ADA/DOGE $5M |
+| Retry | `fetchWithRetry()` — 3 attempts, exponential backoff (1s/2s/4s) + 10% jitter |
+| Server filter | `currency` param passed to API (uses `mapSymbolToWhaleAlert()`) |
+| Tests | 13 tests in `services/whaleWalletService.test.ts` |
+
+### Key Whale Files
+
+| Purpose | Path |
+|---------|------|
+| API provider | `finpulse-app/services/dataProviders/whaleAlertAPI.ts` |
+| Wallet service | `finpulse-app/services/whaleWalletService.ts` |
+| Signal service | `finpulse-app/services/signalService.ts` |
+| Signal card UI | `finpulse-app/components/SignalCard.tsx` |
+| Thresholds | `finpulse-app/constants.tsx` (`WHALE_THRESHOLDS`) |
+| Whale tests | `finpulse-app/services/whaleWalletService.test.ts` |
+
+---
+
+## Analytics Stack (Audited Feb 2026)
+
+| System | Status |
+|--------|--------|
+| Sentry | ✅ Implemented (optional, error tracking + session replay) |
+| GA4 | ❌ Not implemented |
+| PostHog | ❌ Not implemented |
+| Segment | ❌ Not implemented |
+| Mixpanel | ❌ Not implemented |
+| Meta Pixel | ❌ Not implemented |
+| Meta CAPI | ❌ Not implemented |
+| UTM params | ❌ Not implemented |
+| Purchase tracking | ❌ Not implemented |
+
+**Recommended stack when ready:** PostHog + GA4 + Meta Pixel/CAPI
+
+---
+
+## Vitest Configuration
+
+- Config: `finpulse-app/vitest.config.ts`
+- Include: `src/**/*.{test,spec}.{ts,tsx}` + `services/**/*.{test,spec}.{ts,tsx}`
+- Excluded (pre-existing broken): `services/apiService.test.ts`, `services/authService.test.ts`
+- Current count: **205 pass, 1 skip, 5 todo**
+- ESLint warnings: **58 pre-existing** (max-warnings set to 100)
+
+---
+
+## Vite Environment Variables
+
+**Critical pattern:** Only `VITE_*` prefixed vars are exposed to browser via `import.meta.env`.
+
+| Variable | Where Set | Purpose |
+|----------|-----------|---------|
+| `VITE_WHALE_ALERT_API_KEY` | GitHub Secret → deploy.yml | Whale Alert API access |
+| `VITE_ENABLE_LIVE_WHALE_DATA` | deploy.yml (hardcoded `true`) | Enable live whale data |
+| `VITE_SENTRY_DSN` | GitHub Secret → deploy.yml | Sentry error tracking |
 
 ---
 
