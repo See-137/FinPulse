@@ -5,7 +5,7 @@
  * to WhaleSignal format for the signal analysis framework.
  */
 
-import { getWhaleAlertClient } from './dataProviders/whaleAlertAPI';
+import { getWhaleAlertClient, isWhaleAlertSupported } from './dataProviders/whaleAlertAPI';
 import { cacheService, getWhaleDataCacheKey } from './cacheService';
 import { apiConfig } from '../config/apiKeys';
 import { WHALE_THRESHOLDS, DEFAULT_WHALE_THRESHOLD } from '../constants';
@@ -40,6 +40,12 @@ export class WhaleWalletService {
   async getWhaleMetrics(symbol: string): Promise<WhaleMetrics> {
     // Check if live data enabled
     if (!apiConfig.features.liveWhaleData || !apiConfig.whaleAlert.enabled) {
+      this._lastResultWasMock = true;
+      return this.generateMockMetrics(symbol);
+    }
+
+    // Skip API call for symbols not supported by Whale Alert (stocks, commodities, unmapped tokens)
+    if (!isWhaleAlertSupported(symbol)) {
       this._lastResultWasMock = true;
       return this.generateMockMetrics(symbol);
     }

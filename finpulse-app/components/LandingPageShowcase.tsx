@@ -52,7 +52,7 @@ const DashboardPreview = () => (
 const HoldingsPreview = () => (
   <div className="p-6 space-y-4">
     <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-black text-white">Pulsfolio</h3>
+      <h3 className="text-lg font-black text-white">PulseBoard</h3>
       <span className="text-[10px] bg-[#00e5ff]/10 text-[#00e5ff] px-2 py-1 rounded-full font-bold">3 Assets</span>
     </div>
     <div className="space-y-3">
@@ -133,7 +133,7 @@ const SHOWCASE_ITEMS = [
   },
   {
     id: 'holdings',
-    title: 'Pulsfolio',
+    title: 'PulseBoard',
     desc: 'Precision asset tracking with multi-currency support.',
     icon: Wallet,
     preview: HoldingsPreview

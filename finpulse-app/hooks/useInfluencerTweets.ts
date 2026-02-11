@@ -114,23 +114,29 @@ export function useInfluencerTweets(
         const filtered = filterTweetsByHoldings(allTweets, holdingSymbols, usernames);
         setTweets(filtered.slice(0, maxTweets));
         setIsDemo(false);
+        setError(null);
+        setLastUpdated(new Date());
+      } else if (data.error || !data.success) {
+        // API returned an error — surface it, don't hide behind "demo"
+        console.warn('Twitter API error:', data.error || 'Unknown error');
+        setTweets([]);
+        setIsDemo(false);
+        setError(data.error || 'Twitter feed is temporarily unavailable');
         setLastUpdated(new Date());
       } else {
-        // API returned no tweets - show empty state (no mock data)
-        console.log('Twitter API returned no data');
+        // API succeeded but returned zero tweets — legitimate empty state
+        console.log('Twitter API returned no tweets');
         setTweets([]);
-        setIsDemo(true);
-        if (data.error) {
-          setError(data.error);
-        }
+        setIsDemo(false);
+        setError(null);
         setLastUpdated(new Date());
       }
     } catch (err) {
       console.error('Error fetching influencer tweets:', err);
-      // Show empty state with error - no mock data
+      // Network/fetch error — surface it clearly
       setTweets([]);
-      setIsDemo(true);
-      setError(err instanceof Error ? err.message : 'Failed to fetch tweets');
+      setIsDemo(false);
+      setError(err instanceof Error ? err.message : 'Failed to connect to tweet service');
       setLastUpdated(new Date());
     } finally {
       setLoading(false);

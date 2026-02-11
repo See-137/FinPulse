@@ -664,7 +664,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
               {user.plan} Pulse Node
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter dark:text-white text-slate-900">Pulsfolio</h1>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter dark:text-white text-slate-900">PulseBoard</h1>
           <div className="mt-2 flex items-center gap-4">
              <div className="flex flex-col">
                 <span className="text-[8px] font-black text-slate-500 uppercase">Usage</span>

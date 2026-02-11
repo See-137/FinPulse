@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { WhaleWalletService } from './whaleWalletService';
 import { WHALE_THRESHOLDS, DEFAULT_WHALE_THRESHOLD } from '../constants';
-import { mapSymbolToWhaleAlert } from './dataProviders/whaleAlertAPI';
+import { mapSymbolToWhaleAlert, isWhaleAlertSupported } from './dataProviders/whaleAlertAPI';
 
 describe('WhaleWalletService', () => {
   const service = new WhaleWalletService();
@@ -158,9 +158,31 @@ describe('mapSymbolToWhaleAlert', () => {
     expect(mapSymbolToWhaleAlert('ADA')).toBe('cardano');
   });
 
+  it('should map newly added symbols correctly', () => {
+    expect(mapSymbolToWhaleAlert('AVAX')).toBe('avalanche');
+    expect(mapSymbolToWhaleAlert('MATIC')).toBe('polygon');
+    expect(mapSymbolToWhaleAlert('PAXG')).toBe('pax-gold');
+  });
+
   it('should lowercase unknown symbols', () => {
-    expect(mapSymbolToWhaleAlert('AVAX')).toBe('avax');
-    expect(mapSymbolToWhaleAlert('MATIC')).toBe('matic');
+    expect(mapSymbolToWhaleAlert('PEPE')).toBe('pepe');
+    expect(mapSymbolToWhaleAlert('FLOKI')).toBe('floki');
+  });
+});
+
+describe('isWhaleAlertSupported', () => {
+  it('should return true for supported crypto symbols', () => {
+    expect(isWhaleAlertSupported('BTC')).toBe(true);
+    expect(isWhaleAlertSupported('ETH')).toBe(true);
+    expect(isWhaleAlertSupported('PAXG')).toBe(true);
+    expect(isWhaleAlertSupported('AVAX')).toBe(true);
+  });
+
+  it('should return false for stocks and unknown tokens', () => {
+    expect(isWhaleAlertSupported('NVDA')).toBe(false);
+    expect(isWhaleAlertSupported('AAPL')).toBe(false);
+    expect(isWhaleAlertSupported('MSTR')).toBe(false);
+    expect(isWhaleAlertSupported('PEPE')).toBe(false);
   });
 });
 

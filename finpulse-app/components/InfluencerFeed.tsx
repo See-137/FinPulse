@@ -33,7 +33,6 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
     tweets,
     loading,
     error,
-    isDemo,
     refetch,
     lastUpdated,
   } = useInfluencerTweets(user?.plan, holdingSymbols);
@@ -85,9 +84,9 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {isDemo && (
+              {error && (
                 <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] font-bold rounded">
-                  DEMO
+                  OFFLINE
                 </span>
               )}
               <div className={`px-2 py-1 rounded-lg ${TIER_COLORS[user.plan].bg} ${TIER_COLORS[user.plan].border} border`}>
@@ -121,10 +120,10 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
               Updated {formatTimeAgo(lastUpdated)}
             </span>
           )}
-          {error && !isDemo && (
+          {error && (
             <div className="flex items-center gap-1 text-amber-400">
               <AlertCircle className="w-3 h-3" />
-              <span className="text-[10px]">Using cached data</span>
+              <span className="text-[10px]">{error}</span>
             </div>
           )}
         </div>
@@ -162,21 +161,36 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
             </div>
           ))
         ) : tweets.length === 0 ? (
-          // Empty state
+          // Empty state — show different message for API errors vs no results
           <div className="text-center py-12">
-            <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Users className="w-6 h-6 text-slate-600" />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 ${error ? 'bg-amber-500/10' : 'bg-slate-800'}`}>
+              {error
+                ? <AlertCircle className="w-6 h-6 text-amber-500" />
+                : <Users className="w-6 h-6 text-slate-600" />}
             </div>
             <p className="text-slate-400 text-sm font-bold mb-1">
-              {holdingSymbols.length === 0
-                ? 'Add holdings to see relevant tweets'
-                : 'No matching tweets found'}
+              {error
+                ? 'Feed temporarily unavailable'
+                : holdingSymbols.length === 0
+                  ? 'Add holdings to see relevant tweets'
+                  : 'No matching tweets found'}
             </p>
             <p className="text-slate-600 text-xs">
-              {holdingSymbols.length === 0
-                ? 'Your portfolio is empty'
-                : 'Try adding more assets to your Pulsefolio'}
+              {error
+                ? 'The influencer feed could not load. Try refreshing.'
+                : holdingSymbols.length === 0
+                  ? 'Your portfolio is empty'
+                  : 'Try adding more assets to your PulseBoard'}
             </p>
+            {error && (
+              <button
+                onClick={refetch}
+                disabled={loading}
+                className="mt-4 px-4 py-2 text-xs font-bold text-cyan-400 bg-cyan-500/10 rounded-xl hover:bg-cyan-500/20 transition-all"
+              >
+                Try again
+              </button>
+            )}
           </div>
         ) : (
           // Tweet cards
@@ -218,8 +232,8 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
       {/* Footer */}
       <div className="flex items-center justify-center gap-4 pt-2 border-t border-white/5">
         <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
-          <span className={`w-1.5 h-1.5 rounded-full ${isDemo ? 'bg-amber-500' : 'bg-emerald-500'} animate-pulse`} />
-          {isDemo ? 'Demo mode' : 'Live on X.com'}
+          <span className={`w-1.5 h-1.5 rounded-full ${error ? 'bg-amber-500' : tweets.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
+          {error ? 'Disconnected' : tweets.length > 0 ? 'Live on X.com' : 'Waiting for data'}
         </div>
         <div className="text-[10px] text-slate-600">
           {tweets.length} tweets loaded
