@@ -109,6 +109,13 @@ resource "aws_api_gateway_resource" "market_prices" {
   path_part   = "prices"
 }
 
+# /market/{proxy+} - catch-all for other market routes (search, history, stats, binance)
+resource "aws_api_gateway_resource" "market_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.market.id
+  path_part   = "{proxy+}"
+}
+
 # /portfolio
 resource "aws_api_gateway_resource" "portfolio" {
   rest_api_id = aws_api_gateway_rest_api.main.id
@@ -159,6 +166,22 @@ resource "aws_api_gateway_resource" "community" {
   rest_api_id = aws_api_gateway_rest_api.main.id
   parent_id   = aws_api_gateway_rest_api.main.root_resource_id
   path_part   = "community"
+}
+
+# /twitter (optional)
+resource "aws_api_gateway_resource" "twitter" {
+  count       = var.enable_twitter_service ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "twitter"
+}
+
+# /twitter/{proxy+} - catch-all for twitter routes (tweets, user/:username/tweets)
+resource "aws_api_gateway_resource" "twitter_proxy" {
+  count       = var.enable_twitter_service ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.twitter[0].id
+  path_part   = "{proxy+}"
 }
 
 # /admin
@@ -216,6 +239,28 @@ resource "aws_api_gateway_integration" "fx_rates_get" {
   type                    = "AWS_PROXY"
   # FX is now handled by market-data Lambda
   uri = var.lambda_invoke_arns["market_data"]
+}
+
+# Note: Lambda permission already granted via market_prices (source_arn uses /*/*/*)
+
+# =============================================================================
+# ANY /market/{proxy+} (PUBLIC - search, history, stats, binance endpoints)
+# =============================================================================
+
+resource "aws_api_gateway_method" "market_proxy_any" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.market_proxy.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "market_proxy_any" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.market_proxy.id
+  http_method             = aws_api_gateway_method.market_proxy_any.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["market_data"]
 }
 
 # Note: Lambda permission already granted via market_prices (source_arn uses /*/*/*)
@@ -349,18 +394,119 @@ resource "aws_lambda_permission" "admin" {
 }
 
 # =============================================================================
+# Twitter endpoints (optional - influencer feed)
+# =============================================================================
+
+# ANY /twitter - base path
+resource "aws_api_gateway_method" "twitter_any" {
+  count         = var.enable_twitter_service ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.twitter[0].id
+  http_method   = "ANY"
+  authorization = "NONE" # Public endpoint
+}
+
+resource "aws_api_gateway_integration" "twitter_any" {
+  count                   = var.enable_twitter_service ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.twitter[0].id
+  http_method             = aws_api_gateway_method.twitter_any[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["twitter"]
+}
+
+# ANY /twitter/{proxy+} - handles sub-paths like /twitter/tweets
+resource "aws_api_gateway_method" "twitter_proxy_any" {
+  count         = var.enable_twitter_service ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.twitter_proxy[0].id
+  http_method   = "ANY"
+  authorization = "NONE" # Public endpoint
+}
+
+resource "aws_api_gateway_integration" "twitter_proxy_any" {
+  count                   = var.enable_twitter_service ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.twitter_proxy[0].id
+  http_method             = aws_api_gateway_method.twitter_proxy_any[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["twitter"]
+}
+
+resource "aws_lambda_permission" "twitter" {
+  count         = var.enable_twitter_service ? 1 : 0
+  statement_id  = "AllowAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_function_names["twitter"]
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*/*"
+}
+
+# =============================================================================
+# News endpoints (optional - news feed)
+# =============================================================================
+
+# ANY /news - base path
+resource "aws_api_gateway_method" "news_any" {
+  count         = var.enable_news_service ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.news[0].id
+  http_method   = "ANY"
+  authorization = "NONE" # Public endpoint
+}
+
+resource "aws_api_gateway_integration" "news_any" {
+  count                   = var.enable_news_service ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.news[0].id
+  http_method             = aws_api_gateway_method.news_any[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["news"]
+}
+
+resource "aws_lambda_permission" "news" {
+  count         = var.enable_news_service ? 1 : 0
+  statement_id  = "AllowAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_function_names["news"]
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*/*"
+}
+
+# =============================================================================
 # CORS Support
 # =============================================================================
 
 locals {
-  cors_resources = {
+  # Base CORS resources (always present)
+  base_cors_resources = {
     auth          = aws_api_gateway_resource.auth.id
     auth_proxy    = aws_api_gateway_resource.auth_proxy.id
     market_prices = aws_api_gateway_resource.market_prices.id
+    market_proxy  = aws_api_gateway_resource.market_proxy.id
     portfolio     = aws_api_gateway_resource.portfolio.id
     fx_rates      = aws_api_gateway_resource.fx_rates.id
     admin         = aws_api_gateway_resource.admin.id
   }
+
+  # Optional CORS resources (conditional on feature flags)
+  twitter_cors_resources = var.enable_twitter_service ? {
+    twitter       = aws_api_gateway_resource.twitter[0].id
+    twitter_proxy = aws_api_gateway_resource.twitter_proxy[0].id
+  } : {}
+
+  news_cors_resources = var.enable_news_service ? {
+    news = aws_api_gateway_resource.news[0].id
+  } : {}
+
+  cors_resources = merge(
+    local.base_cors_resources,
+    local.twitter_cors_resources,
+    local.news_cors_resources,
+  )
 }
 
 # Gateway Responses for CORS on error responses (4xx/5xx)
@@ -497,12 +643,16 @@ resource "aws_api_gateway_deployment" "main" {
   triggers = {
     redeployment = sha1(jsonencode([
       aws_api_gateway_method.market_prices_get,
+      aws_api_gateway_method.market_proxy_any,
       aws_api_gateway_method.fx_rates_get,
       aws_api_gateway_method.fx_proxy_any,
       aws_api_gateway_method.portfolio_any,
       aws_api_gateway_method.auth_any,
       aws_api_gateway_method.auth_proxy_any,
       aws_api_gateway_method.admin_any,
+      aws_api_gateway_method.twitter_any,
+      aws_api_gateway_method.twitter_proxy_any,
+      aws_api_gateway_method.news_any,
       aws_api_gateway_method.options,
       aws_api_gateway_integration_response.options,
     ]))
@@ -514,11 +664,15 @@ resource "aws_api_gateway_deployment" "main" {
 
   depends_on = [
     aws_api_gateway_integration.market_prices_get,
+    aws_api_gateway_integration.market_proxy_any,
     aws_api_gateway_integration.fx_rates_get,
     aws_api_gateway_integration.fx_proxy_any,
     aws_api_gateway_integration.portfolio_any,
     aws_api_gateway_integration.auth_any,
     aws_api_gateway_integration.admin_any,
+    aws_api_gateway_integration.twitter_any,
+    aws_api_gateway_integration.twitter_proxy_any,
+    aws_api_gateway_integration.news_any,
   ]
 }
 

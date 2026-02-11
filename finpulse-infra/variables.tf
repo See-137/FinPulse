@@ -53,6 +53,12 @@ variable "enable_community_service" {
   default     = true
 }
 
+variable "enable_twitter_service" {
+  description = "Enable Twitter/influencer feed service (requires twitter-bearer-token secret)"
+  type        = bool
+  default     = true
+}
+
 variable "enable_nat_gateway" {
   description = "Enable NAT Gateway (required for Lambda internet access)"
   type        = bool

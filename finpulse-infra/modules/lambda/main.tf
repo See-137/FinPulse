@@ -583,6 +583,59 @@ resource "aws_lambda_function" "admin_service" {
 }
 
 
+# 9. Twitter/Influencer Service (optional)
+resource "aws_lambda_function" "twitter_service" {
+  count = var.enable_twitter_service ? 1 : 0
+
+  function_name = "${var.project_name}-twitter-${var.environment}"
+  role          = aws_iam_role.lambda_execution.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  architectures = [var.lambda_architecture]
+  timeout       = 30
+  memory_size   = 256
+
+  # Shared utilities layer
+  layers = local.shared_layer_arns
+
+  filename         = data.archive_file.placeholder.output_path
+  source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  # X-Ray tracing for observability (Phase 5.1)
+  dynamic "tracing_config" {
+    for_each = var.enable_xray_tracing ? [1] : []
+    content {
+      mode = "Active"
+    }
+  }
+
+  vpc_config {
+    subnet_ids         = var.private_subnet_ids
+    security_group_ids = [var.lambda_security_group_id]
+  }
+
+  environment {
+    variables = {
+      ENVIRONMENT        = var.environment
+      REDIS_ENDPOINT     = var.redis_endpoint
+      TWITTER_SECRET_ARN = var.secret_arns["twitter-bearer-token"]
+      ALLOWED_ORIGIN     = var.allowed_origin
+    }
+  }
+
+  tags = var.tags
+
+  lifecycle {
+    ignore_changes = [
+      filename,
+      source_code_hash,
+      environment,
+      layers,
+    ]
+  }
+}
+
+
 # =============================================================================
 # CloudWatch Log Groups (with retention)
 # =============================================================================
@@ -609,6 +662,13 @@ resource "aws_cloudwatch_log_group" "portfolio" {
 
 resource "aws_cloudwatch_log_group" "admin" {
   name              = "/aws/lambda/${aws_lambda_function.admin_service.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "twitter" {
+  count             = var.enable_twitter_service ? 1 : 0
+  name              = "/aws/lambda/${aws_lambda_function.twitter_service[0].function_name}"
   retention_in_days = var.log_retention_days
   tags              = var.tags
 }

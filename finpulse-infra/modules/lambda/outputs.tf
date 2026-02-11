@@ -25,7 +25,7 @@ output "function_arns" {
     ai          = var.enable_ai_service ? aws_lambda_function.ai_service[0].arn : null
     news        = var.enable_news_service ? aws_lambda_function.news_service[0].arn : null
     community   = var.enable_community_service ? aws_lambda_function.community_service[0].arn : null
-    # fx removed - merged into market_data
+    twitter     = var.enable_twitter_service ? aws_lambda_function.twitter_service[0].arn : null
   }
 }
 
@@ -39,7 +39,7 @@ output "function_names" {
     ai          = var.enable_ai_service ? aws_lambda_function.ai_service[0].function_name : null
     news        = var.enable_news_service ? aws_lambda_function.news_service[0].function_name : null
     community   = var.enable_community_service ? aws_lambda_function.community_service[0].function_name : null
-    # fx removed - merged into market_data
+    twitter     = var.enable_twitter_service ? aws_lambda_function.twitter_service[0].function_name : null
   }
 }
 
@@ -53,6 +53,6 @@ output "invoke_arns" {
     ai          = var.enable_ai_service ? aws_lambda_function.ai_service[0].invoke_arn : null
     news        = var.enable_news_service ? aws_lambda_function.news_service[0].invoke_arn : null
     community   = var.enable_community_service ? aws_lambda_function.community_service[0].invoke_arn : null
-    # fx removed - merged into market_data
+    twitter     = var.enable_twitter_service ? aws_lambda_function.twitter_service[0].invoke_arn : null
   }
 }

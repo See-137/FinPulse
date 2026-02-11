@@ -73,6 +73,12 @@ variable "enable_community_service" {
   default     = true
 }
 
+variable "enable_twitter_service" {
+  description = "Enable Twitter/influencer feed service Lambda"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)
