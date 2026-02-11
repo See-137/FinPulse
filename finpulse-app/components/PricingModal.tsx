@@ -28,6 +28,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
   const [loading, setLoading] = useState<PlanType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [_isDemoMode, setIsDemoMode] = useState(false);
+  const [isAnnual, setIsAnnual] = useState(false);
 
   const handleUpgrade = async (plan: PlanType) => {
     if (plan === 'FREE') {
@@ -43,7 +44,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
     setError(null);
 
     try {
-      const { url } = await createCheckoutSession(user.id, user.email, plan as Exclude<PlanType, 'FREE'>);
+      const { url } = await createCheckoutSession(user.id, user.email, plan as Exclude<PlanType, 'FREE'>, isAnnual ? 'year' : 'month');
       
       // Check if it's a demo URL (doesn't contain stripe.com)
       if (url.includes('demo_upgrade') || url.includes('demo_')) {
@@ -113,6 +114,25 @@ export const PricingModal: React.FC<PricingModalProps> = ({
           </div>
         )}
 
+        {/* Billing Toggle */}
+        <div className="flex justify-center pt-6 pb-2">
+          <div className="flex items-center gap-3 bg-white/5 p-1 rounded-xl border border-white/10">
+            <button
+              onClick={() => setIsAnnual(false)}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${!isAnnual ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-300'}`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setIsAnnual(true)}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isAnnual ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-300'}`}
+            >
+              Annual
+              <span className="text-[10px] font-black text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">SAVE</span>
+            </button>
+          </div>
+        </div>
+
         {/* Plans Grid */}
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map(([planKey, plan]) => {
@@ -130,6 +150,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                 isCurrentPlan={isCurrentPlan}
                 isUpgrade={isUpgrade}
                 isDowngrade={isDowngrade}
+                isAnnual={isAnnual}
                 loading={loading}
                 onUpgrade={handleUpgrade}
                 onManageSubscription={handleManageSubscription}
@@ -145,6 +166,9 @@ export const PricingModal: React.FC<PricingModalProps> = ({
           </p>
           <p className="text-slate-600 text-xs mt-2">
             {t('pricing.cancelAnytime')}
+          </p>
+          <p className="text-slate-600 text-[10px] mt-2">
+            FinPulse is a read-only dashboard. Not financial advice.
           </p>
         </div>
       </div>

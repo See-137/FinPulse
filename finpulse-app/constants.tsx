@@ -31,6 +31,8 @@ export const SaaS_PLANS = {
   FREE: {
     name: 'Free',
     price: '$0',
+    annualPrice: '$0',
+    annualSavings: '',
     maxAssets: 8,
     maxAiQueries: 5,
     allowCommodities: false,
@@ -40,6 +42,8 @@ export const SaaS_PLANS = {
   PROPULSE: {
     name: 'ProPulse',
     price: '$9.90',
+    annualPrice: '$89',
+    annualSavings: '25%',
     maxAssets: 20,
     maxAiQueries: 10,
     allowCommodities: true,
@@ -49,6 +53,8 @@ export const SaaS_PLANS = {
   SUPERPULSE: {
     name: 'SuperPulse',
     price: '$29.90',
+    annualPrice: '$249',
+    annualSavings: '31%',
     maxAssets: 50,
     maxAiQueries: 50,
     allowCommodities: true,
