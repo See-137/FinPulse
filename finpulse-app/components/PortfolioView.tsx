@@ -4,7 +4,8 @@ import { PieChart, Pie, Cell } from 'recharts';
 import {
   Plus, Download, Upload, Lock, Search, Trash2, Pencil, ShieldCheck,
   TrendingUp, TrendingDown, Bitcoin, Activity, Gem, Eye, EyeOff,
-  ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, CheckCircle, X
+  ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, CheckCircle, X,
+  Share2, Link as LinkIcon
 } from 'lucide-react';
 import { User, Currency, Holding, AssetType, CombinedSignal } from '../types';
 import { CURRENCY_RATES, SaaS_PLANS } from '../constants';
@@ -18,6 +19,11 @@ import { PremiumAnalytics } from './PremiumAnalytics';
 import { SignalCard } from './SignalCard';
 import { DataFreshnessIndicator, getDataFreshnessStatus } from './DataFreshnessIndicator';
 import signalService from '../services/signalService';
+import { useToast } from './Toast';
+import { UpgradeModal } from './UpgradeModal';
+import { LockedFeaturePreview } from './LockedFeaturePreview';
+import { useLanguage } from '../i18n';
+import { PlanType } from '../types';
 
 interface PortfolioViewProps {
   user: User;
@@ -28,6 +34,19 @@ interface PortfolioViewProps {
 }
 
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser, currency, onCurrencyChange, onUpgradeClick }) => {
+  const { showToast } = useToast();
+  const { t } = useLanguage();
+
+  // Upgrade modal state
+  const [upgradeModal, setUpgradeModal] = useState<{
+    featureName: string;
+    featureDescription: string;
+    requiredPlan: PlanType;
+  } | null>(null);
+
+  // Share modal state
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
   // Use Zustand store for shared state (including holdings for news filtering)
   const {
     isPrivate, search, filterType, getHoldings,
@@ -180,14 +199,22 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     
     // Check asset limit
     if (!editingAsset && holdings.length >= user.credits.maxAssets) {
-      alert(`Limit Reached: Your ${user.plan} plan allows only ${user.credits.maxAssets} assets. Upgrade to ProPulse or SuperPulse to unlock more slots.`);
+      setUpgradeModal({
+        featureName: t('upgrade.assetLimit'),
+        featureDescription: t('upgrade.assetLimitDesc'),
+        requiredPlan: 'PROPULSE',
+      });
       return;
     }
 
     // Check commodity restriction for Free users
     const planConfig = SaaS_PLANS[user.plan];
     if (formData.type === 'COMMODITY' && !planConfig.allowCommodities) {
-      alert(`🔒 Commodities Locked: Gold, Oil, and other commodities are available on ProPulse ($9.90/mo) and SuperPulse plans. Upgrade to track commodities alongside your stocks and crypto.`);
+      setUpgradeModal({
+        featureName: t('upgrade.commoditiesLocked'),
+        featureDescription: t('upgrade.commoditiesLockedDesc'),
+        requiredPlan: 'PROPULSE',
+      });
       return;
     }
 
@@ -259,7 +286,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
       }
     } catch {
       // Export failed
-      alert('Export failed. Please check your browser permissions and try again.');
+      showToast(t('toast.exportFailed'), 'error');
     }
   };
 
@@ -415,9 +442,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
     if (fileInputRef.current) fileInputRef.current.value = '';
 
     if (skipped.length > 0) {
-      alert(`Imported ${imported} assets. Skipped: ${skipped.join(', ')}`);
+      showToast(`Imported ${imported} assets. Skipped: ${skipped.join(', ')}`, 'info', 6000);
     } else {
-      alert(`Successfully imported ${imported} assets!`);
+      showToast(`Successfully imported ${imported} assets!`, 'success');
     }
   };
 
@@ -673,25 +700,43 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
             ))}
           </div>
 
-          <button 
-            disabled={user.plan === 'FREE'}
-            onClick={exportCSV}
-            aria-label={user.plan === 'FREE' ? 'Export CSV (ProPulse feature)' : 'Export portfolio to CSV'}
-            className={`p-3 sm:p-4 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center gap-3 transition-all ${user.plan === 'FREE' ? 'opacity-30 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-[#00e5ff] hover:border-[#00e5ff]/30'}`}
+          <button
+            onClick={() => {
+              if (user.plan === 'FREE') {
+                setUpgradeModal({ featureName: t('upgrade.csvExport'), featureDescription: t('upgrade.csvExportDesc'), requiredPlan: 'PROPULSE' });
+                return;
+              }
+              exportCSV();
+            }}
+            aria-label={user.plan === 'FREE' ? t('upgrade.csvExport') : 'Export portfolio to CSV'}
+            className={`p-3 sm:p-4 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center gap-3 transition-all ${user.plan === 'FREE' ? 'opacity-50 text-slate-600 hover:opacity-70 hover:border-[#00e5ff]/30 cursor-pointer' : 'text-slate-400 hover:text-[#00e5ff] hover:border-[#00e5ff]/30'}`}
           >
             {user.plan === 'FREE' ? <Lock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
             <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Export {user.plan === 'FREE' && '(ProPulse)'}</span>
           </button>
-          <button 
-            disabled={user.plan === 'FREE'}
-            onClick={() => setIsImportModalOpen(true)}
-            aria-label={user.plan === 'FREE' ? 'Import CSV (ProPulse feature)' : 'Import portfolio from CSV'}
-            className={`p-3 sm:p-4 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center gap-3 transition-all ${user.plan === 'FREE' ? 'opacity-30 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-emerald-400 hover:border-emerald-400/30'}`}
+          <button
+            onClick={() => {
+              if (user.plan === 'FREE') {
+                setUpgradeModal({ featureName: t('upgrade.csvImport'), featureDescription: t('upgrade.csvImportDesc'), requiredPlan: 'PROPULSE' });
+                return;
+              }
+              setIsImportModalOpen(true);
+            }}
+            aria-label={user.plan === 'FREE' ? t('upgrade.csvImport') : 'Import portfolio from CSV'}
+            className={`p-3 sm:p-4 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center gap-3 transition-all ${user.plan === 'FREE' ? 'opacity-50 text-slate-600 hover:opacity-70 hover:border-emerald-400/30 cursor-pointer' : 'text-slate-400 hover:text-emerald-400 hover:border-emerald-400/30'}`}
           >
             {user.plan === 'FREE' ? <Lock className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
             <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Import {user.plan === 'FREE' && '(ProPulse)'}</span>
           </button>
-          <button 
+          <button
+            onClick={() => setIsShareOpen(true)}
+            aria-label={t('share.button')}
+            className="p-3 sm:p-4 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center gap-3 text-slate-400 hover:text-emerald-400 hover:border-emerald-400/30 transition-all"
+          >
+            <Share2 className="w-4 h-4" />
+            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{t('share.button')}</span>
+          </button>
+          <button
             onClick={() => {
               setEditingAsset(null);
               setFormData({ symbol: '', name: '', type: 'STOCK', quantity: '', avgCost: '' });
@@ -754,9 +799,27 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                   <div className="w-8 h-8 mx-auto mb-4 border-2 border-[#00e5ff]/20 border-t-[#00e5ff] rounded-full animate-spin" />
                   <p className="text-slate-500 font-medium text-sm">Syncing your portfolio...</p>
                 </div>
+              ) : holdings.length === 0 ? (
+                <div className="card-surface p-12 rounded-[40px] text-center border-2 border-dashed border-[#00e5ff]/20 dark:border-[#00e5ff]/10">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-[#00e5ff]/10 flex items-center justify-center border border-[#00e5ff]/20">
+                    <Plus className="w-10 h-10 text-[#00e5ff]" />
+                  </div>
+                  <h3 className="text-xl font-black dark:text-white mb-2">{t('emptyPortfolio.title')}</h3>
+                  <p className="text-sm text-slate-500 mb-8 max-w-md mx-auto">{t('emptyPortfolio.description')}</p>
+                  <button
+                    onClick={() => {
+                      setEditingAsset(null);
+                      setFormData({ symbol: '', name: '', type: 'STOCK', quantity: '', avgCost: '' });
+                      setIsAddModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-3 px-10 py-5 bg-[#00e5ff] text-[#0b0e14] font-black uppercase tracking-widest text-[11px] rounded-[24px] shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-all"
+                  >
+                    <Plus className="w-5 h-5" /> {t('emptyPortfolio.cta')}
+                  </button>
+                </div>
               ) : filteredHoldings.length === 0 ? (
                 <div className="card-surface p-12 rounded-[40px] text-center border-dashed border-slate-300 dark:border-white/10">
-                  <p className="text-slate-500 font-medium text-sm">No assets match your filters.</p>
+                  <p className="text-slate-500 font-medium text-sm">{t('emptyPortfolio.noFilterMatch')}</p>
                 </div>
               ) : (
                 <div className="card-surface rounded-[24px] overflow-hidden border border-slate-200 dark:border-white/5">
@@ -976,11 +1039,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
               ) : (
                 <div className="h-[200px] w-full flex items-center justify-center">
                   <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center">
-                      <Activity className="w-8 h-8 text-slate-400" />
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#00e5ff]/10 flex items-center justify-center border border-[#00e5ff]/20">
+                      <Plus className="w-8 h-8 text-[#00e5ff]" />
                     </div>
-                    <p className="text-sm font-medium text-slate-500">No allocation data</p>
-                    <p className="text-xs text-slate-400 mt-1">Add assets to see your portfolio breakdown</p>
+                    <p className="text-sm font-bold dark:text-white mb-1">{t('emptyPortfolio.allocationTitle')}</p>
+                    <p className="text-xs text-slate-400">{t('emptyPortfolio.allocationDesc')}</p>
                   </div>
                 </div>
               )}
@@ -1002,24 +1065,34 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
       {/* Premium Analytics Section */}
       {holdings.length > 0 && (
         <div className="mt-8">
-          <PremiumAnalytics
-            holdings={holdings.map(h => ({
-              symbol: h.symbol,
-              name: h.name,
-              type: h.type,
-              quantity: h.quantity,
-              avgCost: h.avgCost,
-              currentPrice: getMarketPrice(h.symbol, h.avgCost),
-              dayPL: getMarketChange(h.symbol, h.dayPL),
-              addedAt: h.addedAt,
-            }))}
-            user={user}
-            onUpgradeClick={onUpgradeClick || (() => {})}
-            currency={currency}
-            currencySymbol={currencySymbol}
-            exchangeRate={rate}
-            isPrivate={isPrivate}
-          />
+          <LockedFeaturePreview
+            title={t('upgrade.premiumAnalytics')}
+            description={t('upgrade.premiumAnalyticsDesc')}
+            unlockPlan="SUPERPULSE"
+            currentPlan={user.plan}
+            onUpgrade={onUpgradeClick}
+            variant="blur"
+            showPreview={true}
+          >
+            <PremiumAnalytics
+              holdings={holdings.map(h => ({
+                symbol: h.symbol,
+                name: h.name,
+                type: h.type,
+                quantity: h.quantity,
+                avgCost: h.avgCost,
+                currentPrice: getMarketPrice(h.symbol, h.avgCost),
+                dayPL: getMarketChange(h.symbol, h.dayPL),
+                addedAt: h.addedAt,
+              }))}
+              user={user}
+              onUpgradeClick={onUpgradeClick || (() => {})}
+              currency={currency}
+              currencySymbol={currencySymbol}
+              exchangeRate={rate}
+              isPrivate={isPrivate}
+            />
+          </LockedFeaturePreview>
         </div>
       )}
 
@@ -1187,6 +1260,77 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
               >
                 <Upload className="w-4 h-4" />
                 Import {importPreview.length} Assets
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={upgradeModal !== null}
+        onClose={() => setUpgradeModal(null)}
+        onUpgrade={() => { setUpgradeModal(null); onUpgradeClick?.(); }}
+        featureName={upgradeModal?.featureName || ''}
+        featureDescription={upgradeModal?.featureDescription || ''}
+        requiredPlan={upgradeModal?.requiredPlan || 'PROPULSE'}
+      />
+
+      {/* Share Modal */}
+      {isShareOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setIsShareOpen(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative card-surface w-full max-w-sm rounded-3xl p-8 animate-in zoom-in-95 duration-200 shadow-2xl dark:text-white" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setIsShareOpen(false)} className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+              <X className="w-5 h-5 text-slate-400" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                <Share2 className="w-8 h-8 text-emerald-500" />
+              </div>
+              <h3 className="text-lg font-black">{t('share.title')}</h3>
+              <p className="text-sm text-slate-500 mt-1">{t('share.description')}</p>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-2xl mb-6 text-sm text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/5">
+              {t('share.messageTemplate').replace('assets', `${holdings.length} assets`)}
+            </div>
+
+            <div className="space-y-3">
+              {'share' in navigator && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.share({
+                        title: 'FinPulse',
+                        text: t('share.messageTemplate').replace('assets', `${holdings.length} assets`),
+                        url: `https://finpulse.me/?ref=${user.id}`,
+                      });
+                      setIsShareOpen(false);
+                    } catch {
+                      // User cancelled share — ignore
+                    }
+                  }}
+                  className="w-full py-3 px-6 bg-emerald-500 text-white font-bold text-sm rounded-2xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
+                >
+                  <Share2 className="w-4 h-4" /> {t('share.shareNative')}
+                </button>
+              )}
+              <button
+                onClick={async () => {
+                  try {
+                    const shareText = `${t('share.messageTemplate').replace('assets', `${holdings.length} assets`)} https://finpulse.me/?ref=${user.id}`;
+                    await navigator.clipboard.writeText(shareText);
+                    showToast(t('share.copied'), 'success');
+                    setIsShareOpen(false);
+                  } catch {
+                    showToast(t('share.copyFailed'), 'error');
+                  }
+                }}
+                className="w-full py-3 px-6 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 font-bold text-sm rounded-2xl hover:bg-slate-50 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-2"
+              >
+                <LinkIcon className="w-4 h-4" /> {t('share.copyLink')}
               </button>
             </div>
           </div>

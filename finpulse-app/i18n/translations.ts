@@ -234,8 +234,56 @@ export const translations = {
       unlockWith: 'Unlock with',
       availableOn: 'Available on',
     },
+
+    // Empty Portfolio
+    emptyPortfolio: {
+      title: 'Your Portfolio Awaits',
+      description: 'Start tracking your investments. Add your first crypto, stock, or commodity to see real-time prices and analytics.',
+      cta: 'Capture Your First Asset',
+      noFilterMatch: 'No assets match your filters.',
+      allocationTitle: 'Start Building',
+      allocationDesc: 'Add assets to see your portfolio breakdown',
+    },
+
+    // Upgrade Prompts
+    upgrade: {
+      availableOn: 'Available on',
+      upgradeNow: 'Upgrade Now',
+      assetLimit: 'Asset Limit Reached',
+      assetLimitDesc: 'Your current plan allows a limited number of assets. Upgrade to ProPulse or SuperPulse for more slots.',
+      commoditiesLocked: 'Commodities Locked',
+      commoditiesLockedDesc: 'Gold, Oil, and other commodities are available on ProPulse and SuperPulse plans.',
+      csvExport: 'CSV Export',
+      csvExportDesc: 'Export your portfolio data to CSV for backup and analysis in spreadsheets.',
+      csvImport: 'CSV Import',
+      csvImportDesc: 'Import holdings from other platforms via CSV file.',
+      premiumAnalytics: 'Premium Analytics',
+      premiumAnalyticsDesc: 'Advanced portfolio analytics including risk metrics, correlation analysis, and performance attribution.',
+    },
+
+    // Toast Messages
+    toast: {
+      exportFailed: 'Export failed. Please check your browser permissions and try again.',
+      importPartial: 'Imported assets. Some were skipped.',
+      importSuccess: 'Successfully imported assets!',
+      exportDataFailed: 'Failed to export data. Please try again.',
+      accountDeleted: 'Your account has been deleted. Thank you for using FinPulse.',
+      deleteAccountFailed: 'Failed to delete account. Please contact support.',
+    },
+
+    // Share
+    share: {
+      button: 'Share',
+      title: 'Share Your Achievement',
+      description: 'Let others know about your portfolio tracking journey.',
+      messageTemplate: "I'm tracking assets on FinPulse — real-time portfolio tracking for crypto, stocks & commodities. Check it out!",
+      shareNative: 'Share',
+      copyLink: 'Copy Link',
+      copied: 'Link copied to clipboard!',
+      copyFailed: 'Failed to copy link.',
+    },
   },
-  
+
   he: {
     // Navigation
     nav: {
@@ -463,6 +511,54 @@ export const translations = {
     lockedFeature: {
       unlockWith: 'פתח עם',
       availableOn: 'זמין ב',
+    },
+
+    // Empty Portfolio
+    emptyPortfolio: {
+      title: 'התיק שלך מחכה',
+      description: 'התחל לעקוב אחר ההשקעות שלך. הוסף את הקריפטו, המניה או הסחורה הראשונה שלך.',
+      cta: 'לכוד את הנכס הראשון שלך',
+      noFilterMatch: 'אין נכסים שתואמים את המסננים.',
+      allocationTitle: 'התחל לבנות',
+      allocationDesc: 'הוסף נכסים כדי לראות את פירוט התיק שלך',
+    },
+
+    // Upgrade Prompts
+    upgrade: {
+      availableOn: 'זמין ב',
+      upgradeNow: 'שדרג עכשיו',
+      assetLimit: 'הגעת למגבלת הנכסים',
+      assetLimitDesc: 'התוכנית הנוכחית שלך מאפשרת מספר מוגבל של נכסים. שדרג לפרופאלס או סופרפאלס.',
+      commoditiesLocked: 'סחורות נעולות',
+      commoditiesLockedDesc: 'זהב, נפט וסחורות אחרות זמינים בתוכניות פרופאלס וסופרפאלס.',
+      csvExport: 'ייצוא CSV',
+      csvExportDesc: 'ייצא את נתוני התיק שלך ל-CSV לגיבוי וניתוח.',
+      csvImport: 'ייבוא CSV',
+      csvImportDesc: 'ייבא אחזקות מפלטפורמות אחרות באמצעות קובץ CSV.',
+      premiumAnalytics: 'ניתוח פרמיום',
+      premiumAnalyticsDesc: 'ניתוח תיק מתקדם כולל מדדי סיכון, ניתוח מתאם ויחס ביצועים.',
+    },
+
+    // Toast Messages
+    toast: {
+      exportFailed: 'הייצוא נכשל. בדוק את הרשאות הדפדפן ונסה שוב.',
+      importPartial: 'יובאו נכסים. חלקם דולגו.',
+      importSuccess: 'נכסים יובאו בהצלחה!',
+      exportDataFailed: 'ייצוא הנתונים נכשל. נסה שוב.',
+      accountDeleted: 'החשבון שלך נמחק. תודה שהשתמשת בפינפאלס.',
+      deleteAccountFailed: 'מחיקת החשבון נכשלה. צור קשר עם התמיכה.',
+    },
+
+    // Share
+    share: {
+      button: 'שתף',
+      title: 'שתף את ההישג שלך',
+      description: 'ספר לאחרים על מסע מעקב התיק שלך.',
+      messageTemplate: 'אני עוקב אחרי נכסים בפינפאלס — מעקב תיק בזמן אמת לקריפטו, מניות וסחורות. בדקו את זה!',
+      shareNative: 'שתף',
+      copyLink: 'העתק קישור',
+      copied: 'הקישור הועתק!',
+      copyFailed: 'העתקת הקישור נכשלה.',
     },
   },
 } as const;

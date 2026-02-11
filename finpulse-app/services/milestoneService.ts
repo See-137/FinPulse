@@ -91,8 +91,81 @@ export const MILESTONES: Milestone[] = [
     ctaText: 'Explore',
     ctaUrl: '#community',
     showOnce: true
+  },
+  // Login streak milestones
+  {
+    id: 'login_streak_3',
+    trigger: (_user, stats) => stats.loginStreak >= 3,
+    message: "🎉 3-day streak! You're building a great habit. Keep tracking your portfolio daily!",
+    ctaText: 'Keep Going',
+    showOnce: true,
+  },
+  {
+    id: 'login_streak_7',
+    trigger: (_user, stats) => stats.loginStreak >= 7,
+    message: "🎉 7-day streak! A full week of tracking. You're a disciplined investor!",
+    ctaText: 'View Portfolio',
+    showOnce: true,
+  },
+  {
+    id: 'login_streak_14',
+    trigger: (_user, stats) => stats.loginStreak >= 14,
+    message: "🎉 14-day streak! Two weeks of consistency. ProPulse users get even more insights!",
+    ctaText: 'See ProPulse',
+    ctaUrl: '#pricing',
+    showOnce: true,
   }
 ];
+
+// ---- Login Streak Tracking ----
+
+/**
+ * Record a login for today. Maintains an array of ISO date strings.
+ * Keeps only the last 30 days to bound storage.
+ */
+export function recordLoginDate(): void {
+  const today = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+  const stored = localStorage.getItem(NOTIFICATION_STORAGE_KEYS.LOGIN_DATES);
+  const dates: string[] = stored ? JSON.parse(stored) : [];
+
+  if (dates.length > 0 && dates[dates.length - 1] === today) return; // Already recorded
+
+  dates.push(today);
+  // Keep only last 30 dates
+  const trimmed = dates.slice(-30);
+  localStorage.setItem(NOTIFICATION_STORAGE_KEYS.LOGIN_DATES, JSON.stringify(trimmed));
+}
+
+/**
+ * Calculate current login streak (consecutive days ending today or yesterday).
+ */
+export function getLoginStreak(): number {
+  const stored = localStorage.getItem(NOTIFICATION_STORAGE_KEYS.LOGIN_DATES);
+  if (!stored) return 0;
+
+  const dates: string[] = JSON.parse(stored);
+  if (dates.length === 0) return 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let streak = 0;
+  const checkDate = new Date(today);
+
+  for (let i = dates.length - 1; i >= 0; i--) {
+    const loginDate = new Date(dates[i] + 'T00:00:00');
+    const diff = Math.round((checkDate.getTime() - loginDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diff === 0) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
 
 export interface MilestoneResult {
   milestone: Milestone;
@@ -123,7 +196,8 @@ class MilestoneService {
       aiQueriesUsed: user.credits.ai,
       portfolioValue,
       daysActive,
-      signupDate
+      signupDate,
+      loginStreak: getLoginStreak(),
     };
   }
 

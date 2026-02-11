@@ -7,6 +7,8 @@ import { auth } from '../services/authService';
 import { redirectToCustomerPortal } from '../services/lemonSqueezyService';
 import { componentLogger } from '../services/logger';
 import { config } from '../config';
+import { useToast } from './Toast';
+import { useLanguage } from '../i18n';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,6 +31,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onThemeChange,
   onLogout
 }) => {
+  const { showToast } = useToast();
+  const { t } = useLanguage();
   const [isExporting, setIsExporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -68,7 +72,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       URL.revokeObjectURL(url);
     } catch (error) {
       componentLogger.error('Failed to export data:', error);
-      alert('Failed to export data. Please try again.');
+      showToast(t('toast.exportDataFailed'), 'error');
     } finally {
       setIsExporting(false);
     }
@@ -87,14 +91,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       
       if (!response.ok) throw new Error('Delete failed');
       
+      // Show toast before sign-out (toast persists in DOM)
+      showToast(t('toast.accountDeleted'), 'success', 6000);
       // Sign out and redirect
       await auth.signOut();
       onLogout();
       onClose();
-      alert('Your account has been deleted. Thank you for using FinPulse.');
     } catch (error) {
       componentLogger.error('Failed to delete account:', error);
-      alert('Failed to delete account. Please contact support.');
+      showToast(t('toast.deleteAccountFailed'), 'error');
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
