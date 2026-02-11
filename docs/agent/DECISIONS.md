@@ -1,7 +1,7 @@
 # FinPulse Architecture Decision Records
 
 > Short ADR-style decisions with rationale.
-> Last updated: 2026-01-27
+> Last updated: 2026-02-11
 
 ---
 
@@ -301,6 +301,94 @@
 - Error message leakage in some catch blocks (H5)
 - `tokenStorage.ts` not yet wired into AuthContext
 - Portfolio PUT should use partial schema for updates
+
+---
+
+## ADR-012: Whale Feature Production Hardening
+
+**Date:** 2026-02-11
+**Status:** Accepted
+
+**Context:** Whale Watch feature was entirely broken in production — API key never reached the browser due to missing `VITE_` prefix on env var. Mock data used `Math.random()` causing signal flickering. No retry logic, no server-side filtering, hardcoded $10M threshold for all symbols.
+
+**Decision:** 8-phase hardening rewrite:
+1. Fix env var: `WHALE_ALERT_API_KEY` → `VITE_WHALE_ALERT_API_KEY`
+2. Wire `mapSymbolToWhaleAlert()` for server-side filtering via `currency` param
+3. Add `fetchWithRetry()` — 3 attempts, exponential backoff (1s/2s/4s) + 10% jitter
+4. Per-symbol thresholds in `constants.tsx` (BTC $50M, ETH $30M, etc.)
+5. Deterministic hash-based mock data + `isMock` flag on `CombinedSignal`
+6. "Demo" badge in `SignalCard.tsx` when `signal.isMock`
+7. Fix env var names in enable scripts + docs
+8. Replace broken ts-node test with 13 Vitest tests
+
+**Rationale:**
+- Root cause was a single env var naming error but investigation revealed 10 issues total
+- Deterministic mocks prevent misleading signal changes on re-render
+- Per-symbol thresholds give meaningful signals (BTC $10M is noise; DOGE $10M is massive)
+- 47 files changed, +5751/-953 lines
+
+**Consequences:**
+- API key stored as GitHub Secret `VITE_WHALE_ALERT_API_KEY` + wired into `deploy.yml`
+- `VITE_ENABLE_LIVE_WHALE_DATA: true` hardcoded in CI/CD for staging + production
+- Dead code removed: `getTransactionsByBlockchain()`, `testWhaleDataIntegration.ts`, `verifyWhaleImprovements.js`
+- 205 tests now passing (up from 117)
+
+**Related Commit:** `b072ab6`
+
+---
+
+## ADR-013: JWT Decode Fallback (Temporary Revert)
+
+**Date:** 2026-02-11
+**Status:** Accepted
+
+**Context:** ADR-011 introduced `verifyJwtSecure()` with fail-closed behavior (return `null` when JWT verifier unavailable). However, the Lambda Layer containing `jwt-verifier.js` was never deployed via Terraform (`Layers: null` on all Lambdas). This caused ALL authenticated endpoints to return 401, completely breaking login.
+
+**Decision:** Revert `verifyJwtSecure()` to fall back to `decodeJwt()` (decode-only) when verifier module is unavailable, with a console.warn log.
+
+**Rationale:**
+- Production login was completely broken (100% auth failure rate)
+- Lambda Layer deployment requires Terraform apply (Level C action)
+- Decode-only fallback matches pre-audit behavior and is acceptable until Layer deployed
+- Console.warn ensures the fallback is visible in CloudWatch for tracking
+
+**Consequences:**
+- Auth works again with decode-only JWT (no signature verification)
+- Security debt: must deploy Lambda Layer + re-enable fail-closed
+- `getUserFromEventSecure()` chain works: authorizer → verifier → cookie → header → null
+- Updated MEMORY.md security lessons to reflect temporary state
+
+**Related Commit:** `60a4d2d`
+
+---
+
+## ADR-014: Analytics Stack — None Currently
+
+**Date:** 2026-02-11
+**Status:** Accepted (audit only)
+
+**Context:** Manager inquiry: "Which analytics/attribution stack is live? Do we have Meta Pixel + Conversions API for Purchase/Subscribe?"
+
+**Decision:** Documented that zero analytics/attribution is implemented. Only Sentry (error tracking, optional) exists. No implementation planned yet.
+
+**Audit Result:**
+- ❌ GA4, PostHog, Segment, Mixpanel — not implemented
+- ❌ Meta Pixel (client-side) — not implemented
+- ❌ Meta Conversions API (server-side) — not implemented
+- ❌ Purchase/Subscribe event tracking — not implemented
+- ❌ UTM parameter handling — not implemented
+- ✅ Sentry — optional error tracking + session replay
+
+**Recommended stack when ready:**
+- Product analytics: PostHog (open-source, generous free tier)
+- Attribution/marketing: GA4 (free, required for Google Ads)
+- Meta ad attribution: Meta Pixel + CAPI (server-side from payments Lambda)
+- Event routing: Segment only if 3+ destinations
+
+**Consequences:**
+- No data collected on user behavior, funnels, or conversion attribution
+- LemonSqueezy webhooks processed but not forwarded to any analytics platform
+- CAPI for Purchase events would be ~50 lines in payments Lambda when needed
 
 ---
 
