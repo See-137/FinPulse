@@ -66,7 +66,8 @@ interface SubscriptionStatus {
 export const createCheckoutSession = async (
   userId: string,
   email: string,
-  plan: Exclude<PlanType, 'FREE'>
+  plan: Exclude<PlanType, 'FREE'>,
+  billingInterval: 'month' | 'year' = 'month'
 ): Promise<{ url: string }> => {
   const variantId = LEMONSQUEEZY_VARIANT_IDS[plan];
   
@@ -90,6 +91,7 @@ export const createCheckoutSession = async (
         email,
         variantId,
         plan,
+        billingInterval,
         successUrl: `${window.location.origin}?success=true&plan=${plan}`,
         cancelUrl: `${window.location.origin}?canceled=true`
       })

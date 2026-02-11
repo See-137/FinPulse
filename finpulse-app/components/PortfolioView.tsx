@@ -644,11 +644,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                 <div className="flex items-center gap-2">
                    <div className="h-1.5 w-24 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
                       <div 
-                        className={`h-full transition-all ${holdings.length / user.credits.maxAssets > 0.8 ? 'bg-rose-500' : 'bg-cyan-500'}`}
-                        style={{ width: `${(holdings.length / user.credits.maxAssets) * 100}%` }}
+                        className={`h-full transition-all ${user.credits.maxAssets < 9999 && holdings.length / user.credits.maxAssets > 0.8 ? 'bg-rose-500' : 'bg-cyan-500'}`}
+                        style={{ width: user.credits.maxAssets >= 9999 ? '0%' : `${(holdings.length / user.credits.maxAssets) * 100}%` }}
                       />
                    </div>
-                   <span className="text-[10px] font-bold text-slate-400">{holdings.length} / {user.credits.maxAssets}</span>
+                   <span className="text-[10px] font-bold text-slate-400">{holdings.length} / {user.credits.maxAssets >= 9999 ? '∞' : user.credits.maxAssets}</span>
                 </div>
              </div>
           </div>

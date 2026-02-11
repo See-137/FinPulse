@@ -10,6 +10,7 @@ interface PricingCardProps {
   isCurrentPlan: boolean;
   isUpgrade: boolean;
   isDowngrade: boolean;
+  isAnnual?: boolean;
   loading: PlanType | null;
   onUpgrade: (plan: PlanType) => void;
   onManageSubscription: () => void;
@@ -44,6 +45,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({
   isCurrentPlan,
   isUpgrade,
   isDowngrade,
+  isAnnual = false,
   loading,
   onUpgrade,
   onManageSubscription,
@@ -84,9 +86,14 @@ export const PricingCard: React.FC<PricingCardProps> = ({
       {/* Plan Name & Price */}
       <h3 className="text-xl font-bold text-white">{plan.name}</h3>
       <div className="flex items-baseline gap-1 mt-2">
-        <span className="text-4xl font-black text-white">${plan.price}</span>
-        <span className="text-slate-400">{t('pricing.perMonth')}</span>
+        <span className="text-4xl font-black text-white">{isAnnual ? plan.annualPrice : plan.price}</span>
+        <span className="text-slate-400">{isAnnual ? '/yr' : t('pricing.perMonth')}</span>
       </div>
+      {isAnnual && plan.annualSavings && (
+        <span className="inline-block mt-1.5 text-[10px] font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">
+          Save {plan.annualSavings}
+        </span>
+      )}
 
       {/* Features summary */}
       <p className="text-slate-400 text-sm mt-3">{plan.features[0]}</p>

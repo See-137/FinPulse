@@ -143,7 +143,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                      <span className={`text-xs font-black px-2 py-1 rounded-md ${user.plan === 'SUPERPULSE' ? 'bg-cyan-500 text-black' : 'bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-white'}`}>{user.plan}</span>
                      <span className="text-2xl font-black">{SaaS_PLANS[user.plan].price}<span className="text-xs text-slate-500">/mo</span></span>
                   </div>
-                  <p className="text-xs text-slate-500 font-medium">Your account is currently trialing institutional features.</p>
+                  <p className="text-xs text-slate-500 font-medium">You are on the {SaaS_PLANS[user.plan].name} plan.</p>
                </div>
             </div>
 
@@ -153,16 +153,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="space-y-1">
                      <div className="flex justify-between text-[10px] font-black uppercase text-slate-500">
                         <span>AI Pulse Credits</span>
-                        <span>{user.credits.ai} / {user.credits.maxAi}</span>
+                        <span>{user.credits.ai} / {user.credits.maxAi >= 9999 ? '∞' : user.credits.maxAi}</span>
                      </div>
-                     <div className="h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-cyan-500" style={{ width: `${(user.credits.ai / user.credits.maxAi) * 100}%` }} /></div>
+                     <div className="h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-cyan-500" style={{ width: user.credits.maxAi >= 9999 ? '0%' : `${(user.credits.ai / user.credits.maxAi) * 100}%` }} /></div>
                   </div>
                   <div className="space-y-1">
                      <div className="flex justify-between text-[10px] font-black uppercase text-slate-500">
                         <span>Pulse Slots</span>
-                        <span>{user.credits.assets} / {user.credits.maxAssets}</span>
+                        <span>{user.credits.assets} / {user.credits.maxAssets >= 9999 ? '∞' : user.credits.maxAssets}</span>
                      </div>
-                     <div className="h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: `${(user.credits.assets / user.credits.maxAssets) * 100}%` }} /></div>
+                     <div className="h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: user.credits.maxAssets >= 9999 ? '0%' : `${(user.credits.assets / user.credits.maxAssets) * 100}%` }} /></div>
                   </div>
                </div>
             </div>
