@@ -46,6 +46,12 @@ variable "enable_community_service" {
   default     = true
 }
 
+variable "enable_twitter_service" {
+  description = "Enable Twitter/influencer feed service endpoints"
+  type        = bool
+  default     = false
+}
+
 # Caching
 variable "enable_caching" {
   description = "Enable API Gateway caching"

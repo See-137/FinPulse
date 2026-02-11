@@ -211,10 +211,6 @@ export class WhaleAlertAPI {
 }
 
 /**
- * Get symbol map for Whale Alert API
- * Maps our internal symbols to Whale Alert symbols
- */
-/**
  * Map of symbols that Whale Alert API actually supports.
  * Only these symbols should be queried; anything else will error.
  */

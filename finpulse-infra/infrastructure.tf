@@ -62,7 +62,13 @@ module "secrets" {
 
   project_name = local.project_name
   environment  = var.environment
-  # secret_names uses default list in module - all 5 API keys
+  secret_names = [
+    "alpaca-credentials",
+    "gemini-api-key",
+    "gnews-api-key",
+    "newsapi-key",
+    "twitter-bearer-token",
+  ]
   tags = local.common_tags
 }
 
@@ -87,6 +93,7 @@ module "lambda" {
   enable_ai_service        = var.enable_ai_service
   enable_news_service      = var.enable_news_service
   enable_community_service = var.enable_community_service
+  enable_twitter_service   = var.enable_twitter_service
   allowed_origin           = var.allowed_origin
   tags                     = local.common_tags
 
@@ -116,6 +123,7 @@ module "api_gateway" {
   enable_ai_service        = var.enable_ai_service
   enable_news_service      = var.enable_news_service
   enable_community_service = var.enable_community_service
+  enable_twitter_service   = var.enable_twitter_service
   enable_caching           = var.enable_api_caching
   log_retention_days       = var.cloudwatch_log_retention_days
   tags                     = local.common_tags
