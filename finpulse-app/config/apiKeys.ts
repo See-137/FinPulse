@@ -127,8 +127,8 @@ function validateConfig(config: ApiConfig): void {
  */
 export const apiConfig: ApiConfig = {
   whaleAlert: {
-    apiKey: getEnv('WHALE_ALERT_API_KEY'),
-    enabled: !!getEnv('WHALE_ALERT_API_KEY'),
+    apiKey: getEnv('VITE_WHALE_ALERT_API_KEY'),
+    enabled: !!getEnv('VITE_WHALE_ALERT_API_KEY'),
   },
 
   twitter: {

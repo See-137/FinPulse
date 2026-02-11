@@ -1,7 +1,7 @@
 # FinPulse Agent Memory
 
 > Stable project facts, commands, and invariants. Updated automatically.
-> Last updated: 2026-01-27 (session 2)
+> Last updated: 2026-02-11 (session 5 — production readiness audit)
 
 ---
 
@@ -76,20 +76,31 @@ aws lambda update-function-code --function-name finpulse-auth-prod --zip-file fi
 | Purpose | Path |
 |---------|------|
 | Auth service | `finpulse-app/services/authService.ts` |
+| Auth context | `finpulse-app/contexts/AuthContext.tsx` |
 | Portfolio store | `finpulse-app/store/portfolioStore.ts` |
 | Portfolio view | `finpulse-app/components/PortfolioView.tsx` |
+| GlobalErrorHandler | `finpulse-app/components/GlobalErrorHandler.tsx` |
 | Premium analytics | `finpulse-app/components/PremiumAnalytics.tsx` |
 | Auth Lambda | `finpulse-infra/lambda-code/auth/index.js` |
 | Main Terraform | `finpulse-infra/main.tf` |
+| Lambda Module | `finpulse-infra/modules/lambda/main.tf` |
 | MarketTicker | `finpulse-app/components/MarketTicker.tsx` |
 | Market Lambda | `finpulse-infra/lambda-code/market-data/index.js` |
-| WebSocket Service | `finpulse-app/services/websocketService.ts` |
-| WS Prices Hook | `finpulse-app/hooks/useWebSocketPrices.ts` |
-| Alpaca Service | `finpulse-infra/lambda-code/market-data/shared/alpaca-service.js` |
-| CoinGecko Service | `finpulse-infra/lambda-code/market-data/shared/coingecko-service.js` |
-| Cache Manager | `finpulse-infra/lambda-code/market-data/shared/cache-manager.js` |
+| Shared Utils Layer | `finpulse-infra/lambda-layers/shared-utils/nodejs/` |
+| JWT Verifier | `finpulse-infra/lambda-layers/shared-utils/nodejs/jwt-verifier.js` |
+| Rate Limiter | `finpulse-infra/lambda-layers/shared-utils/nodejs/rate-limiter.js` |
+| Env Validator | `finpulse-infra/lambda-layers/shared-utils/nodejs/env-validator.js` |
+| Token Storage | `finpulse-app/services/tokenStorage.ts` |
+| Multi-Tab Sync | `finpulse-app/hooks/useMultiTabSync.ts` |
 
 ---
+
+## FX Data
+
+**Live FX rates** via Frankfurter API (`https://api.frankfurter.app/latest?from=USD`)
+- Multi-tier cache: Memory (15min) → Redis (15min) → Live API → Static fallback
+- Response includes `source: 'live'|'redis'|'fallback'` and actual timestamp
+- Static rates kept as `FX_FALLBACK_RATES` for reliability
 
 ## Current Version
 
@@ -198,6 +209,75 @@ MarketTicker.tsx → AWS Lambda /market/prices → CoinGecko (crypto) / Alpaca (
 | Price Preservation | WebSocket fallback won't overwrite valid prices with zeros |
 
 **Note:** Phase 4 infra changes were reverted due to AWS limitations.
+
+---
+
+## Architecture Remediation (2026-01-27, session 3)
+
+### Lambda Layer (Shared Utils)
+
+All shared code consolidated into a Lambda Layer at `finpulse-infra/lambda-layers/shared-utils/nodejs/`:
+
+| Module | Purpose |
+|--------|---------|
+| `jwt-verifier.js` | Secure JWT verification with Cognito public keys (replaces decode-only) |
+| `rate-limiter.js` | Redis-based distributed rate limiting with sliding window |
+| `request-context.js` | Request ID correlation and structured JSON logging |
+| `env-validator.js` | Environment variable validation at cold start |
+| `validation.js` | Input validation with Zod schemas |
+| `redis-cache.js` | Redis caching utilities |
+| `cache-manager.js` | Multi-tier cache management |
+
+**Terraform:** Layer attached to all Lambda functions via `layers = local.shared_layer_arns`
+
+**Deploy Layer:**
+```powershell
+.\finpulse-infra\scripts\package-lambda-layer.ps1
+terraform apply -var="lambda_layer_zip_path=./lambda-layers/shared-utils.zip"
+```
+
+### Frontend Improvements
+
+| Improvement | Description |
+|-------------|-------------|
+| `AuthContext.tsx` | Centralized auth state (extracted from App.tsx) |
+| `GlobalErrorHandler.tsx` | Catches unhandled promise rejections |
+| `portfolioStore.ts` | Async `setCurrentUser()` with retry logic and race condition protection |
+| `tokenStorage.ts` | Unified token storage service (single source of truth for localStorage/cookie) |
+| `useMultiTabSync.ts` | Multi-tab state synchronization via storage events |
+
+### Observability (Phase 5.1)
+
+| Feature | Description |
+|---------|-------------|
+| X-Ray Tracing | Optional AWS X-Ray tracing for all Lambda functions (`enable_xray_tracing = true`) |
+| Dynamic Tracing | Uses Terraform dynamic blocks - no changes needed per-Lambda |
+
+### Security Improvements
+
+| Fix | Description |
+|-----|-------------|
+| JWT Verification | Auth Lambda now verifies JWT signatures with `aws-jwt-verify` library |
+| JWT Fail-Closed | `verifyJwtSecure()` returns null when verifier unavailable (no decode-only fallback) |
+| Distributed Rate Limiting | Redis-based sliding window replaces per-instance memory |
+| Env Validation | Fail-fast on missing required env vars at cold start |
+| Request Tracing | All requests tagged with X-Request-ID for correlation |
+| x-user-id Bypass | Portfolio/community `x-user-id` header only works when `ENVIRONMENT !== 'prod'` |
+| Webhook Signature | Rejects when secret missing; guards length-mismatch and null signature |
+| Self-Upgrade Blocked | `plan`/`credits` removed from profile update `allowedFields` |
+| Input Validation | Zod schemas on auth profile/settings/check-limit/usage + portfolio PUT |
+| Webhook Idempotency | DynamoDB-based dedup for LemonSqueezy webhooks (7-day TTL) |
+| CORS Validation | Terraform `allowed_origin` variable with HTTPS validation constraint |
+
+### Known Security Debt (deferred)
+
+| Issue | Severity | Description |
+|-------|----------|-------------|
+| Payments no auth | HIGH | All payment endpoints accept userId from URL without JWT verification |
+| Federated sign-in | HIGH | `/federated-signin` trusts client-provided identity without server-side OAuth token verification |
+| Hardcoded testers | HIGH | `tester@finpulse.internal` and personal email hardcoded in auth Lambda |
+| Error leakage | HIGH | Several catch blocks return `error.message` to client without env check |
+| Token in localStorage | INFO | ID tokens stored in localStorage even in cookie mode |
 
 ---
 

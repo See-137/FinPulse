@@ -51,36 +51,36 @@ fi
 echo ""
 echo "Configuring .env file..."
 
-# Update or add WHALE_ALERT_API_KEY
-if grep -q "^WHALE_ALERT_API_KEY=" "$ENV_FILE"; then
+# Update or add VITE_WHALE_ALERT_API_KEY
+if grep -q "^VITE_WHALE_ALERT_API_KEY=" "$ENV_FILE"; then
     # Update existing key
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS
-        sed -i '' "s|^WHALE_ALERT_API_KEY=.*|WHALE_ALERT_API_KEY=$API_KEY|" "$ENV_FILE"
+        sed -i '' "s|^VITE_WHALE_ALERT_API_KEY=.*|VITE_WHALE_ALERT_API_KEY=$API_KEY|" "$ENV_FILE"
     else
         # Linux
-        sed -i "s|^WHALE_ALERT_API_KEY=.*|WHALE_ALERT_API_KEY=$API_KEY|" "$ENV_FILE"
+        sed -i "s|^VITE_WHALE_ALERT_API_KEY=.*|VITE_WHALE_ALERT_API_KEY=$API_KEY|" "$ENV_FILE"
     fi
-    echo "✓ Updated WHALE_ALERT_API_KEY"
+    echo "✓ Updated VITE_WHALE_ALERT_API_KEY"
 else
     # Add new key
     echo "" >> "$ENV_FILE"
-    echo "WHALE_ALERT_API_KEY=$API_KEY" >> "$ENV_FILE"
-    echo "✓ Added WHALE_ALERT_API_KEY"
+    echo "VITE_WHALE_ALERT_API_KEY=$API_KEY" >> "$ENV_FILE"
+    echo "✓ Added VITE_WHALE_ALERT_API_KEY"
 fi
 
-# Update or add NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA
-if grep -q "^NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=" "$ENV_FILE"; then
+# Update or add VITE_ENABLE_LIVE_WHALE_DATA
+if grep -q "^VITE_ENABLE_LIVE_WHALE_DATA=" "$ENV_FILE"; then
     # Update existing flag
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s|^NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=.*|NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=true|" "$ENV_FILE"
+        sed -i '' "s|^VITE_ENABLE_LIVE_WHALE_DATA=.*|VITE_ENABLE_LIVE_WHALE_DATA=true|" "$ENV_FILE"
     else
-        sed -i "s|^NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=.*|NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=true|" "$ENV_FILE"
+        sed -i "s|^VITE_ENABLE_LIVE_WHALE_DATA=.*|VITE_ENABLE_LIVE_WHALE_DATA=true|" "$ENV_FILE"
     fi
     echo "✓ Enabled live whale data"
 else
     # Add new flag
-    echo "NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=true" >> "$ENV_FILE"
+    echo "VITE_ENABLE_LIVE_WHALE_DATA=true" >> "$ENV_FILE"
     echo "✓ Enabled live whale data"
 fi
 
@@ -111,7 +111,7 @@ echo "  1. Restart your dev server:"
 echo "     npm run dev"
 echo ""
 echo "  2. Test the integration:"
-echo "     npx ts-node scripts/testWhaleDataIntegration.ts"
+echo "     npx vitest run --reporter=verbose"
 echo ""
 echo "  3. Check the UI:"
 echo "     - Open portfolio view"

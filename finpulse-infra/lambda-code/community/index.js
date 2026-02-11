@@ -1,41 +1,79 @@
 /**
- * FinPulse Community Service
+ * FinPulse Community Service v2.0
  * Social features: posts, comments, likes, follows
  */
 
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+// =============================================================================
+// Shared Utilities from Lambda Layer (with fallback)
+// =============================================================================
 
-// Validation utilities
-let validation;
+let envValidator, requestContext, validation, redisCache;
 try {
-  validation = require('./shared/validation');
-} catch {
-  // Fallback if shared module not copied yet
-  validation = {
-    validatePost: (input) => ({ valid: true, data: input }),
-    validateComment: (input) => ({ valid: true, data: input }),
-    sanitizeString: (str) => str,
-    checkRateLimit: () => ({ allowed: true, remaining: 100 })
+  envValidator = require('/opt/nodejs/env-validator');
+  requestContext = require('/opt/nodejs/request-context');
+  validation = require('/opt/nodejs/validation');
+  redisCache = require('/opt/nodejs/redis-cache');
+  console.log('[Community] Loaded shared utilities from Lambda Layer');
+} catch (e) {
+  // Fallback to local shared directory
+  try {
+    validation = require('./shared/validation');
+    redisCache = require('./shared/redis-cache');
+    console.log('[Community] Loaded shared utilities from local shared');
+  } catch (e2) {
+    // Minimal fallbacks
+    validation = {
+      validatePost: (input) => ({ valid: true, data: input }),
+      validateComment: (input) => ({ valid: true, data: input }),
+      sanitizeString: (str) => str,
+      checkRateLimit: () => ({ allowed: true, remaining: 100 })
+    };
+    redisCache = {
+      checkRateLimit: async () => ({ allowed: true, remaining: 100, resetIn: 60 })
+    };
+  }
+  envValidator = {
+    ensureEnvValidated: () => true,
+    getOptionalEnv: (name, def) => process.env[name] || def,
+  };
+  requestContext = {
+    createRequestContext: (event) => ({
+      requestId: event?.requestContext?.requestId || 'unknown',
+      logger: {
+        info: (msg, data) => console.log(JSON.stringify({ level: 'INFO', message: msg, ...data })),
+        error: (msg, data) => console.error(JSON.stringify({ level: 'ERROR', message: msg, ...data })),
+      },
+    }),
+    addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
   };
 }
 
-// Redis cache for distributed rate limiting
-let redisCache;
+// Validate environment at cold start
 try {
-  redisCache = require('./shared/redis-cache');
-  console.log('Redis cache loaded for distributed rate limiting');
-} catch {
-  // Fallback if redis-cache module not available
-  redisCache = {
-    checkRateLimit: async () => ({ allowed: true, remaining: 100, resetIn: 60 })
-  };
-  console.log('Redis cache not available, using fallback');
+  envValidator.ensureEnvValidated('community');
+} catch (e) {
+  console.error('[Community] Environment validation failed:', e.message);
 }
 
-// Initialize clients
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+// =============================================================================
+// AWS SDK Clients (lazy initialization for cold start optimization)
+// =============================================================================
+
+let dynamoClient = null;
+let docClient = null;
+
+function getDynamoClient() {
+  if (!docClient) {
+    const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+    const { DynamoDBDocumentClient } = require('@aws-sdk/lib-dynamodb');
+    dynamoClient = new DynamoDBClient({});
+    docClient = DynamoDBDocumentClient.from(dynamoClient);
+  }
+  return docClient;
+}
+
+// Import commands
+const { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 
 const POSTS_TABLE = `finpulse-community-posts-${process.env.ENVIRONMENT}`;
 const USERS_TABLE = `finpulse-users-${process.env.ENVIRONMENT}`;
@@ -129,8 +167,8 @@ function getUserFromEvent(event) {
     }
   }
   
-  // For testing
-  if (event.headers?.['x-user-id']) {
+  // For testing (dev/staging only)
+  if (process.env.ENVIRONMENT !== 'prod' && event.headers?.['x-user-id']) {
     return {
       userId: event.headers['x-user-id'],
       email: event.headers['x-user-email'] || 'test@example.com',
@@ -170,7 +208,7 @@ async function createPost(user, content, type = 'discussion') {
     updatedAt: timestamp
   };
 
-  await docClient.send(new PutCommand({
+  await getDynamoClient().send(new PutCommand({
     TableName: POSTS_TABLE,
     Item: post
   }));
@@ -214,7 +252,7 @@ async function getPosts(limit = 20, lastKey = null, type = null) {
     params.ExpressionAttributeValues = { ':type': type };
   }
 
-  const result = await docClient.send(new ScanCommand(params));
+  const result = await getDynamoClient().send(new ScanCommand(params));
 
   // Sort by createdAt descending
   const sortedItems = (result.Items || []).sort((a, b) => 
@@ -233,7 +271,7 @@ async function getPosts(limit = 20, lastKey = null, type = null) {
  * Get a single post
  */
 async function getPost(postId) {
-  const result = await docClient.send(new GetCommand({
+  const result = await getDynamoClient().send(new GetCommand({
     TableName: POSTS_TABLE,
     Key: { postId }
   }));
@@ -253,7 +291,7 @@ async function likePost(postId, userId) {
 
   if (alreadyLiked) {
     // Unlike
-    await docClient.send(new UpdateCommand({
+    await getDynamoClient().send(new UpdateCommand({
       TableName: POSTS_TABLE,
       Key: { postId },
       UpdateExpression: 'SET likes = likes - :dec, likedBy = :likedBy',
@@ -265,7 +303,7 @@ async function likePost(postId, userId) {
     return { liked: false, likes: post.likes - 1 };
   } else {
     // Like
-    await docClient.send(new UpdateCommand({
+    await getDynamoClient().send(new UpdateCommand({
       TableName: POSTS_TABLE,
       Key: { postId },
       UpdateExpression: 'SET likes = likes + :inc, likedBy = :likedBy',
@@ -295,7 +333,7 @@ async function addComment(postId, user, content) {
 
   const comments = [...(post.comments || []), comment];
 
-  await docClient.send(new UpdateCommand({
+  await getDynamoClient().send(new UpdateCommand({
     TableName: POSTS_TABLE,
     Key: { postId },
     UpdateExpression: 'SET comments = :comments, commentCount = :count, updatedAt = :updatedAt',
@@ -317,7 +355,7 @@ async function deletePost(postId, userId) {
   if (!post) throw new Error('Post not found');
   if (post.authorId !== userId) throw new Error('Not authorized');
 
-  await docClient.send(new DeleteCommand({
+  await getDynamoClient().send(new DeleteCommand({
     TableName: POSTS_TABLE,
     Key: { postId }
   }));
@@ -329,7 +367,7 @@ async function deletePost(postId, userId) {
  * Get posts by ticker
  */
 async function getPostsByTicker(ticker, limit = 20) {
-  const result = await docClient.send(new ScanCommand({
+  const result = await getDynamoClient().send(new ScanCommand({
     TableName: POSTS_TABLE,
     FilterExpression: 'contains(tickers, :ticker)',
     ExpressionAttributeValues: { ':ticker': ticker.toUpperCase() },
@@ -345,7 +383,7 @@ async function getPostsByTicker(ticker, limit = 20) {
  * Get posts by user
  */
 async function getPostsByUser(userId, limit = 20) {
-  const result = await docClient.send(new ScanCommand({
+  const result = await getDynamoClient().send(new ScanCommand({
     TableName: POSTS_TABLE,
     FilterExpression: 'authorId = :userId',
     ExpressionAttributeValues: { ':userId': userId },

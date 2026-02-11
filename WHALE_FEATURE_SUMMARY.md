@@ -159,8 +159,8 @@ npm run dev
 1. **Get API key:** https://whale-alert.io/signup
 2. **Edit `.env`:**
    ```bash
-   WHALE_ALERT_API_KEY=wak_your_key_here
-   NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=true
+   VITE_WHALE_ALERT_API_KEY=wak_your_key_here
+   VITE_ENABLE_LIVE_WHALE_DATA=true
    ```
 3. **Restart:** `npm run dev`
 
@@ -172,8 +172,8 @@ npm run dev
 
 ```bash
 # Required
-WHALE_ALERT_API_KEY=wak_xxxxx           # From whale-alert.io
-NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=true # Enable live data
+VITE_WHALE_ALERT_API_KEY=wak_xxxxx           # From whale-alert.io
+VITE_ENABLE_LIVE_WHALE_DATA=true # Enable live data
 
 # Optional (with defaults)
 CACHE_TTL_WHALE_DATA=300                # 5 min cache
@@ -261,7 +261,7 @@ dist/assets/whaleWalletService-rYiuxJYK.js  5.17 kB │ gzip: 2.09 kB
 
 ```bash
 # Integration test
-npx ts-node scripts/testWhaleDataIntegration.ts
+npx vitest run --reporter=verbose
 
 # Verification
 node scripts/verifyWhaleImprovements.js
@@ -309,7 +309,7 @@ npm run build
 
 ### Still Seeing Mock Data
 1. Check API key in `.env`
-2. Verify `NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=true`
+2. Verify `VITE_ENABLE_LIVE_WHALE_DATA=true`
 3. Restart dev server
 4. Clear browser cache
 

@@ -1,12 +1,58 @@
 /**
- * FinPulse News Service v2.0
+ * FinPulse News Service v2.1
  * Multi-provider news with fallback chain: GNews -> NewsAPI -> Static Fallback
  * Includes response caching to minimize API calls
  */
 
-const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+// =============================================================================
+// Shared Utilities from Lambda Layer (with fallback)
+// =============================================================================
 
-const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION });
+let envValidator, requestContext;
+try {
+  envValidator = require('/opt/nodejs/env-validator');
+  requestContext = require('/opt/nodejs/request-context');
+  console.log('[News] Loaded shared utilities from Lambda Layer');
+} catch (e) {
+  // Minimal fallbacks
+  envValidator = {
+    ensureEnvValidated: () => true,
+    getOptionalEnv: (name, def) => process.env[name] || def,
+  };
+  requestContext = {
+    createRequestContext: (event) => ({
+      requestId: event?.requestContext?.requestId || 'unknown',
+      logger: {
+        info: (msg, data) => console.log(JSON.stringify({ level: 'INFO', message: msg, ...data })),
+        error: (msg, data) => console.error(JSON.stringify({ level: 'ERROR', message: msg, ...data })),
+      },
+    }),
+    addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
+  };
+}
+
+// Validate environment at cold start
+try {
+  envValidator.ensureEnvValidated('news');
+} catch (e) {
+  console.error('[News] Environment validation failed:', e.message);
+}
+
+// =============================================================================
+// AWS SDK Clients (lazy initialization for cold start optimization)
+// =============================================================================
+
+let secretsClient = null;
+
+function getSecretsClient() {
+  if (!secretsClient) {
+    const { SecretsManagerClient } = require('@aws-sdk/client-secrets-manager');
+    secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION });
+  }
+  return secretsClient;
+}
+
+const { GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
 
 // API key cache
 let gnewsApiKey = null;
@@ -51,8 +97,8 @@ async function getApiKeys() {
     
     // Fetch both keys in parallel
     const [gnewsResult, newsApiResult] = await Promise.allSettled([
-        secretsClient.send(new GetSecretValueCommand({ SecretId: `finpulse/${env}/gnews-api-key` })),
-        secretsClient.send(new GetSecretValueCommand({ SecretId: `finpulse/${env}/newsapi-key` }))
+        getSecretsClient().send(new GetSecretValueCommand({ SecretId: `finpulse/${env}/gnews-api-key` })),
+        getSecretsClient().send(new GetSecretValueCommand({ SecretId: `finpulse/${env}/newsapi-key` }))
     ]);
     
     if (gnewsResult.status === 'fulfilled') {

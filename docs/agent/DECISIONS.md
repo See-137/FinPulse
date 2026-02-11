@@ -200,6 +200,110 @@
 
 ---
 
+## ADR-009: Lambda Layer for Shared Code
+
+**Date:** 2026-01-27
+**Status:** Accepted
+
+**Context:** 9 Lambda functions duplicate `validation.js`, `redis-cache.js`, `cache-manager.js` (~10,000 lines duplicated). JWT verification only decoded tokens without verifying signatures. Rate limiting was per-instance (not distributed).
+
+**Decision:** Create a Lambda Layer at `finpulse-infra/lambda-layers/shared-utils/nodejs/` containing all shared modules:
+- `jwt-verifier.js` - Secure JWT verification with `aws-jwt-verify`
+- `rate-limiter.js` - Redis-based distributed rate limiting
+- `request-context.js` - Request ID correlation and structured logging
+- `env-validator.js` - Environment variable validation at cold start
+- `validation.js`, `redis-cache.js`, `cache-manager.js` - Existing shared code
+
+**Rationale:**
+- Eliminates code duplication across all Lambdas
+- Enables secure JWT signature verification (P0 security fix)
+- Provides distributed rate limiting across all Lambda instances
+- Standardizes logging with request ID correlation
+- Reduces deployment package sizes
+
+**Consequences:**
+- All Lambdas import from `/opt/nodejs/...` with fallback to local for dev
+- Terraform manages layer version and attachment
+- Layer must be deployed before Lambdas that depend on new modules
+- Package layer with: `.\scripts\package-lambda-layer.ps1`
+
+---
+
+## ADR-010: Frontend Auth Refactoring
+
+**Date:** 2026-01-27
+**Status:** Accepted
+
+**Context:** App.tsx had 856 lines with 23 useState hooks. Auth logic mixed with UI code. Race condition in `portfolioStore.setCurrentUser()` not awaiting backend load.
+
+**Decision:**
+1. Create `AuthContext.tsx` for centralized auth state management
+2. Make `setCurrentUser()` async and await `loadFromBackend()`
+3. Add retry logic with exponential backoff to portfolio loads
+4. Create `GlobalErrorHandler.tsx` for unhandled promise rejections
+
+**Rationale:**
+- Separation of concerns improves maintainability
+- Async `setCurrentUser()` prevents race conditions
+- Retry logic improves resilience to transient network failures
+- Global error handler catches async errors that ErrorBoundary misses
+
+**Consequences:**
+- Components can use `useAuth()` hook instead of prop drilling
+- `setCurrentUser()` callers must now await the result
+- Portfolio loads retry up to 3 times with 1s, 2s, 4s delays
+- Unhandled promise rejections are logged and recoverable errors don't crash UI
+
+---
+
+## ADR-011: Production Readiness Hardening
+
+**Date:** 2026-02-11
+**Status:** Accepted
+
+**Context:** Comprehensive production readiness audit revealed 18+ issues across frontend, backend, and infrastructure. Critical security gaps, missing error boundaries, stale data, and input validation holes.
+
+**Decision:** Implement 14 fixes in a single session:
+
+1. **ErrorBoundary wrappers** — 13 bare `<Suspense>` blocks wrapped with `<ErrorBoundary>`
+2. **GlobalErrorHandler mounted** — catches unhandled promise rejections in App root
+3. **AuthContext wired** — replaced ~200 lines of inline auth code with `useAuth()` hook
+4. **Live FX rates** — Frankfurter API with multi-tier cache (Memory → Redis → API → Static fallback)
+5. **Input validation** — Zod schemas on 5 auth/portfolio endpoints
+6. **Webhook idempotency** — DynamoDB-based dedup for LemonSqueezy webhooks
+7. **CORS parameterization** — `allowed_origin` Terraform variable replaces 7 hardcoded instances
+8. **JWT fail-closed** — `verifyJwtSecure()` returns null (not decode-only) when verifier unavailable
+9. **Webhook signature hardened** — rejects when secret missing, guards against length-mismatch and null signature
+10. **x-user-id bypass gated** — only works in non-prod environments
+11. **Self-upgrade blocked** — `plan` and `credits` removed from profile update allowed fields
+12. **Schema strictness** — `SettingsUpdateSchema` changed from `.passthrough()` to `.strict()`
+13. **subscriptionStatus default** — changed from `'none'` to `'active'` to preserve free-tier behavior
+14. **Multi-tab sync key fix** — corrected storage key from `'finpulse-portfolio-storage'` to `'finpulse-portfolio-v2'`
+
+**Rationale:**
+- Security: 3 critical auth bypass vectors closed (x-user-id, JWT fallback, self-upgrade)
+- Reliability: ErrorBoundary + GlobalErrorHandler prevent blank-screen crashes
+- Data quality: Live FX rates replace month-old static values
+- Idempotency: Prevents double-processing of payment webhooks
+- Maintainability: AuthContext extracts 200+ lines from App.tsx
+
+**Consequences:**
+- All existing tests continue to pass (117/117)
+- Terraform validates cleanly
+- Backend changes are additive (existing valid requests unaffected)
+- Invalid requests now return 400 instead of writing unvalidated data
+- `allowed_origin` variable needs Terraform apply to take effect in AWS
+
+**Deferred:**
+- Payments endpoints still lack JWT auth (H1 from security audit)
+- Federated sign-in doesn't verify OAuth tokens server-side (H4)
+- Hardcoded tester emails still in source (H2)
+- Error message leakage in some catch blocks (H5)
+- `tokenStorage.ts` not yet wired into AuthContext
+- Portfolio PUT should use partial schema for updates
+
+---
+
 ## Template for New Decisions
 
 ```markdown

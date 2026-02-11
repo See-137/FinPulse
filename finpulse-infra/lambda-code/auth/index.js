@@ -8,10 +8,56 @@ const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, DeleteCommand, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 const { CognitoIdentityProviderClient, AdminGetUserCommand, AdminUpdateUserAttributesCommand, AdminDeleteUserCommand, AdminInitiateAuthCommand } = require('@aws-sdk/client-cognito-identity-provider');
 
-// Initialize clients
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
-const cognitoClient = new CognitoIdentityProviderClient({});
+// Import shared utilities from Lambda Layer (or fallback to local for development)
+let jwtVerifier, envValidator, requestContext, rateLimiter, validation;
+try {
+  // Production: Load from Lambda Layer
+  jwtVerifier = require('/opt/nodejs/jwt-verifier');
+  envValidator = require('/opt/nodejs/env-validator');
+  requestContext = require('/opt/nodejs/request-context');
+  rateLimiter = require('/opt/nodejs/rate-limiter');
+  validation = require('/opt/nodejs/validation');
+} catch (e) {
+  // Development/Local: Load from shared directory
+  try {
+    jwtVerifier = require('./shared/jwt-verifier');
+    envValidator = require('./shared/env-validator');
+    requestContext = require('./shared/request-context');
+    rateLimiter = require('./shared/rate-limiter');
+    validation = require('./shared/validation');
+  } catch (e2) {
+    console.warn('Shared utilities not available, using minimal fallbacks');
+    // Minimal fallbacks for backward compatibility
+    jwtVerifier = null;
+    envValidator = { ensureEnvValidated: () => true };
+    requestContext = { getRequestId: (event) => event?.requestContext?.requestId || 'unknown' };
+    rateLimiter = { checkRateLimitForRequest: async () => ({ blocked: false }) };
+    validation = null;
+  }
+}
+
+// Validate required environment variables at cold start
+envValidator.ensureEnvValidated('auth');
+
+// Initialize clients (lazy initialization for cold start optimization)
+let dynamoClient = null;
+let docClient = null;
+let cognitoClient = null;
+
+function getDynamoClient() {
+  if (!docClient) {
+    dynamoClient = new DynamoDBClient({});
+    docClient = DynamoDBDocumentClient.from(dynamoClient);
+  }
+  return docClient;
+}
+
+function getCognitoClient() {
+  if (!cognitoClient) {
+    cognitoClient = new CognitoIdentityProviderClient({});
+  }
+  return cognitoClient;
+}
 
 const ENVIRONMENT = process.env.ENVIRONMENT || 'prod';
 const USERS_TABLE = `finpulse-users-${ENVIRONMENT}`;
@@ -107,15 +153,22 @@ function parseCookies(cookieHeader) {
 }
 
 /**
- * Decode JWT token (without validation - API Gateway should validate)
+ * Decode JWT token (without signature verification - for backward compatibility)
+ * NOTE: For security-critical operations, use verifyJwtSecure() instead
  */
 function decodeJwt(token) {
+  // Use the shared jwt-verifier if available
+  if (jwtVerifier && jwtVerifier.decodeJwt) {
+    return jwtVerifier.decodeJwt(token);
+  }
+
+  // Fallback implementation
   try {
     // Remove 'Bearer ' prefix if present
     const cleanToken = token.replace(/^Bearer\s+/i, '');
     const parts = cleanToken.split('.');
     if (parts.length !== 3) return null;
-    
+
     // Decode payload (middle part)
     const payload = Buffer.from(parts[1], 'base64').toString('utf8');
     return JSON.parse(payload);
@@ -126,10 +179,25 @@ function decodeJwt(token) {
 }
 
 /**
+ * Verify JWT token with Cognito signature validation (SECURE)
+ * Use this for all authentication decisions
+ */
+async function verifyJwtSecure(token, tokenUse = 'id') {
+  if (!jwtVerifier || !jwtVerifier.verifyJwt) {
+    console.error('[Auth] CRITICAL: JWT verifier not available, rejecting token (fail-closed)');
+    return null;
+  }
+
+  return await jwtVerifier.verifyJwt(token, tokenUse);
+}
+
+/**
  * Extract user from Cognito JWT (supports cookies, Authorization header, and API Gateway authorizer)
+ * NOTE: This is the SYNC version for backward compatibility. For new code, use getUserFromEventSecure()
  */
 function getUserFromEvent(event) {
   // First try API Gateway authorizer claims (when using COGNITO_USER_POOLS)
+  // This is already verified by API Gateway
   if (event.requestContext?.authorizer?.claims) {
     const claims = event.requestContext.authorizer.claims;
     return {
@@ -139,7 +207,7 @@ function getUserFromEvent(event) {
       emailVerified: claims.email_verified === 'true'
     };
   }
-  
+
   // Second: Try httpOnly cookies (preferred for security)
   const cookieHeader = event.headers?.Cookie || event.headers?.cookie;
   if (cookieHeader) {
@@ -159,7 +227,7 @@ function getUserFromEvent(event) {
       }
     }
   }
-  
+
   // Third fallback: Decode JWT from Authorization header
   // (Used when auth endpoint has authorization = "NONE" or for backward compatibility)
   const authHeader = event.headers?.Authorization || event.headers?.authorization;
@@ -183,7 +251,78 @@ function getUserFromEvent(event) {
       };
     }
   }
-  
+
+  return null;
+}
+
+/**
+ * Extract user from Cognito JWT with SECURE signature verification
+ * Use this for all authentication-critical operations
+ */
+async function getUserFromEventSecure(event) {
+  // First try API Gateway authorizer claims (already verified by API Gateway)
+  if (event.requestContext?.authorizer?.claims) {
+    const claims = event.requestContext.authorizer.claims;
+    console.log('[Auth] Using verified API Gateway authorizer claims');
+    return {
+      userId: claims.sub,
+      email: claims.email,
+      name: claims.name || claims['cognito:username'],
+      emailVerified: claims.email_verified === 'true',
+      source: 'authorizer'
+    };
+  }
+
+  // Use shared jwt-verifier if available
+  if (jwtVerifier && jwtVerifier.getUserFromEvent) {
+    const user = await jwtVerifier.getUserFromEvent(event);
+    if (user) {
+      console.log('[Auth] JWT verified via shared verifier');
+      return user;
+    }
+  }
+
+  // Second: Try httpOnly cookies with VERIFICATION
+  const cookieHeader = event.headers?.Cookie || event.headers?.cookie;
+  if (cookieHeader) {
+    const cookies = parseCookies(cookieHeader);
+    const idToken = cookies.finpulse_id_token;
+    if (idToken) {
+      const claims = await verifyJwtSecure(idToken, 'id');
+      if (claims && claims.sub) {
+        const email = claims.email || null;
+        const derivedName = email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
+        console.log('[Auth] JWT verified from cookie');
+        return {
+          userId: claims.sub,
+          email: email,
+          name: claims.name || derivedName || claims['cognito:username'] || claims.username,
+          emailVerified: claims.email_verified === 'true' || claims.email_verified === true,
+          source: 'cookie'
+        };
+      }
+    }
+  }
+
+  // Third: Try Authorization header with VERIFICATION
+  const authHeader = event.headers?.Authorization || event.headers?.authorization;
+  if (authHeader) {
+    const claims = await verifyJwtSecure(authHeader, 'id');
+    if (claims && claims.sub) {
+      const email = claims.email || null;
+      const derivedName = email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
+      console.log('[Auth] JWT verified from Authorization header');
+      return {
+        userId: claims.sub,
+        email: email,
+        name: claims.name || derivedName || claims['cognito:username'] || claims.username,
+        emailVerified: claims.email_verified === 'true' || claims.email_verified === true,
+        source: 'header'
+      };
+    }
+  }
+
+  console.log('[Auth] No valid authentication found');
   return null;
 }
 
@@ -198,7 +337,7 @@ async function getOrCreateUser(cognitoUser) {
     process.env.INTERNAL_TESTER_EMAIL
   ].filter(Boolean);
   
-  const result = await docClient.send(new GetCommand({
+  const result = await getDynamoClient().send(new GetCommand({
     TableName: USERS_TABLE,
     Key: { userId: cognitoUser.userId }
   }));
@@ -241,7 +380,7 @@ async function getOrCreateUser(cognitoUser) {
         })
       };
       
-      await docClient.send(new PutCommand({
+      await getDynamoClient().send(new PutCommand({
         TableName: USERS_TABLE,
         Item: updatedUser
       }));
@@ -286,7 +425,7 @@ async function getOrCreateUser(cognitoUser) {
     lastLogin: new Date().toISOString()
   };
 
-  await docClient.send(new PutCommand({
+  await getDynamoClient().send(new PutCommand({
     TableName: USERS_TABLE,
     Item: newUser
   }));
@@ -302,7 +441,7 @@ async function getOrCreateUser(cognitoUser) {
 async function getUserByEmail(email) {
   if (!email) return null;
   
-  const result = await docClient.send(new QueryCommand({
+  const result = await getDynamoClient().send(new QueryCommand({
     TableName: USERS_TABLE,
     IndexName: 'email-index',
     KeyConditionExpression: 'email = :email',
@@ -316,7 +455,7 @@ async function getUserByEmail(email) {
  * Update user profile
  */
 async function updateUser(userId, updates) {
-  const allowedFields = ['name', 'settings', 'plan', 'credits'];
+  const allowedFields = ['name', 'settings'];
   const updateExpressions = [];
   const expressionValues = {};
   const expressionNames = {};
@@ -337,7 +476,7 @@ async function updateUser(userId, updates) {
   expressionValues[':updatedAt'] = new Date().toISOString();
   expressionNames['#updatedAt'] = 'updatedAt';
 
-  await docClient.send(new UpdateCommand({
+  await getDynamoClient().send(new UpdateCommand({
     TableName: USERS_TABLE,
     Key: { userId },
     UpdateExpression: `SET ${updateExpressions.join(', ')}`,
@@ -352,7 +491,7 @@ async function updateUser(userId, updates) {
  * Record user login
  */
 async function recordLogin(userId) {
-  await docClient.send(new UpdateCommand({
+  await getDynamoClient().send(new UpdateCommand({
     TableName: USERS_TABLE,
     Key: { userId },
     UpdateExpression: 'SET lastLogin = :lastLogin, loginCount = if_not_exists(loginCount, :zero) + :inc',
@@ -397,7 +536,7 @@ function checkLimits(user, action) {
 async function incrementUsage(userId, type) {
   const field = type === 'ai' ? 'credits.ai' : 'credits.assets';
   
-  await docClient.send(new UpdateCommand({
+  await getDynamoClient().send(new UpdateCommand({
     TableName: USERS_TABLE,
     Key: { userId },
     UpdateExpression: `SET ${field} = if_not_exists(${field}, :zero) + :inc`,
@@ -426,7 +565,7 @@ function createIdentityKey(provider, providerSubject) {
 async function getIdentityByProviderSubject(provider, providerSubject) {
   const identityKey = createIdentityKey(provider, providerSubject);
   
-  const result = await docClient.send(new QueryCommand({
+  const result = await getDynamoClient().send(new QueryCommand({
     TableName: IDENTITIES_TABLE,
     IndexName: 'provider-subject-index',
     KeyConditionExpression: 'identityKey = :identityKey',
@@ -440,7 +579,7 @@ async function getIdentityByProviderSubject(provider, providerSubject) {
  * Get all identities for a user
  */
 async function getIdentitiesForUser(userId) {
-  const result = await docClient.send(new QueryCommand({
+  const result = await getDynamoClient().send(new QueryCommand({
     TableName: IDENTITIES_TABLE,
     KeyConditionExpression: 'userId = :userId',
     ExpressionAttributeValues: { ':userId': userId }
@@ -453,7 +592,7 @@ async function getIdentitiesForUser(userId) {
  * Check if an email already exists in any identity (for account linking detection)
  */
 async function getIdentitiesByEmail(email) {
-  const result = await docClient.send(new QueryCommand({
+  const result = await getDynamoClient().send(new QueryCommand({
     TableName: IDENTITIES_TABLE,
     IndexName: 'email-index',
     KeyConditionExpression: 'email = :email',
@@ -483,7 +622,7 @@ async function createIdentity(identityData) {
     isPrimary: isPrimary || false
   };
   
-  await docClient.send(new PutCommand({
+  await getDynamoClient().send(new PutCommand({
     TableName: IDENTITIES_TABLE,
     Item: identity
   }));
@@ -497,7 +636,7 @@ async function createIdentity(identityData) {
  */
 async function linkIdentityToUser(userId, identityData) {
   // Verify user exists
-  const userResult = await docClient.send(new GetCommand({
+  const userResult = await getDynamoClient().send(new GetCommand({
     TableName: USERS_TABLE,
     Key: { userId }
   }));
@@ -617,7 +756,7 @@ async function handleFederatedSignIn(federatedUser) {
     lastLogin: new Date().toISOString()
   };
   
-  await docClient.send(new PutCommand({
+  await getDynamoClient().send(new PutCommand({
     TableName: USERS_TABLE,
     Item: newUser
   }));
@@ -686,7 +825,7 @@ async function exportUserData(userId, email) {
 
   // 1. Get user profile
   try {
-    const userResult = await docClient.send(new GetCommand({
+    const userResult = await getDynamoClient().send(new GetCommand({
       TableName: USERS_TABLE,
       Key: { userId }
     }));
@@ -697,7 +836,7 @@ async function exportUserData(userId, email) {
 
   // 2. Get portfolios (query by userId)
   try {
-    const portfolioResult = await docClient.send(new QueryCommand({
+    const portfolioResult = await getDynamoClient().send(new QueryCommand({
       TableName: PORTFOLIOS_TABLE,
       KeyConditionExpression: 'userId = :userId',
       ExpressionAttributeValues: { ':userId': userId }
@@ -709,7 +848,7 @@ async function exportUserData(userId, email) {
 
   // 3. Get AI queries (query by userId)
   try {
-    const aiResult = await docClient.send(new QueryCommand({
+    const aiResult = await getDynamoClient().send(new QueryCommand({
       TableName: AI_QUERIES_TABLE,
       KeyConditionExpression: 'userId = :userId',
       ExpressionAttributeValues: { ':userId': userId }
@@ -721,7 +860,7 @@ async function exportUserData(userId, email) {
 
   // 4. Get community posts (scan with filter - posts table may use different key)
   try {
-    const postsResult = await docClient.send(new ScanCommand({
+    const postsResult = await getDynamoClient().send(new ScanCommand({
       TableName: COMMUNITY_POSTS_TABLE,
       FilterExpression: 'userId = :userId',
       ExpressionAttributeValues: { ':userId': userId }
@@ -747,7 +886,7 @@ async function deleteUserAccount(userId, username) {
 
   // 1. Delete from DynamoDB Users table
   try {
-    await docClient.send(new DeleteCommand({
+    await getDynamoClient().send(new DeleteCommand({
       TableName: USERS_TABLE,
       Key: { userId }
     }));
@@ -759,14 +898,14 @@ async function deleteUserAccount(userId, username) {
 
   // 2. Delete all portfolios
   try {
-    const portfolioResult = await docClient.send(new QueryCommand({
+    const portfolioResult = await getDynamoClient().send(new QueryCommand({
       TableName: PORTFOLIOS_TABLE,
       KeyConditionExpression: 'userId = :userId',
       ExpressionAttributeValues: { ':userId': userId }
     }));
     
     for (const item of (portfolioResult.Items || [])) {
-      await docClient.send(new DeleteCommand({
+      await getDynamoClient().send(new DeleteCommand({
         TableName: PORTFOLIOS_TABLE,
         Key: { userId: item.userId, assetId: item.assetId }
       }));
@@ -779,14 +918,14 @@ async function deleteUserAccount(userId, username) {
 
   // 3. Delete all AI queries
   try {
-    const aiResult = await docClient.send(new QueryCommand({
+    const aiResult = await getDynamoClient().send(new QueryCommand({
       TableName: AI_QUERIES_TABLE,
       KeyConditionExpression: 'userId = :userId',
       ExpressionAttributeValues: { ':userId': userId }
     }));
     
     for (const item of (aiResult.Items || [])) {
-      await docClient.send(new DeleteCommand({
+      await getDynamoClient().send(new DeleteCommand({
         TableName: AI_QUERIES_TABLE,
         Key: { userId: item.userId, queryId: item.queryId }
       }));
@@ -799,7 +938,7 @@ async function deleteUserAccount(userId, username) {
 
   // 4. Delete/anonymize community posts (keep posts but remove user info)
   try {
-    const postsResult = await docClient.send(new ScanCommand({
+    const postsResult = await getDynamoClient().send(new ScanCommand({
       TableName: COMMUNITY_POSTS_TABLE,
       FilterExpression: 'userId = :userId',
       ExpressionAttributeValues: { ':userId': userId }
@@ -807,7 +946,7 @@ async function deleteUserAccount(userId, username) {
     
     for (const item of (postsResult.Items || [])) {
       // Anonymize instead of delete to preserve community discussions
-      await docClient.send(new UpdateCommand({
+      await getDynamoClient().send(new UpdateCommand({
         TableName: COMMUNITY_POSTS_TABLE,
         Key: { postId: item.postId },
         UpdateExpression: 'SET userId = :anon, authorName = :deleted, authorEmail = :removed',
@@ -827,7 +966,7 @@ async function deleteUserAccount(userId, username) {
   // 5. Delete from Cognito (last step - point of no return)
   try {
     if (COGNITO_POOL_ID && username) {
-      await cognitoClient.send(new AdminDeleteUserCommand({
+      await getCognitoClient().send(new AdminDeleteUserCommand({
         UserPoolId: COGNITO_POOL_ID,
         Username: username
       }));
@@ -866,19 +1005,25 @@ function sanitizeEvent(event) {
 /**
  * Main handler
  */
-exports.handler = async (event) => {
-  console.log('Event:', JSON.stringify(sanitizeEvent(event)));
+exports.handler = async (event, context) => {
+  // Get request ID for correlation
+  const requestId = requestContext.getRequestId(event, context);
+  const logger = requestContext.createLogger ? requestContext.createLogger(requestId, 'auth') : console;
+
+  logger.info ? logger.info('Request received', { path: event.path, method: event.httpMethod }) : console.log('Event:', JSON.stringify(sanitizeEvent(event)));
 
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers: corsHeaders, body: '' };
+    return { statusCode: 200, headers: { ...corsHeaders, 'X-Request-ID': requestId }, body: '' };
   }
 
   try {
     const path = event.path || '';
     const method = event.httpMethod || 'GET';
-    const body = event.body ? JSON.parse(event.body) : {};
-    const cognitoUser = getUserFromEvent(event);
+    let body = event.body ? JSON.parse(event.body) : {};
+
+    // Use secure JWT verification for authentication
+    const cognitoUser = await getUserFromEventSecure(event);
 
     // POST /auth/login - Called after Cognito login
     if (path.includes('/login') && method === 'POST') {
@@ -1007,6 +1152,18 @@ exports.handler = async (event) => {
         };
       }
 
+      if (validation) {
+        const profileValidation = validation.validateProfileUpdate(body);
+        if (!profileValidation.valid) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: false, error: 'Validation failed', details: profileValidation.errors })
+          };
+        }
+        body = profileValidation.data;
+      }
+
       const updated = await updateUser(cognitoUser.userId, body);
 
       return {
@@ -1026,6 +1183,14 @@ exports.handler = async (event) => {
           statusCode: 401,
           headers: corsHeaders,
           body: JSON.stringify({ success: false, error: 'Not authenticated' })
+        };
+      }
+
+      if (validation && !validation.validateActionType(body.action)) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ success: false, error: 'Invalid action type. Must be: add_asset or ai_query' })
         };
       }
 
@@ -1049,6 +1214,14 @@ exports.handler = async (event) => {
           statusCode: 401,
           headers: corsHeaders,
           body: JSON.stringify({ success: false, error: 'Not authenticated' })
+        };
+      }
+
+      if (validation && !validation.validateUsageType(body.type)) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ success: false, error: 'Invalid usage type. Must be: ai or asset' })
         };
       }
 
@@ -1106,6 +1279,18 @@ exports.handler = async (event) => {
           headers: corsHeaders,
           body: JSON.stringify({ success: false, error: 'Not authenticated' })
         };
+      }
+
+      if (validation) {
+        const settingsValidation = validation.validateSettings(body);
+        if (!settingsValidation.valid) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: false, error: 'Validation failed', details: settingsValidation.errors })
+          };
+        }
+        body = settingsValidation.data;
       }
 
       await updateUser(cognitoUser.userId, { settings: body });
@@ -1298,7 +1483,7 @@ exports.handler = async (event) => {
       if (linkingToken && password) {
         try {
           // Verify password via Cognito
-          const authResult = await cognitoClient.send(new AdminInitiateAuthCommand({
+          const authResult = await getCognitoClient().send(new AdminInitiateAuthCommand({
             UserPoolId: COGNITO_POOL_ID,
             ClientId: process.env.COGNITO_CLIENT_ID,
             AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
@@ -1438,7 +1623,7 @@ exports.handler = async (event) => {
         }
 
         // Delete the identity
-        await docClient.send(new DeleteCommand({
+        await getDynamoClient().send(new DeleteCommand({
           TableName: IDENTITIES_TABLE,
           Key: {
             userId: cognitoUser.userId,
@@ -1557,14 +1742,14 @@ exports.handler = async (event) => {
         let userToUpdate = null;
         
         if (targetUserId) {
-          const result = await docClient.send(new GetCommand({
+          const result = await getDynamoClient().send(new GetCommand({
             TableName: USERS_TABLE,
             Key: { userId: targetUserId }
           }));
           userToUpdate = result.Item;
         } else if (targetEmail) {
           // Scan for user by email
-          const scanResult = await docClient.send(new ScanCommand({
+          const scanResult = await getDynamoClient().send(new ScanCommand({
             TableName: USERS_TABLE,
             FilterExpression: 'email = :email',
             ExpressionAttributeValues: { ':email': targetEmail }
@@ -1586,7 +1771,7 @@ exports.handler = async (event) => {
 
         // Update user tier and limits
         const limits = TIER_LIMITS[tier];
-        await docClient.send(new UpdateCommand({
+        await getDynamoClient().send(new UpdateCommand({
           TableName: USERS_TABLE,
           Key: { userId: userToUpdate.userId },
           UpdateExpression: 'SET #plan = :plan, tier = :tier, tierUpdatedAt = :ts, credits.maxAssets = :maxAssets, credits.maxAi = :maxAi',
@@ -1655,7 +1840,7 @@ exports.handler = async (event) => {
       }
 
       try {
-        const result = await docClient.send(new ScanCommand({
+        const result = await getDynamoClient().send(new ScanCommand({
           TableName: USERS_TABLE,
           ProjectionExpression: 'userId, email, #n, #plan, tier, credits, createdAt, lastLogin',
           ExpressionAttributeNames: { '#n': 'name', '#plan': 'plan' }

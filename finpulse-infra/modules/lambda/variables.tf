@@ -99,3 +99,41 @@ variable "portfolio_reserved_concurrency" {
   type        = number
   default     = 0 # Disabled - account limit too low
 }
+
+# Lambda Layer Configuration
+variable "shared_layer_zip_path" {
+  description = "Path to the shared-utils Lambda layer ZIP file"
+  type        = string
+  default     = ""
+}
+
+variable "enable_shared_layer" {
+  description = "Enable shared utilities Lambda layer"
+  type        = bool
+  default     = true
+}
+
+variable "cognito_client_id" {
+  description = "Cognito User Pool Client ID for JWT verification"
+  type        = string
+  default     = ""
+}
+
+# CORS Configuration
+variable "allowed_origin" {
+  description = "CORS allowed origin for Lambda function responses"
+  type        = string
+  default     = "https://finpulse.me"
+
+  validation {
+    condition     = can(regex("^https://", var.allowed_origin)) && var.allowed_origin != "*"
+    error_message = "allowed_origin must be an HTTPS URL and cannot be '*'."
+  }
+}
+
+# Observability Configuration (Phase 5.1)
+variable "enable_xray_tracing" {
+  description = "Enable AWS X-Ray tracing for all Lambda functions"
+  type        = bool
+  default     = false
+}

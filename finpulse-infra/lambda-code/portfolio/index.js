@@ -1,54 +1,101 @@
 /**
- * FinPulse Portfolio Service
+ * FinPulse Portfolio Service v2.0
  * Manages user portfolios, holdings, and transactions
  */
 
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
+// =============================================================================
+// Shared Utilities from Lambda Layer (with fallback)
+// =============================================================================
+
+let envValidator, requestContext, validation, redisCache, rateLimiter;
+try {
+  envValidator = require('/opt/nodejs/env-validator');
+  requestContext = require('/opt/nodejs/request-context');
+  validation = require('/opt/nodejs/validation');
+  redisCache = require('/opt/nodejs/redis-cache');
+  rateLimiter = require('/opt/nodejs/rate-limiter');
+  console.log('[Portfolio] Loaded shared utilities from Lambda Layer');
+} catch (e) {
+  // Fallback to local shared directory
+  try {
+    envValidator = require('../shared/env-validator');
+    requestContext = require('../shared/request-context');
+    validation = require('./shared/validation');
+    redisCache = require('./shared/redis-cache');
+    console.log('[Portfolio] Loaded shared utilities from local shared');
+  } catch (e2) {
+    // Minimal fallbacks
+    envValidator = {
+      ensureEnvValidated: () => true,
+      getOptionalEnv: (name, def) => process.env[name] || def,
+    };
+    requestContext = {
+      createRequestContext: (event) => ({
+        requestId: event?.requestContext?.requestId || 'unknown',
+        logger: {
+          info: (msg, data) => console.log(JSON.stringify({ level: 'INFO', message: msg, ...data })),
+          error: (msg, data) => console.error(JSON.stringify({ level: 'ERROR', message: msg, ...data })),
+          warn: (msg, data) => console.warn(JSON.stringify({ level: 'WARN', message: msg, ...data })),
+        },
+      }),
+      addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
+    };
+    validation = {
+      validateHolding: (input) => ({ valid: true, data: input }),
+      validateUserId: () => true,
+      checkRateLimit: () => ({ allowed: true, remaining: 100 })
+    };
+    redisCache = {
+      checkRateLimit: async () => ({ allowed: true, remaining: 100, resetIn: 60 })
+    };
+    console.log('[Portfolio] Using fallback utilities');
+  }
+}
+
+// Validate environment at cold start
+try {
+  envValidator.ensureEnvValidated('portfolio');
+} catch (e) {
+  console.error('[Portfolio] Environment validation failed:', e.message);
+}
+
+// =============================================================================
+// AWS SDK Clients (lazy initialization for cold start optimization)
+// =============================================================================
+
+let dynamoClient = null;
+let docClient = null;
+
+function getDynamoClient() {
+  if (!docClient) {
+    const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+    const { DynamoDBDocumentClient } = require('@aws-sdk/lib-dynamodb');
+    dynamoClient = new DynamoDBClient({});
+    docClient = DynamoDBDocumentClient.from(dynamoClient);
+  }
+  return docClient;
+}
+
+// Import commands
+const { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
+
+// =============================================================================
+// Service-specific modules
+// =============================================================================
 
 // Alpaca service for live price data
 let alpacaService = null;
 try {
   alpacaService = require('./alpaca-service');
-  console.log('Alpaca service loaded for live price sync');
+  console.log('[Portfolio] Alpaca service loaded for live price sync');
 } catch (e) {
   try {
     alpacaService = require('../shared/alpaca-service');
-    console.log('Alpaca service loaded from shared');
+    console.log('[Portfolio] Alpaca service loaded from shared');
   } catch (e2) {
-    console.log('Alpaca service not available:', e2.message);
+    console.log('[Portfolio] Alpaca service not available:', e2.message);
   }
 }
-
-// Validation utilities
-let validation;
-try {
-  validation = require('./shared/validation');
-} catch {
-  // Fallback if shared module not copied yet
-  validation = {
-    validateHolding: (input) => ({ valid: true, data: input }),
-    validateUserId: () => true,
-    checkRateLimit: () => ({ allowed: true, remaining: 100 })
-  };
-}
-
-// Redis cache for distributed rate limiting
-let redisCache;
-try {
-  redisCache = require('./shared/redis-cache');
-  console.log('Redis cache loaded for distributed rate limiting');
-} catch {
-  // Fallback if redis-cache module not available
-  redisCache = {
-    checkRateLimit: async () => ({ allowed: true, remaining: 100, resetIn: 60 })
-  };
-  console.log('Redis cache not available, using fallback');
-}
-
-// Initialize clients
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
 const PORTFOLIOS_TABLE = `finpulse-portfolios-${process.env.ENVIRONMENT}`;
 const USERS_TABLE = `finpulse-users-${process.env.ENVIRONMENT}`;
@@ -126,11 +173,11 @@ function getUserIdFromEvent(event) {
     }
   }
   
-  // From headers for testing
-  if (event.headers?.['x-user-id']) {
+  // From headers for testing (dev/staging only)
+  if (process.env.ENVIRONMENT !== 'prod' && event.headers?.['x-user-id']) {
     return event.headers['x-user-id'];
   }
-  
+
   return null;
 }
 
@@ -169,7 +216,7 @@ async function fetchLivePrices(holdings) {
  * @param {boolean} includeLivePrices - Whether to fetch live prices (default: true)
  */
 async function getPortfolio(userId, includeLivePrices = true) {
-  const result = await docClient.send(new QueryCommand({
+  const result = await getDynamoClient().send(new QueryCommand({
     TableName: PORTFOLIOS_TABLE,
     KeyConditionExpression: 'userId = :userId',
     ExpressionAttributeValues: {
@@ -250,7 +297,7 @@ async function addHolding(userId, holding) {
     notes: holding.notes || ''
   };
 
-  await docClient.send(new PutCommand({
+  await getDynamoClient().send(new PutCommand({
     TableName: PORTFOLIOS_TABLE,
     Item: newItem
   }));
@@ -310,7 +357,7 @@ async function updateHolding(userId, holdingId, updates) {
     params.ExpressionAttributeNames = expressionNames;
   }
 
-  const result = await docClient.send(new UpdateCommand(params));
+  const result = await getDynamoClient().send(new UpdateCommand(params));
 
   return {
     id: result.Attributes.assetId,
@@ -328,7 +375,7 @@ async function updateHolding(userId, holdingId, updates) {
  * Uses DeleteCommand with composite key (userId + assetId)
  */
 async function removeHolding(userId, holdingId) {
-  await docClient.send(new DeleteCommand({
+  await getDynamoClient().send(new DeleteCommand({
     TableName: PORTFOLIOS_TABLE,
     Key: { userId, assetId: holdingId }
   }));
@@ -348,7 +395,7 @@ async function updatePrices(userId, priceUpdates) {
   for (const holding of portfolio.holdings) {
     const priceData = priceUpdates[holding.symbol];
     if (priceData) {
-      await docClient.send(new UpdateCommand({
+      await getDynamoClient().send(new UpdateCommand({
         TableName: PORTFOLIOS_TABLE,
         Key: { userId, assetId: holding.id },
         UpdateExpression: 'SET currentPrice = :price, change24h = :change, priceUpdatedAt = :updated',
@@ -530,7 +577,22 @@ exports.handler = async (event) => {
     // PUT /portfolio/holdings/{id} - Update holding
     if (path.includes('/holdings/') && method === 'PUT') {
       const holdingId = pathParams.holdingId || path.split('/').pop();
-      const updated = await updateHolding(userId, holdingId, body);
+
+      // Validate input (same as POST)
+      const validationResult = validation.validateHolding(body);
+      if (!validationResult.valid) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: false,
+            error: 'Validation failed',
+            details: validationResult.errors
+          })
+        };
+      }
+
+      const updated = await updateHolding(userId, holdingId, validationResult.data);
 
       return {
         statusCode: 200,

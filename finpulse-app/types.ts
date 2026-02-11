@@ -111,6 +111,7 @@ export interface CombinedSignal {
   hasConflict: boolean;
   conflictDetails?: string; // Description of conflicting signals
   accuracy?: number; // Historical accuracy % of this signal type
+  isMock?: boolean; // True when signal is generated from mock/demo data
   createdAt: number;
 }
 

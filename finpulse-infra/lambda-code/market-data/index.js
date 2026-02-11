@@ -1,5 +1,5 @@
 /**
- * FinPulse Market Data Service v3.1
+ * FinPulse Market Data Service v3.2
  * Single data source: Alpaca Markets
  * Now includes FX service (merged from standalone fx-service)
  *
@@ -19,8 +19,73 @@
  * - GET /fx/rates, /fx/convert, /fx/currencies - Backward compatibility routes
  */
 
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+// =============================================================================
+// Shared Utilities from Lambda Layer (with fallback)
+// =============================================================================
+
+// Environment validator - checks required env vars at cold start
+let envValidator, requestContext;
+try {
+  envValidator = require('/opt/nodejs/env-validator');
+  requestContext = require('/opt/nodejs/request-context');
+  console.log('[MarketData] Loaded shared utilities from Lambda Layer');
+} catch (e) {
+  // Fallback to local shared directory for local development
+  try {
+    envValidator = require('../shared/env-validator');
+    requestContext = require('../shared/request-context');
+    console.log('[MarketData] Loaded shared utilities from local shared');
+  } catch (e2) {
+    // Minimal fallback if neither available
+    envValidator = {
+      ensureEnvValidated: () => true,
+      getOptionalEnv: (name, def) => process.env[name] || def,
+    };
+    requestContext = {
+      createRequestContext: (event) => ({
+        requestId: event?.requestContext?.requestId || 'unknown',
+        logger: {
+          info: (msg, data) => console.log(JSON.stringify({ level: 'INFO', message: msg, ...data })),
+          error: (msg, data) => console.error(JSON.stringify({ level: 'ERROR', message: msg, ...data })),
+          warn: (msg, data) => console.warn(JSON.stringify({ level: 'WARN', message: msg, ...data })),
+        },
+      }),
+      addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
+    };
+  }
+}
+
+// Validate environment at cold start
+try {
+  envValidator.ensureEnvValidated('market-data');
+} catch (e) {
+  console.error('[MarketData] Environment validation failed:', e.message);
+  // Continue but log the error - don't fail completely for backwards compatibility
+}
+
+// =============================================================================
+// AWS SDK Clients (lazy initialization for cold start optimization)
+// =============================================================================
+
+let dynamoClient = null;
+let docClient = null;
+
+function getDynamoClient() {
+  if (!docClient) {
+    const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+    const { DynamoDBDocumentClient } = require('@aws-sdk/lib-dynamodb');
+    dynamoClient = new DynamoDBClient({});
+    docClient = DynamoDBDocumentClient.from(dynamoClient);
+  }
+  return docClient;
+}
+
+// Import commands when needed
+const { PutCommand, GetCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+
+// =============================================================================
+// Service-specific modules (Alpaca, Cache)
+// =============================================================================
 
 // Alpaca service (single source of truth)
 // Try multiple paths for Lambda deployment compatibility
@@ -36,39 +101,51 @@ try {
 }
 
 // Multi-tier cache manager
+// Priority: Lambda Layer → local shared → fallback
 let cacheManager = null;
 try {
-  cacheManager = require('./cache-manager');
-  console.log('Cache manager loaded successfully');
+  cacheManager = require('/opt/nodejs/cache-manager');
+  console.log('[MarketData] Cache manager loaded from Lambda Layer');
 } catch (e) {
   try {
-    cacheManager = require('./shared/cache-manager');
-    console.log('Cache manager loaded from ./shared');
+    cacheManager = require('./cache-manager');
+    console.log('[MarketData] Cache manager loaded from local');
   } catch (e2) {
     try {
-      cacheManager = require('../shared/cache-manager');
-      console.log('Cache manager loaded from ../shared');
+      cacheManager = require('./shared/cache-manager');
+      console.log('[MarketData] Cache manager loaded from ./shared');
     } catch (e3) {
-      console.log('Cache manager not available:', e3.message);
+      try {
+        cacheManager = require('../shared/cache-manager');
+        console.log('[MarketData] Cache manager loaded from ../shared');
+      } catch (e4) {
+        console.log('[MarketData] Cache manager not available');
+      }
     }
   }
 }
 
-// Redis cache utility (fallback)
+// Redis cache utility
+// Priority: Lambda Layer → local shared → fallback
 let redisCache = null;
 try {
-  redisCache = require('./shared/redis-cache');
+  redisCache = require('/opt/nodejs/redis-cache');
+  console.log('[MarketData] Redis cache loaded from Lambda Layer');
 } catch (e) {
   try {
-    redisCache = require('../shared/redis-cache');
+    redisCache = require('./shared/redis-cache');
   } catch (e2) {
-    console.log('Redis cache not available');
+    try {
+      redisCache = require('../shared/redis-cache');
+    } catch (e3) {
+      console.log('[MarketData] Redis cache not available');
+    }
   }
 }
 
-// Initialize DynamoDB
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+// =============================================================================
+// Constants
+// =============================================================================
 
 // In-memory price cache (fallback when Redis unavailable)
 const priceCache = new Map();
@@ -139,9 +216,9 @@ function getRateLimitStatus() {
 // Static exchange rates (updated periodically)
 // =============================================================================
 
-// Static rates (as of last update - refresh manually or via scheduled job)
+// Fallback static rates (used when live API is unavailable)
 // Base: USD - Last updated: 2026-01-09
-const FX_STATIC_RATES = {
+const FX_FALLBACK_RATES = {
   USD: 1,
   EUR: 0.92,
   GBP: 0.79,
@@ -174,39 +251,126 @@ const FX_STATIC_RATES = {
   SAR: 3.75,
 };
 
-const FX_LAST_UPDATED = '2026-01-09T00:00:00Z';
-const FX_SUPPORTED_CURRENCIES = Object.keys(FX_STATIC_RATES);
+const FX_FALLBACK_UPDATED = '2026-01-09T00:00:00Z';
+const FX_SUPPORTED_CURRENCIES = Object.keys(FX_FALLBACK_RATES);
 
-// Cache for converted FX rates
+// Cache for FX rates (memory + Redis)
 const fxRatesCache = new Map();
-const FX_CACHE_TTL = 3600000; // 1 hour
+const FX_CACHE_TTL = 900000; // 15 minutes
+const FX_REDIS_TTL = 900; // 15 minutes in seconds
+
+/**
+ * Fetch live FX rates from Frankfurter API (free, no API key)
+ * @returns {{ rates: object, timestamp: string, source: string }} USD-based rates
+ */
+async function fetchLiveFxRates() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch('https://api.frankfurter.app/latest?from=USD', {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`Frankfurter API responded with ${response.status}`);
+    }
+
+    const data = await response.json();
+    // Frankfurter returns rates relative to USD but doesn't include USD itself
+    const rates = { USD: 1, ...data.rates };
+    // Add currencies Frankfurter doesn't cover using fallback
+    for (const [currency, rate] of Object.entries(FX_FALLBACK_RATES)) {
+      if (!(currency in rates)) {
+        rates[currency] = rate;
+      }
+    }
+    return {
+      rates,
+      timestamp: new Date(data.date + 'T12:00:00Z').toISOString(),
+      source: 'live',
+    };
+  } catch (error) {
+    clearTimeout(timeout);
+    console.warn('[FX] Live rate fetch failed, using fallback:', error.message);
+    return null;
+  }
+}
 
 /**
  * Get exchange rates for a given base currency
+ * Multi-tier cache: Memory → Redis → Frankfurter API → Static fallback
  * @param {string} baseCurrency - Base currency code (e.g., 'USD', 'EUR')
- * @returns {object} - Exchange rates relative to base
+ * @returns {Promise<{ rates: object, timestamp: string, source: string }>}
  */
-function getExchangeRates(baseCurrency = 'USD') {
-  const cacheKey = `fx:${baseCurrency}`;
-  const cached = fxRatesCache.get(cacheKey);
-
-  if (cached && (Date.now() - cached.timestamp) < FX_CACHE_TTL) {
-    return cached.rates;
+async function getExchangeRates(baseCurrency = 'USD') {
+  // Layer 1: Memory cache (per-base)
+  const memKey = `fx:${baseCurrency}`;
+  const memCached = fxRatesCache.get(memKey);
+  if (memCached && (Date.now() - memCached.fetchedAt) < FX_CACHE_TTL) {
+    return memCached;
   }
 
-  const baseRate = FX_STATIC_RATES[baseCurrency];
+  // Layer 2: Redis cache (USD-based rates, then convert)
+  const redisKey = 'fx:usd:latest';
+  let usdRates = null;
+  let timestamp = null;
+  let source = 'fallback';
+
+  if (redisCache) {
+    try {
+      const redisCached = await redisCache.get(redisKey);
+      if (redisCached && redisCached.rates) {
+        usdRates = redisCached.rates;
+        timestamp = redisCached.timestamp;
+        source = redisCached.source || 'redis';
+      }
+    } catch (e) {
+      console.warn('[FX] Redis read failed:', e.message);
+    }
+  }
+
+  // Layer 3: Live API fetch
+  if (!usdRates) {
+    const liveData = await fetchLiveFxRates();
+    if (liveData) {
+      usdRates = liveData.rates;
+      timestamp = liveData.timestamp;
+      source = 'live';
+
+      // Store in Redis
+      if (redisCache) {
+        try {
+          await redisCache.set(redisKey, { rates: usdRates, timestamp, source }, FX_REDIS_TTL);
+        } catch (e) {
+          console.warn('[FX] Redis write failed:', e.message);
+        }
+      }
+    }
+  }
+
+  // Layer 4: Static fallback
+  if (!usdRates) {
+    usdRates = FX_FALLBACK_RATES;
+    timestamp = FX_FALLBACK_UPDATED;
+    source = 'fallback';
+  }
+
+  // Convert from USD base to requested base
+  const baseRate = usdRates[baseCurrency];
   if (!baseRate) {
     throw new Error(`Unsupported base currency: ${baseCurrency}`);
   }
 
-  // Convert all rates relative to requested base
   const rates = {};
-  for (const [currency, rate] of Object.entries(FX_STATIC_RATES)) {
+  for (const [currency, rate] of Object.entries(usdRates)) {
     rates[currency] = rate / baseRate;
   }
 
-  fxRatesCache.set(cacheKey, { rates, timestamp: Date.now() });
-  return rates;
+  const result = { rates, timestamp, source, fetchedAt: Date.now() };
+  fxRatesCache.set(memKey, result);
+  return result;
 }
 
 /**
@@ -216,7 +380,7 @@ function getExchangeRates(baseCurrency = 'USD') {
  * @param {object} corsHeaders - CORS headers to use
  * @returns {object|null} - Response object or null if not an FX route
  */
-function handleFxRoutes(path, queryParams, corsHeaders) {
+async function handleFxRoutes(path, queryParams, corsHeaders) {
   // Match both /fx/* and /market/fx/* paths
   const isFxRoute = path.includes('/fx/') || path.endsWith('/fx');
   if (!isFxRoute) return null;
@@ -226,12 +390,12 @@ function handleFxRoutes(path, queryParams, corsHeaders) {
     const base = (queryParams.base || 'USD').toUpperCase();
 
     try {
-      const rates = getExchangeRates(base);
+      const fxData = await getExchangeRates(base);
 
       // Filter to supported currencies
       const filteredRates = {};
       FX_SUPPORTED_CURRENCIES.forEach(currency => {
-        if (rates[currency]) filteredRates[currency] = rates[currency];
+        if (fxData.rates[currency]) filteredRates[currency] = fxData.rates[currency];
       });
 
       return {
@@ -241,9 +405,8 @@ function handleFxRoutes(path, queryParams, corsHeaders) {
           success: true,
           base: base,
           rates: filteredRates,
-          timestamp: FX_LAST_UPDATED,
-          source: 'static',
-          note: 'Rates are approximate and updated weekly. For real-time FX, upgrade to premium.'
+          timestamp: fxData.timestamp,
+          source: fxData.source,
         })
       };
     } catch (error) {
@@ -272,7 +435,7 @@ function handleFxRoutes(path, queryParams, corsHeaders) {
     }
 
     const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount < 0) {
+    if (isNaN(numericAmount) || numericAmount <= 0) {
       return {
         statusCode: 400,
         headers: corsHeaders,
@@ -283,8 +446,8 @@ function handleFxRoutes(path, queryParams, corsHeaders) {
     try {
       const fromCurrency = from.toUpperCase();
       const toCurrency = to.toUpperCase();
-      const rates = getExchangeRates(fromCurrency);
-      const rate = rates[toCurrency];
+      const fxData = await getExchangeRates(fromCurrency);
+      const rate = fxData.rates[toCurrency];
 
       if (!rate) {
         return {
@@ -310,8 +473,8 @@ function handleFxRoutes(path, queryParams, corsHeaders) {
           amount: numericAmount,
           rate: rate,
           converted: Math.round(converted * 100) / 100,
-          timestamp: FX_LAST_UPDATED,
-          source: 'static'
+          timestamp: fxData.timestamp,
+          source: fxData.source,
         })
       };
     } catch (error) {
@@ -332,7 +495,6 @@ function handleFxRoutes(path, queryParams, corsHeaders) {
         success: true,
         currencies: FX_SUPPORTED_CURRENCIES,
         count: FX_SUPPORTED_CURRENCIES.length,
-        lastUpdated: FX_LAST_UPDATED
       })
     };
   }
@@ -346,7 +508,7 @@ function handleFxRoutes(path, queryParams, corsHeaders) {
       version: '2.1.0',
       source: 'static',
       note: 'Using static rates (Alpaca does not provide FX data)',
-      lastUpdated: FX_LAST_UPDATED,
+      lastUpdated: FX_FALLBACK_UPDATED,
       endpoints: [
         'GET /fx/rates?base=USD',
         'GET /fx/convert?amount=100&from=USD&to=ILS',
@@ -513,7 +675,7 @@ async function getStoredHistoricalPrices(symbol, hours = 24) {
   const startTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 
   try {
-    const result = await docClient.send(new QueryCommand({
+    const result = await getDynamoClient().send(new QueryCommand({
       TableName: tableName,
       KeyConditionExpression: 'symbol = :symbol AND #ts >= :startTime',
       ExpressionAttributeNames: { '#ts': 'timestamp' },
@@ -552,7 +714,7 @@ async function storePrices(prices, type) {
       provider: 'alpaca',
       ttl: Math.floor(Date.now() / 1000) + 86400 * 7 // 7 days TTL
     };
-    return docClient.send(new PutCommand({
+    return getDynamoClient().send(new PutCommand({
       TableName: tableName,
       Item: item
     })).catch(e => console.warn(`Failed to store ${symbol}:`, e.message));
@@ -612,7 +774,7 @@ exports.handler = async (event) => {
     const queryParams = event.queryStringParameters || {};
 
     // Handle FX routes (both /fx/* and /market/fx/*)
-    const fxResponse = handleFxRoutes(path, queryParams, corsHeaders);
+    const fxResponse = await handleFxRoutes(path, queryParams, corsHeaders);
     if (fxResponse) {
       return fxResponse;
     }

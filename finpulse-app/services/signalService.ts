@@ -183,7 +183,8 @@ export function combineSignals(
   symbol: string,
   whale: WhaleSignal | null,
   trade: TradeSignal | null,
-  sentiment: SentimentSignal | null
+  sentiment: SentimentSignal | null,
+  isMock?: boolean
 ): CombinedSignal {
   // Validate inputs
   const allNullOrInvalid = [whale, trade, sentiment].every((s) => s === null || !validateSignal(s));
@@ -226,6 +227,7 @@ export function combineSignals(
     hasConflict: conflict.hasConflict,
     conflictDetails: conflict.details || undefined,
     accuracy,
+    ...(isMock !== undefined ? { isMock } : {}),
     createdAt: Date.now(),
   };
 }
@@ -361,6 +363,8 @@ export async function generateLiveSignals(symbol: string): Promise<CombinedSigna
   let tradeSignal: TradeSignal | null = null;
   let sentimentSignal: SentimentSignal | null = null;
 
+  let whaleMockFlag = false;
+
   // Fetch all signals in parallel with error handling for each
   const results = await Promise.allSettled([
     // Whale signal from whale wallet service
@@ -368,13 +372,14 @@ export async function generateLiveSignals(symbol: string): Promise<CombinedSigna
       try {
         const service = await getWhaleService();
         const metrics = await service.getWhaleMetrics(symbol);
+        whaleMockFlag = service.wasMockData;
         return service.convertToWhaleSignal(metrics);
       } catch (error) {
         signalLogger.warn(`Failed to fetch whale signal for ${symbol}:`, error);
         return null;
       }
     })(),
-    
+
     // Trade signal from technical analysis
     (async () => {
       try {
@@ -388,7 +393,7 @@ export async function generateLiveSignals(symbol: string): Promise<CombinedSigna
         return null;
       }
     })(),
-    
+
     // Sentiment signal from social data
     (async () => {
       try {
@@ -412,10 +417,10 @@ export async function generateLiveSignals(symbol: string): Promise<CombinedSigna
     sentimentSignal = results[2].value;
   }
 
-  signalLogger.info(`Signals fetched for ${symbol}: whale=${!!whaleSignal}, trade=${!!tradeSignal}, sentiment=${!!sentimentSignal}`);
+  signalLogger.info(`Signals fetched for ${symbol}: whale=${!!whaleSignal}, trade=${!!tradeSignal}, sentiment=${!!sentimentSignal}, whaleMock=${whaleMockFlag}`);
 
-  // Combine signals using existing logic
-  return combineSignals(symbol, whaleSignal, tradeSignal, sentimentSignal);
+  // Combine signals using existing logic, propagate isMock flag
+  return combineSignals(symbol, whaleSignal, tradeSignal, sentimentSignal, whaleMockFlag || undefined);
 }
 
 /**
@@ -460,7 +465,6 @@ export default {
   determineDirection,
   combineSignals,
   getAverageAccuracy,
-  createMockSignals,
   generateLiveSignals,
   generateLiveSignalsBatch,
 };

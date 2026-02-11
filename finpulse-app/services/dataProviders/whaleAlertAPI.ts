@@ -66,11 +66,13 @@ export class WhaleAlertAPI {
   /**
    * Fetch recent whale transactions
    * @param minValue Minimum transaction value in USD (default: $500k)
+   * @param currency Optional Whale Alert currency name for server-side filtering
    * @param start Start timestamp (default: 24h ago)
    * @param end End timestamp (default: now)
    */
   async getTransactions(
     minValue: number = 500000,
+    currency?: string,
     start?: number,
     end?: number
   ): Promise<WhaleTransaction[]> {
@@ -87,22 +89,12 @@ export class WhaleAlertAPI {
     url.searchParams.append('start', startTime.toString());
     url.searchParams.append('end', endTime.toString());
     url.searchParams.append('min_value', minValue.toString());
+    if (currency) {
+      url.searchParams.append('currency', currency);
+    }
 
     try {
-      const response = await throttle('whaleAlert', async () => {
-        const res = await fetch(url.toString());
-
-        if (!res.ok) {
-          if (res.status === 429) {
-            throw new Error('Whale Alert rate limit exceeded');
-          }
-          throw new Error(`Whale Alert API error: ${res.status} ${res.statusText}`);
-        }
-
-        return res.json();
-      });
-
-      const data = response as WhaleAlertResponse;
+      const data = await this.fetchWithRetry(url.toString());
 
       if (data.result !== 'success') {
         throw new Error(`Whale Alert API returned error: ${data.result}`);
@@ -116,25 +108,67 @@ export class WhaleAlertAPI {
   }
 
   /**
-   * Get transactions for specific blockchain
-   */
-  async getTransactionsByBlockchain(
-    blockchain: string,
-    minValue: number = 500000
-  ): Promise<WhaleTransaction[]> {
-    const transactions = await this.getTransactions(minValue);
-    return transactions.filter(tx => tx.blockchain === blockchain);
-  }
-
-  /**
-   * Get transactions for specific symbol
+   * Get transactions for specific symbol (server-side filtered)
    */
   async getTransactionsBySymbol(
     symbol: string,
     minValue: number = 500000
   ): Promise<WhaleTransaction[]> {
-    const transactions = await this.getTransactions(minValue);
-    return transactions.filter(tx => tx.symbol === symbol);
+    const currency = mapSymbolToWhaleAlert(symbol);
+    return this.getTransactions(minValue, currency);
+  }
+
+  /**
+   * Fetch with retry and exponential backoff
+   * Retries on 429 (rate limit) and 5xx (server error)
+   * @param url Full URL to fetch
+   * @param maxRetries Maximum retry attempts (default: 3)
+   */
+  private async fetchWithRetry(
+    url: string,
+    maxRetries: number = 3
+  ): Promise<WhaleAlertResponse> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await throttle('whaleAlert', async () => {
+          const res = await fetch(url);
+
+          if (!res.ok) {
+            const isRetryable = res.status === 429 || res.status >= 500;
+            const err = new Error(`Whale Alert API error: ${res.status} ${res.statusText}`);
+            (err as any).status = res.status;
+            (err as any).retryable = isRetryable;
+            throw err;
+          }
+
+          return res.json();
+        });
+
+        return response as WhaleAlertResponse;
+      } catch (error: any) {
+        lastError = error;
+
+        // Don't retry on non-retryable errors or final attempt
+        if (!error.retryable || attempt === maxRetries) {
+          break;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s + 10% jitter
+        const baseDelay = Math.pow(2, attempt) * 1000;
+        const jitter = baseDelay * 0.1 * Math.random();
+        const delay = baseDelay + jitter;
+
+        console.warn(
+          `[WhaleAlert] Retry ${attempt + 1}/${maxRetries} after ${Math.round(delay)}ms (status: ${error.status})`
+        );
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError || new Error('Whale Alert API request failed');
   }
 
   /**

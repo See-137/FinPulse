@@ -85,6 +85,8 @@ jobs:
           VITE_COGNITO_CLIENT_ID: ${{ secrets.VITE_COGNITO_CLIENT_ID_STAGING }}
           VITE_COGNITO_REGION: us-east-1
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_WHALE_ALERT_API_KEY: ${{ secrets.VITE_WHALE_ALERT_API_KEY }}
+          VITE_ENABLE_LIVE_WHALE_DATA: true
           VITE_ENABLE_AI: true
           VITE_ENABLE_COMMUNITY: true
           VITE_ENABLE_NEWS: true
@@ -102,6 +104,8 @@ jobs:
           VITE_OAUTH_LOGOUT_URI: https://finpulse.me
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
           VITE_TWITTER_BEARER_TOKEN: ${{ secrets.VITE_TWITTER_BEARER_TOKEN }}
+          VITE_WHALE_ALERT_API_KEY: ${{ secrets.VITE_WHALE_ALERT_API_KEY }}
+          VITE_ENABLE_LIVE_WHALE_DATA: true
           VITE_ENABLE_AI: true
           VITE_ENABLE_COMMUNITY: true
           VITE_ENABLE_NEWS: true

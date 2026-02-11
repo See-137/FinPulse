@@ -1,12 +1,50 @@
 /**
- * LemonSqueezy Payments Lambda
+ * LemonSqueezy Payments Lambda v2.0
  * Handles checkout sessions, webhooks, and subscription management
- * 
+ *
  * LemonSqueezy API: https://docs.lemonsqueezy.com/api
  * Webhooks: https://docs.lemonsqueezy.com/guides/developer-guide/webhooks
  */
 
 const crypto = require('crypto');
+
+// =============================================================================
+// Shared Utilities from Lambda Layer (with fallback)
+// =============================================================================
+
+let envValidator, requestContext;
+try {
+  envValidator = require('/opt/nodejs/env-validator');
+  requestContext = require('/opt/nodejs/request-context');
+  console.log('[Payments] Loaded shared utilities from Lambda Layer');
+} catch (e) {
+  // Minimal fallbacks
+  envValidator = {
+    ensureEnvValidated: () => true,
+    getOptionalEnv: (name, def) => process.env[name] || def,
+  };
+  requestContext = {
+    createRequestContext: (event) => ({
+      requestId: event?.requestContext?.requestId || 'unknown',
+      logger: {
+        info: (msg, data) => console.log(JSON.stringify({ level: 'INFO', message: msg, ...data })),
+        error: (msg, data) => console.error(JSON.stringify({ level: 'ERROR', message: msg, ...data })),
+      },
+    }),
+    addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
+  };
+}
+
+// Validate environment at cold start
+try {
+  envValidator.ensureEnvValidated('payments');
+} catch (e) {
+  console.error('[Payments] Environment validation failed:', e.message);
+}
+
+// =============================================================================
+// Configuration
+// =============================================================================
 
 // LemonSqueezy API configuration
 const LEMONSQUEEZY_API_KEY = process.env.LEMONSQUEEZY_API_KEY;
@@ -34,11 +72,104 @@ const headers = {
   'Content-Type': 'application/json'
 };
 
-// AWS SDK
-const AWS = require('aws-sdk');
-const dynamoDB = new AWS.DynamoDB.DocumentClient();
+// =============================================================================
+// AWS SDK Clients (lazy initialization for cold start optimization)
+// Uses SDK v2 style for backwards compatibility with existing code
+// =============================================================================
+
+let _dynamoDB = null;
+
+// Lazy-loaded DynamoDB DocumentClient
+const dynamoDB = {
+  put: (params) => {
+    if (!_dynamoDB) {
+      const AWS = require('aws-sdk');
+      _dynamoDB = new AWS.DynamoDB.DocumentClient();
+    }
+    return _dynamoDB.put(params);
+  },
+  get: (params) => {
+    if (!_dynamoDB) {
+      const AWS = require('aws-sdk');
+      _dynamoDB = new AWS.DynamoDB.DocumentClient();
+    }
+    return _dynamoDB.get(params);
+  },
+  update: (params) => {
+    if (!_dynamoDB) {
+      const AWS = require('aws-sdk');
+      _dynamoDB = new AWS.DynamoDB.DocumentClient();
+    }
+    return _dynamoDB.update(params);
+  },
+  delete: (params) => {
+    if (!_dynamoDB) {
+      const AWS = require('aws-sdk');
+      _dynamoDB = new AWS.DynamoDB.DocumentClient();
+    }
+    return _dynamoDB.delete(params);
+  },
+  query: (params) => {
+    if (!_dynamoDB) {
+      const AWS = require('aws-sdk');
+      _dynamoDB = new AWS.DynamoDB.DocumentClient();
+    }
+    return _dynamoDB.query(params);
+  },
+  scan: (params) => {
+    if (!_dynamoDB) {
+      const AWS = require('aws-sdk');
+      _dynamoDB = new AWS.DynamoDB.DocumentClient();
+    }
+    return _dynamoDB.scan(params);
+  }
+};
+
+const ENVIRONMENT = process.env.ENVIRONMENT || 'prod';
 const USERS_TABLE = process.env.USERS_TABLE || 'finpulse-users';
 const SUBSCRIPTIONS_TABLE = process.env.SUBSCRIPTIONS_TABLE || 'finpulse-subscriptions';
+const CACHE_TABLE = `finpulse-api-cache-${ENVIRONMENT}`;
+
+/**
+ * Check if a webhook event has already been processed (idempotency)
+ * Uses api-cache table with TTL for automatic cleanup
+ * @param {string} eventKey - Unique key for the webhook event
+ * @returns {Promise<boolean>} - true if already processed
+ */
+async function isWebhookProcessed(eventKey) {
+  try {
+    const result = await dynamoDB.get({
+      TableName: CACHE_TABLE,
+      Key: { cacheKey: `webhook:${eventKey}` }
+    }).promise();
+    return !!result.Item;
+  } catch (error) {
+    console.warn('Idempotency check failed, proceeding:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Mark a webhook event as processed
+ * @param {string} eventKey - Unique key for the webhook event
+ * @param {string} eventName - Name of the webhook event
+ */
+async function markWebhookProcessed(eventKey, eventName) {
+  try {
+    await dynamoDB.put({
+      TableName: CACHE_TABLE,
+      Item: {
+        cacheKey: `webhook:${eventKey}`,
+        dataType: 'webhook',
+        eventName,
+        processedAt: new Date().toISOString(),
+        expiresAt: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7-day TTL
+      }
+    }).promise();
+  } catch (error) {
+    console.warn('Failed to mark webhook processed:', error.message);
+  }
+}
 
 /**
  * Make authenticated request to LemonSqueezy API
@@ -68,17 +199,23 @@ async function lemonSqueezyRequest(endpoint, options = {}) {
  */
 function verifyWebhookSignature(payload, signature) {
   if (!LEMONSQUEEZY_WEBHOOK_SECRET) {
-    console.warn('No webhook secret configured, skipping verification');
-    return true;
+    console.error('[Payments] CRITICAL: No webhook secret configured, rejecting webhook');
+    return false;
+  }
+
+  if (!signature) {
+    return false;
   }
 
   const hmac = crypto.createHmac('sha256', LEMONSQUEEZY_WEBHOOK_SECRET);
   const digest = hmac.update(payload).digest('hex');
-  
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(digest)
-  );
+
+  const sigBuf = Buffer.from(signature);
+  const digestBuf = Buffer.from(digest);
+  if (sigBuf.length !== digestBuf.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(sigBuf, digestBuf);
 }
 
 /**
@@ -408,6 +545,17 @@ async function handleWebhook(event) {
 
   console.log('Webhook event:', eventName);
 
+  // Idempotency check — prevent duplicate processing on webhook retries
+  const idempotencyKey = `${eventName}:${data.id}:${data.attributes?.updated_at || 'unknown'}`;
+  if (await isWebhookProcessed(idempotencyKey)) {
+    console.log('Webhook already processed, skipping:', idempotencyKey);
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ received: true, deduplicated: true })
+    };
+  }
+
   try {
     switch (eventName) {
       case 'subscription_created':
@@ -437,6 +585,9 @@ async function handleWebhook(event) {
       default:
         console.log('Unhandled webhook event:', eventName);
     }
+
+    // Mark as processed after successful handling
+    await markWebhookProcessed(idempotencyKey, eventName);
 
     return {
       statusCode: 200,

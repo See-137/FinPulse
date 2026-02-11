@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Logo, SaaS_PLANS } from './constants';
+import { Logo } from './constants';
 // Critical components - loaded immediately
 import { MarketTicker } from './components/MarketTicker';
 import { LandingPage } from './components/LandingPage';
@@ -9,6 +9,8 @@ import { NotificationBell } from './components/NotificationBell';
 import { TopBanner } from './components/TopBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator';
+import { GlobalErrorHandler } from './components/GlobalErrorHandler';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Lazy-loaded components (code splitting)
 const NewsSidebar = lazy(() => import('./components/NewsSidebar').then(m => ({ default: m.NewsSidebar })));
@@ -38,10 +40,7 @@ import { milestoneService } from './services/milestoneService';
 import { Milestone } from './types/notifications';
 import { LayoutGrid, Users, Menu, X, Terminal, Star, Check } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
-import { auth } from './services/authService';
 import { LanguageProvider, useLanguage } from './i18n';
-import { usePortfolioStore } from './store/portfolioStore';
-import { api } from './services/apiService';
 
 // Loading fallback component
 const LoadingSpinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
@@ -53,36 +52,11 @@ const LoadingSpinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }
   );
 };
 
-// Map backend plan names to frontend plan types
-const mapBackendPlanToFrontend = (backendPlan: string | undefined): PlanType => {
-  const planMap: Record<string, PlanType> = {
-    'FREE': 'FREE',
-    'free': 'FREE',
-    'PROPULSE': 'PROPULSE',
-    'propulse': 'PROPULSE',
-    'PREMIUM': 'PROPULSE',    // Backend 'premium' maps to 'PROPULSE'
-    'premium': 'PROPULSE',
-    'SUPERPULSE': 'SUPERPULSE',
-    'superpulse': 'SUPERPULSE',
-    'PRO': 'SUPERPULSE',       // Backend 'PRO' maps to 'SUPERPULSE' (highest tier)
-    'pro': 'SUPERPULSE',
-    'ENTERPRISE': 'SUPERPULSE',
-    'enterprise': 'SUPERPULSE'
-  };
-  return planMap[backendPlan || 'FREE'] || 'FREE';
-};
-
-const USER_STORAGE_KEY = 'finpulse_user_session';
-
 // Inner App component that uses language context
 const AppContent: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
-  const { setCurrentUser, clearCurrentUser } = usePortfolioStore();
-  
-  // OAuth callback handling state
-  const [isOAuthProcessing, setIsOAuthProcessing] = useState(false);
-  const [oauthError, setOauthError] = useState<string | null>(null);
-  
+  const { user, isAuthInitializing, isOAuthProcessing, oauthError, userCreatedAt, login, logout, updateUser: authUpdateUser, updateUserPlan } = useAuth();
+
   const [view, setView] = useState<'landing' | 'welcome' | 'dashboard' | 'terms' | 'privacy' | 'pricing' | 'accessibility'>(() => {
     // Check for OAuth callback in URL
     const pathname = window.location.pathname;
@@ -90,7 +64,7 @@ const AppContent: React.FC = () => {
     if (pathname.includes('/oauth/callback') || searchParams.has('code')) {
       return 'landing'; // Will be processed by OAuth handler
     }
-    
+
     // Check URL hash for legal pages
     const hash = window.location.hash.slice(1);
     if (hash === 'terms') return 'terms';
@@ -100,14 +74,10 @@ const AppContent: React.FC = () => {
     return 'landing';
   });
   const [activeTab, setActiveTab] = useState<'portfolio' | 'watchlist' | 'community'>('portfolio');
-  const [user, setUser] = useState<User | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNewsSidebarOpen, setIsNewsSidebarOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
-  
-  // Track user creation date for onboarding logic
-  const [userCreatedAt, setUserCreatedAt] = useState<string | undefined>(undefined);
   
   // Notification & Onboarding State
   const { showChangelog, currentChangelog, dismissChangelog } = useChangelog();
@@ -171,172 +141,13 @@ const AppContent: React.FC = () => {
     return (localStorage.getItem('theme') as Theme) || 'system';
   });
 
-  // Helper to check if JWT is expired (kept for future use)
-  const _isTokenExpired = (token: string): boolean => {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const expiry = payload.exp * 1000;
-      return Date.now() >= expiry;
-    } catch {
-      return true;
+  // Navigate to dashboard when user becomes authenticated (session restore or OAuth)
+  useEffect(() => {
+    if (user && view === 'landing' && !isAuthInitializing && !isOAuthProcessing) {
+      setView('dashboard');
     }
-  };
-
-  // Helper to clear all auth data
-  const clearAuthData = () => {
-    auth.signOut();
-    api.setIdToken(null);
-    localStorage.removeItem('finpulse_id_token');
-    localStorage.removeItem('finpulse_user_session');
-    localStorage.removeItem('finpulse_auth_tokens');
-    localStorage.removeItem('finpulse_user');
-    localStorage.removeItem('finpulse_cognito_user');
-  };
-
-  // Auth initialization state
-  const [isAuthInitializing, setIsAuthInitializing] = useState(true);
-
-  // Restore session from Cognito (proper auth flow with async token refresh)
-  useEffect(() => {
-    const restoreAuth = async () => {
-      setIsAuthInitializing(true);
-      
-      try {
-        // DEV MODE: Allow bypassing auth with localStorage flag
-        const devModeUser = localStorage.getItem('finpulse_dev_user');
-        if (devModeUser && import.meta.env.DEV) {
-          console.log('[App] DEV MODE: Using local user session');
-          const parsedUser = JSON.parse(devModeUser);
-          setUser(parsedUser);
-          setView('dashboard');
-          setIsAuthInitializing(false);
-          return;
-        }
-        
-        // Use new async initializeAuth that properly waits for token refresh
-        const cognitoUser = await auth.initializeAuth();
-        
-        if (!cognitoUser) {
-          console.log('[App] No valid session to restore');
-          setIsAuthInitializing(false);
-          return; // No session to restore - stay on landing
-        }
-        
-        const idToken = localStorage.getItem('finpulse_id_token');
-        if (!idToken) {
-          // Partial session state - clean it up
-          console.log('[App] Partial session state, cleaning up');
-          clearAuthData();
-          setIsAuthInitializing(false);
-          return;
-        }
-        
-        // Token is already validated and refreshed by initializeAuth
-        api.setIdToken(idToken);
-        
-        // Create User object from Cognito credentials + backend data
-        const result = await fetchUserProfile(cognitoUser.userId);
-        if (result) {
-          console.log('[App] Session restored for user:', result.user.email);
-          setUser(result.user);
-          setUserCreatedAt(result.createdAt);
-          setCurrentUser(result.user.id);
-          setView('dashboard');
-        } else {
-          // Profile fetch returned null (401/error handled inside)
-          console.log('[App] Profile fetch failed, clearing auth');
-          clearAuthData();
-        }
-      } catch (error) {
-        // Auth error - clear and stay on landing
-        console.error('[App] Auth restoration error:', error);
-        clearAuthData();
-      } finally {
-        setIsAuthInitializing(false);
-      }
-    };
-    restoreAuth();
-  }, [setCurrentUser]);
-
-  // Handle OAuth callback (Google Sign-In)
-  useEffect(() => {
-    const handleOAuthCallback = async () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const pathname = window.location.pathname;
-      
-      // Check if this is an OAuth callback
-      if (!searchParams.has('code') && !pathname.includes('/oauth/callback')) {
-        return;
-      }
-
-      // Parse the callback
-      const callbackResult = auth.parseOAuthCallback();
-      
-      if (!callbackResult.success) {
-        setOauthError(callbackResult.errorDescription || callbackResult.error || 'OAuth failed');
-        // Clear the URL params
-        window.history.replaceState({}, '', window.location.pathname);
-        return;
-      }
-
-      if (!callbackResult.code) {
-        return;
-      }
-
-      setIsOAuthProcessing(true);
-      setOauthError(null);
-
-      try {
-        // Exchange code for tokens and complete sign-in
-        const result = await auth.exchangeOAuthCode(callbackResult.code);
-        
-        // Clear the URL params
-        window.history.replaceState({}, '', '/');
-        
-        if (result.success && result.user) {
-          // Sign-in successful
-          const idToken = localStorage.getItem('finpulse_id_token');
-          if (idToken) {
-            api.setIdToken(idToken);
-          }
-          
-          const profile = await fetchUserProfile(result.user.userId);
-          if (profile) {
-            setUser(profile.user);
-            setUserCreatedAt(profile.createdAt);
-            setCurrentUser(profile.user.id);
-            setView('dashboard');
-          }
-        } else if (result.requiresLinking) {
-          // Account collision - needs password verification
-          // Store linking info and show linking UI
-          sessionStorage.setItem('oauth_linking', JSON.stringify({
-            existingUserId: result.existingUserId,
-            linkingToken: result.linkingToken,
-            error: result.error
-          }));
-          setOauthError(result.error || 'An account with this email already exists. Please sign in with your password to link accounts.');
-        } else {
-          setOauthError(result.error || 'OAuth sign-in failed');
-        }
-      } catch (error) {
-        console.error('OAuth callback error:', error);
-        setOauthError('Failed to complete sign-in. Please try again.');
-      } finally {
-        setIsOAuthProcessing(false);
-      }
-    };
-
-    handleOAuthCallback();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount - setCurrentUser is stable
-
-  // Persist session
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-    }
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isAuthInitializing, isOAuthProcessing]);
 
   // Handle demo_upgrade parameter from pricing modal
   useEffect(() => {
@@ -347,21 +158,10 @@ const AppContent: React.FC = () => {
 
     if (demoUpgrade && demoUpgrade.toUpperCase() !== user.plan) {
       const newPlan = demoUpgrade.toUpperCase() as PlanType;
-      
-      // Apply the plan change
-      setUser({
-        ...user,
-        plan: newPlan,
-        credits: {
-          ...user.credits,
-          maxAi: SaaS_PLANS[newPlan].maxAiQueries,
-          maxAssets: SaaS_PLANS[newPlan].maxAssets
-        }
-      });
-
-      // Clear the demo parameter from URL
+      updateUserPlan(newPlan);
       window.history.replaceState({}, '', window.location.pathname);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
@@ -396,88 +196,20 @@ const AppContent: React.FC = () => {
     };
   }, [theme]);
 
-  // Step 1: Fetch user profile from backend (DynamoDB via /auth/me)
-  // Returns user object and createdAt timestamp for onboarding logic
-  const fetchUserProfile = async (_userId: string): Promise<{ user: User; createdAt?: string } | null> => {
-    try {
-      const idToken = localStorage.getItem('finpulse_id_token');
-      if (!idToken) {
-        console.log('[App] fetchUserProfile: No idToken in localStorage');
-        return null;
-      }
-
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod';
-      console.log('[App] fetchUserProfile: Calling', `${apiUrl}/auth/me`);
-      const response = await fetch(`${apiUrl}/auth/me`, {
-        headers: { 'Authorization': `Bearer ${idToken}` },
-      });
-      
-      if (!response.ok) {
-        console.error('[App] fetchUserProfile: API returned', response.status, response.statusText);
-        const errorBody = await response.text().catch(() => 'Could not read error body');
-        console.error('[App] fetchUserProfile: Error body:', errorBody);
-        return null;
-      }
-      
-      const data = await response.json();
-      console.log('[App] fetchUserProfile: Got user data', data);
-      const backendUser = data.data || data;
-      
-      // Map backend plan to frontend plan type
-      const frontendPlan = mapBackendPlanToFrontend(backendUser.plan);
-      
-      // Map backend user to frontend User type
-      const user: User = {
-        id: backendUser.userId,
-        email: backendUser.email,
-        name: backendUser.name,
-        plan: frontendPlan,
-        userRole: backendUser.userRole || 'user',
-        credits: {
-          ai: backendUser.credits?.ai || 0,
-          maxAi: backendUser.credits?.maxAi || SaaS_PLANS[frontendPlan].maxAiQueries,
-          assets: backendUser.credits?.assets || 0,
-          maxAssets: backendUser.credits?.maxAssets || SaaS_PLANS[frontendPlan].maxAssets
-        },
-        subscriptionStatus: backendUser.subscriptionStatus || 'active'
-      };
-      
-      return { user, createdAt: backendUser.createdAt };
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error);
-      return null;
+  // Wrapper for components that need to set the full user object
+  const setUser = (userOrUpdater: User | null | ((prev: User | null) => User | null)) => {
+    if (typeof userOrUpdater === 'function') {
+      const newUser = userOrUpdater(user);
+      if (newUser) authUpdateUser(newUser);
+    } else if (userOrUpdater) {
+      authUpdateUser(userOrUpdater);
     }
   };
 
-  // Step 2: User profile created automatically by Lambda's getOrCreateUser
-  // No need for separate POST - /auth/me handles creation on first access
-
-  // Step 3-5: Handle login with full Cognito + backend flow
-  const handleLogin = async (_email: string, _name: string) => {
-    const cognitoUser = auth.getCurrentUser();
-    if (!cognitoUser) {
-      console.error('No Cognito user found');
-      return;
-    }
-
-    // Step 5: Set idToken for all API calls
-    const idToken = localStorage.getItem('finpulse_id_token');
-    if (idToken) {
-      api.setIdToken(idToken);
-    }
-
-    // /auth/me automatically creates user on first access (getOrCreateUser)
-    // So just fetch it - will be created if doesn't exist
-    const result = await fetchUserProfile(cognitoUser.userId);
-
-    if (result) {
-      setUser(result.user);
-      setUserCreatedAt(result.createdAt); // Pass to onboarding hook
-      setCurrentUser(result.user.id); // Set persistent userId from Cognito
-      setView('dashboard');
-    } else {
-      console.error('Failed to setup user profile');
-    }
+  // Login handler delegates to AuthContext, then navigates to dashboard
+  const handleLogin = async (email: string, name: string) => {
+    await login(email, name);
+    setView('dashboard');
   };
 
   // Milestone checks when usage changes
@@ -493,16 +225,7 @@ const AppContent: React.FC = () => {
   }, [user]);
   
   const handlePlanUpgrade = (plan: PlanType) => {
-    if (!user) return;
-    setUser({
-      ...user,
-      plan,
-      credits: {
-        ...user.credits,
-        maxAi: SaaS_PLANS[plan].maxAiQueries,
-        maxAssets: SaaS_PLANS[plan].maxAssets
-      }
-    });
+    updateUserPlan(plan);
   };
 
   const handleMilestoneClose = () => {
@@ -529,13 +252,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await auth.signOut(); // Clear Cognito session
-    api.setIdToken(null); // Clear API token for all future requests
-    setUser(null);
-    setUserCreatedAt(undefined); // Clear for next user
-    clearCurrentUser(); // Clear portfolio user scope
-    localStorage.removeItem(USER_STORAGE_KEY);
-    // Note: onboarding state is now user-scoped, so no need to clear it
+    await logout();
     setView('landing');
   };
 
@@ -543,24 +260,32 @@ const AppContent: React.FC = () => {
 
   // Legal pages (accessible via URL hash: #terms, #privacy, #pricing, #accessibility)
   if (view === 'terms') return (
-    <Suspense fallback={<LoadingSpinner size="lg" />}>
-      <TermsOfService onBack={() => { window.location.hash = ''; setView('landing'); }} />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingSpinner size="lg" />}>
+        <TermsOfService onBack={() => { window.location.hash = ''; setView('landing'); }} />
+      </Suspense>
+    </ErrorBoundary>
   );
   if (view === 'privacy') return (
-    <Suspense fallback={<LoadingSpinner size="lg" />}>
-      <PrivacyPolicy onBack={() => { window.location.hash = ''; setView('landing'); }} />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingSpinner size="lg" />}>
+        <PrivacyPolicy onBack={() => { window.location.hash = ''; setView('landing'); }} />
+      </Suspense>
+    </ErrorBoundary>
   );
   if (view === 'pricing') return (
-    <Suspense fallback={<LoadingSpinner size="lg" />}>
-      <PricingPage onBack={() => { window.location.hash = ''; setView('landing'); }} />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingSpinner size="lg" />}>
+        <PricingPage onBack={() => { window.location.hash = ''; setView('landing'); }} />
+      </Suspense>
+    </ErrorBoundary>
   );
   if (view === 'accessibility') return (
-    <Suspense fallback={<LoadingSpinner size="lg" />}>
-      <AccessibilityStatement onBack={() => { window.location.hash = ''; setView('landing'); }} />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingSpinner size="lg" />}>
+        <AccessibilityStatement onBack={() => { window.location.hash = ''; setView('landing'); }} />
+      </Suspense>
+    </ErrorBoundary>
   );
 
   // Show loading spinner while restoring auth session
@@ -592,14 +317,16 @@ const AppContent: React.FC = () => {
     }
     
     return !showcaseDisabled
-      ? <Suspense fallback={<LoadingSpinner size="lg" />}><LandingPageShowcase onLogin={handleLogin} initialError={oauthError} /></Suspense>
+      ? <ErrorBoundary><Suspense fallback={<LoadingSpinner size="lg" />}><LandingPageShowcase onLogin={handleLogin} initialError={oauthError} /></Suspense></ErrorBoundary>
       : <LandingPage onLogin={handleLogin} />;
   }
   
   if (view === 'welcome' && user) return (
-    <Suspense fallback={<LoadingSpinner size="lg" />}>
-      <WelcomePage userName={user.name} onContinue={handleContinue} />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingSpinner size="lg" />}>
+        <WelcomePage userName={user.name} onContinue={handleContinue} />
+      </Suspense>
+    </ErrorBoundary>
   );
 
   // Safety check
@@ -765,90 +492,108 @@ const AppContent: React.FC = () => {
         </div>
       </div>
 
-      <Suspense fallback={null}>
-        <SettingsModal 
-          isOpen={isSettingsOpen} 
-          onClose={() => setIsSettingsOpen(false)} 
-          user={user!}
-          onUpgrade={handlePlanUpgrade}
-          onOpenPricing={() => { setIsSettingsOpen(false); setIsPricingOpen(true); }}
-          currentTheme={theme}
-          onThemeChange={setTheme}
-          onLogout={handleLogout}
-        />
-      </Suspense>
-
-      <Suspense fallback={null}>
-        <AdminPortal 
-          isOpen={isAdminOpen} 
-          onClose={() => setIsAdminOpen(false)} 
-          user={user!} 
-          onUpdateUser={setUser} 
-        />
-      </Suspense>
-
-      {user && (
+      <ErrorBoundary>
         <Suspense fallback={null}>
-          <PricingModal
-            user={user}
-            isOpen={isPricingOpen}
-            onClose={() => setIsPricingOpen(false)}
-            onPlanChange={handlePlanUpgrade}
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            user={user!}
+            onUpgrade={handlePlanUpgrade}
+            onOpenPricing={() => { setIsSettingsOpen(false); setIsPricingOpen(true); }}
+            currentTheme={theme}
+            onThemeChange={setTheme}
+            onLogout={handleLogout}
           />
         </Suspense>
+      </ErrorBoundary>
+
+      <ErrorBoundary>
+        <Suspense fallback={null}>
+          <AdminPortal
+            isOpen={isAdminOpen}
+            onClose={() => setIsAdminOpen(false)}
+            user={user!}
+            onUpdateUser={setUser}
+          />
+        </Suspense>
+      </ErrorBoundary>
+
+      {user && (
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <PricingModal
+              user={user}
+              isOpen={isPricingOpen}
+              onClose={() => setIsPricingOpen(false)}
+              onPlanChange={handlePlanUpgrade}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {user && (
-        <Suspense fallback={null}>
-          <AIAssistant user={user} onUpdateUsage={(credits) => setUser(u => u ? {...u, credits: {...u.credits, ai: credits}} : null)} />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <AIAssistant user={user} onUpdateUsage={(credits) => setUser(u => u ? {...u, credits: {...u.credits, ai: credits}} : null)} />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* Notification & Onboarding Overlays */}
       {showChangelog && currentChangelog && (
-        <Suspense fallback={null}>
-          <ChangelogModal
-            isOpen={showChangelog}
-            onClose={dismissChangelog}
-            changelog={currentChangelog}
-          />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <ChangelogModal
+              isOpen={showChangelog}
+              onClose={dismissChangelog}
+              changelog={currentChangelog}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {user && showOnboarding && (
-        <Suspense fallback={null}>
-          <OnboardingFlow
-            isOpen={showOnboarding}
-            onComplete={completeOnboarding}
-            onSkip={skipOnboarding}
-            userName={user.name}
-            userPlan={user.plan}
-            onOpenPricing={() => setIsPricingOpen(true)}
-          />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <OnboardingFlow
+              isOpen={showOnboarding}
+              onComplete={completeOnboarding}
+              onSkip={skipOnboarding}
+              userName={user.name}
+              userPlan={user.plan}
+              onOpenPricing={() => setIsPricingOpen(true)}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {user && activeMilestone && isMilestoneOpen && (
-        <Suspense fallback={null}>
-          <MilestoneModal
-            isOpen={isMilestoneOpen}
-            milestone={activeMilestone}
-            onClose={handleMilestoneClose}
-            onAction={handleMilestoneAction}
-          />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <MilestoneModal
+              isOpen={isMilestoneOpen}
+              milestone={activeMilestone}
+              onClose={handleMilestoneClose}
+              onAction={handleMilestoneAction}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
     </div>
   );
 };
 
-// Main App component with LanguageProvider and ErrorBoundary wrappers
+// Main App component with providers and error boundaries
 const App: React.FC = () => {
   return (
     <ErrorBoundary>
-      <LanguageProvider>
-        <AppContent />
-      </LanguageProvider>
+      <GlobalErrorHandler>
+        <LanguageProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </LanguageProvider>
+      </GlobalErrorHandler>
     </ErrorBoundary>
   );
 };

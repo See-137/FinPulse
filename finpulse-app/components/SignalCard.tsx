@@ -59,6 +59,9 @@ const CompactSignalCard: React.FC<SignalCardProps> = ({ signal, onClick }) => {
       <span className={`${colors.text}`}>{signal.direction.charAt(0).toUpperCase() + signal.direction.slice(1)}</span>
       <span className="text-slate-400 text-[8px]">·</span>
       <span className="text-white text-[9px]">{signal.confidenceScore}</span>
+      {signal.isMock && (
+        <span className="text-amber-400 text-[8px] ml-0.5">Demo</span>
+      )}
       {signal.hasConflict && (
         <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0 ml-0.5" />
       )}
@@ -93,6 +96,14 @@ const FullSignalCard: React.FC<SignalCardProps> = ({ signal, showComponents = tr
           <div className="text-[9px] font-bold text-slate-500 uppercase">Confidence</div>
         </div>
       </div>
+
+      {/* Mock Data Indicator */}
+      {signal.isMock && (
+        <div className="mb-3 flex items-center gap-1.5 px-2 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+          <span className="text-[10px] text-amber-300">Simulated data — Configure API key for live signals</span>
+        </div>
+      )}
 
       {/* Accuracy Badge */}
       {signal.accuracy && (
@@ -181,6 +192,7 @@ export const SignalCard: React.FC<SignalCardProps> = React.memo((props) => {
     prevProps.signal.symbol === nextProps.signal.symbol &&
     prevProps.signal.direction === nextProps.signal.direction &&
     prevProps.signal.confidenceScore === nextProps.signal.confidenceScore &&
+    prevProps.signal.isMock === nextProps.signal.isMock &&
     prevProps.compact === nextProps.compact &&
     prevProps.showComponents === nextProps.showComponents
   );
