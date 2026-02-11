@@ -16,6 +16,7 @@ import { auth } from '../services/authService';
 import { api } from '../services/apiService';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { SaaS_PLANS } from '../constants';
+import { trackCompleteRegistration } from '../services/analytics';
 
 // API URL for profile fetch
 const API_URL = import.meta.env.VITE_API_URL || 'https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod';
@@ -331,6 +332,8 @@ export function AuthProvider({ children, onUserChange }: AuthProviderProps) {
       setUser(result.user);
       setUserCreatedAt(result.createdAt);
       setCurrentUser(result.user.id);
+      // Analytics: track signup/login completion
+      trackCompleteRegistration(result.user.id);
     }
   }, [setCurrentUser, fetchUserProfile]);
 

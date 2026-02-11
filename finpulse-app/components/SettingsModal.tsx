@@ -181,7 +181,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${p === 'PROPULSE' ? 'bg-cyan-500/10 text-cyan-400' : 'bg-purple-500/10 text-purple-400'}`}><Sparkles className="w-5 h-5" /></div>
                        <div className="text-left">
                           <p className="text-sm font-black">{SaaS_PLANS[p].name}</p>
-                          <p className="text-[10px] text-slate-500 font-bold uppercase">{SaaS_PLANS[p].price}/mo</p>
+                          <p className="text-[10px] text-slate-500 font-bold uppercase">From {SaaS_PLANS[p].price}/mo</p>
                        </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-cyan-400" />

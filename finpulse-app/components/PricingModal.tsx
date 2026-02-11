@@ -5,6 +5,7 @@ import { SaaS_PLANS } from '../constants';
 import { createCheckoutSession, redirectToCustomerPortal } from '../services/lemonSqueezyService';
 import { useLanguage } from '../i18n';
 import { PricingCard } from './PricingCard';
+import { trackPurchase } from '../services/analytics';
 
 interface PricingModalProps {
   user: User;
@@ -51,6 +52,10 @@ export const PricingModal: React.FC<PricingModalProps> = ({
         setIsDemoMode(true);
         // In demo mode, immediately apply the plan change
         onPlanChange(plan);
+        // Analytics: track purchase (demo mode fires client-side; real checkout fires via CAPI webhook)
+        const planInfo = SaaS_PLANS[plan as keyof typeof SaaS_PLANS];
+        const price = isAnnual ? parseFloat(planInfo.annualPrice.replace('$', '')) : parseFloat(planInfo.price.replace('$', ''));
+        trackPurchase(user.id, plan, price, 'USD', isAnnual ? 'year' : 'month');
         setLoading(null);
         // Show success message
         setError(null);

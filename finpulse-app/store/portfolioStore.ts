@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { Holding } from '../types';
 import { portfolioService } from '../services/portfolioService';
 import { storeLogger } from '../services/logger';
+import { trackActivation } from '../services/analytics';
 
 type AssetType = 'CRYPTO' | 'STOCK' | 'COMMODITY';
 
@@ -313,6 +314,11 @@ export const usePortfolioStore = create<PortfolioState>()(
         const currentHoldings = userHoldings[currentUserId] || [];
         const operationId = `add-${holding.symbol}-${Date.now()}`;
         
+        // Analytics: fire activation event on first holding (the "aha moment")
+        if (currentHoldings.length === 0) {
+          trackActivation(currentUserId, 1);
+        }
+
         // Update local state immediately (optimistic update)
         set((state) => ({
           userHoldings: {

@@ -4,6 +4,7 @@ import { Logo } from '../constants';
 import { Shield, ArrowRight, Lock, TrendingUp, User as UserIcon, Key, Zap, Globe, Cpu } from 'lucide-react';
 import { DashboardPreview } from './DashboardPreview';
 import { auth } from '../services/authService';
+import { trackLandingView } from '../services/analytics';
 
 // Type for AI Studio window extension
 interface AIStudioWindow {
@@ -21,6 +22,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [requiresKey, setRequiresKey] = useState(false);
+
+  // Analytics: track landing page view
+  useEffect(() => { trackLandingView(); }, []);
 
   useEffect(() => {
     const checkKey = async () => {
