@@ -41,6 +41,8 @@ import { Milestone } from './types/notifications';
 import { LayoutGrid, Users, Menu, X, Terminal, Star, Check } from 'lucide-react';
 import { User, PlanType, Theme, Currency } from './types';
 import { LanguageProvider, useLanguage } from './i18n';
+import { captureUTMParams, getConsent, initPixel } from './services/analytics';
+const CookieConsent = lazy(() => import('./components/CookieConsent').then(m => ({ default: m.CookieConsent })));
 
 // Loading fallback component
 const LoadingSpinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
@@ -195,6 +197,14 @@ const AppContent: React.FC = () => {
       }
     };
   }, [theme]);
+
+  // Analytics: capture UTM params on first load, init Pixel if consent already given
+  useEffect(() => {
+    captureUTMParams();
+    if (getConsent() === 'accepted') {
+      initPixel();
+    }
+  }, []);
 
   // Wrapper for components that need to set the full user object
   const setUser = (userOrUpdater: User | null | ((prev: User | null) => User | null)) => {
@@ -579,6 +589,11 @@ const AppContent: React.FC = () => {
           </Suspense>
         </ErrorBoundary>
       )}
+
+      {/* Cookie consent banner — shown once, persisted */}
+      <Suspense fallback={null}>
+        <CookieConsent />
+      </Suspense>
     </div>
   );
 };

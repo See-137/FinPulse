@@ -261,8 +261,9 @@ export const PrivacyPolicy: React.FC<LegalPageProps> = ({ onBack }) => (
           <li><strong>Strictly Necessary:</strong> Authentication tokens, session management, security cookies (cannot be disabled)</li>
           <li><strong>Functional:</strong> User preferences (theme, language, currency)</li>
           <li><strong>Analytics:</strong> Aggregated usage statistics to improve the Service (anonymized)</li>
+          <li><strong>Marketing:</strong> Meta Pixel for advertising attribution and campaign optimization (opt-in only)</li>
         </ul>
-        <p className="text-slate-300 mt-2">We do NOT use third-party advertising cookies, tracking pixels, or cross-site trackers. You can manage cookies through your browser settings.</p>
+        <p className="text-slate-300 mt-2">Marketing cookies (Meta Pixel) are loaded <strong>only after you provide explicit consent</strong> via our cookie banner. You can withdraw consent at any time through your browser settings or by clearing site data. We do NOT sell your personal data or use it for cross-site behavioral advertising beyond campaign attribution.</p>
       </section>
 
       <section>
