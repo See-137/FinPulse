@@ -42,6 +42,7 @@ import { LayoutGrid, Users, Menu, X, Terminal, Star, Check } from 'lucide-react'
 import { User, PlanType, Theme, Currency } from './types';
 import { LanguageProvider, useLanguage } from './i18n';
 import { captureUTMParams, getConsent, initPixel } from './services/analytics';
+import { ToastProvider } from './components/Toast';
 const CookieConsent = lazy(() => import('./components/CookieConsent').then(m => ({ default: m.CookieConsent })));
 
 // Loading fallback component
@@ -605,7 +606,9 @@ const App: React.FC = () => {
       <GlobalErrorHandler>
         <LanguageProvider>
           <AuthProvider>
-            <AppContent />
+            <ToastProvider>
+              <AppContent />
+            </ToastProvider>
           </AuthProvider>
         </LanguageProvider>
       </GlobalErrorHandler>

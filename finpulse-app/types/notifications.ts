@@ -70,6 +70,7 @@ export interface UserStats {
   portfolioValue: number;
   daysActive: number;
   signupDate: string;
+  loginStreak: number;
 }
 
 // ========================================
@@ -101,6 +102,7 @@ export const NOTIFICATION_STORAGE_KEYS = {
   DISMISSED_PROGRESSIVE: 'finpulse_dismissed_progressive_features',
   USER_SIGNUP_DATE: 'finpulse_user_signup_date',
   READ_NOTIFICATIONS: 'finpulse_read_notifications',
+  LOGIN_DATES: 'finpulse_login_dates',
 } as const;
 
 // ========================================
