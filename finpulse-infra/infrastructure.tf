@@ -81,12 +81,22 @@ module "lambda" {
   private_subnet_ids       = aws_subnet.private[*].id
   lambda_security_group_id = aws_security_group.lambda.id
   cognito_user_pool_id     = module.cognito.user_pool_id
+  cognito_client_id        = module.cognito.client_id
   redis_endpoint           = module.redis.connection_string
   secret_arns              = module.secrets.secret_arns
   enable_ai_service        = var.enable_ai_service
   enable_news_service      = var.enable_news_service
   enable_community_service = var.enable_community_service
+  allowed_origin           = var.allowed_origin
   tags                     = local.common_tags
+
+  # Lambda Layer configuration
+  # Set path to enable layer: shared_layer_zip_path = "${path.module}/lambda-layers/shared-utils.zip"
+  enable_shared_layer   = var.enable_lambda_layer
+  shared_layer_zip_path = var.lambda_layer_zip_path
+
+  # Observability (Phase 5.1)
+  enable_xray_tracing = var.enable_xray_tracing
 
   depends_on = [module.redis, module.secrets]
 }

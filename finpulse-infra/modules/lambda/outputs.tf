@@ -5,6 +5,16 @@ output "lambda_role_arn" {
   value       = aws_iam_role.lambda_execution.arn
 }
 
+output "shared_layer_arn" {
+  description = "Shared utilities Lambda layer ARN"
+  value       = var.enable_shared_layer && var.shared_layer_zip_path != "" ? aws_lambda_layer_version.shared_utils[0].arn : null
+}
+
+output "shared_layer_version" {
+  description = "Shared utilities Lambda layer version"
+  value       = var.enable_shared_layer && var.shared_layer_zip_path != "" ? aws_lambda_layer_version.shared_utils[0].version : null
+}
+
 output "function_arns" {
   description = "Map of Lambda function ARNs"
   value = {

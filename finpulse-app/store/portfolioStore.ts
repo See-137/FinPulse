@@ -46,7 +46,7 @@ interface PortfolioState {
   filterType: string | null;
   
   // User management
-  setCurrentUser: (userId: string) => void;
+  setCurrentUser: (userId: string) => Promise<void>;
   clearCurrentUser: () => void;
   
   // UI actions
@@ -109,23 +109,24 @@ export const usePortfolioStore = create<PortfolioState>()(
       },
       
       // Set current user on login/restore - also loads from backend
-      setCurrentUser: (userId: string) => {
+      // Now async to ensure callers can await the backend load
+      setCurrentUser: async (userId: string) => {
         set((state) => {
           const userHoldings = { ...state.userHoldings };
           const userWatchlists = { ...state.userWatchlists };
-          
+
           if (!userHoldings[userId]) {
             userHoldings[userId] = [];
           }
           if (!userWatchlists[userId]) {
             userWatchlists[userId] = [];
           }
-          
+
           return { currentUserId: userId, userHoldings, userWatchlists };
         });
-        
-        // Load from backend after setting user
-        get().loadFromBackend();
+
+        // Load from backend after setting user - now awaited
+        await get().loadFromBackend();
       },
       
       // Clear current user on logout
@@ -138,7 +139,7 @@ export const usePortfolioStore = create<PortfolioState>()(
       setSearch: (value) => set({ search: value }),
       setFilterType: (value) => set({ filterType: value }),
       
-      // Load holdings from backend with race condition protection
+      // Load holdings from backend with race condition protection and retry logic
       loadFromBackend: async () => {
         const state = get();
         const { currentUserId, loadPromise } = state;
@@ -146,49 +147,74 @@ export const usePortfolioStore = create<PortfolioState>()(
 
         // If already loading, return existing promise (deduplication)
         if (loadPromise) {
-          console.log('[Portfolio] Load already in progress, reusing promise');
+          storeLogger.info('[Portfolio] Load already in progress, reusing promise');
           return loadPromise;
         }
 
-        // Create new load promise
+        // Retry configuration
+        const MAX_RETRIES = 3;
+        const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff
+
+        // Create new load promise with retry logic
         const newLoadPromise = (async () => {
           set({ isSyncing: true, lastSyncError: null, syncStatus: 'syncing' });
 
-          try {
-            const portfolio = await portfolioService.getPortfolio();
-            const holdings: Holding[] = portfolio.holdings.map(h => ({
-              symbol: h.symbol,
-              name: h.name,
-              type: h.type,
-              quantity: h.quantity,
-              avgCost: h.avgCost,
-              currentPrice: h.currentPrice || h.avgCost,
-              dayPL: 0,
-              addedAt: h.addedAt,
-            }));
+          let lastError: Error | null = null;
 
-            set((state) => ({
-              isSyncing: false,
-              syncStatus: 'idle',
-              lastSyncTime: Date.now(),
-              loadPromise: null,
-              userHoldings: {
-                ...state.userHoldings,
-                [currentUserId]: holdings
+          for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+              const portfolio = await portfolioService.getPortfolio();
+              const holdings: Holding[] = portfolio.holdings.map(h => ({
+                symbol: h.symbol,
+                name: h.name,
+                type: h.type,
+                quantity: h.quantity,
+                avgCost: h.avgCost,
+                currentPrice: h.currentPrice || h.avgCost,
+                dayPL: 0,
+                addedAt: h.addedAt,
+              }));
+
+              set((state) => ({
+                isSyncing: false,
+                syncStatus: 'idle',
+                lastSyncTime: Date.now(),
+                loadPromise: null,
+                userHoldings: {
+                  ...state.userHoldings,
+                  [currentUserId]: holdings
+                }
+              }));
+
+              storeLogger.info(`Loaded ${holdings.length} holdings from backend`);
+              return; // Success - exit retry loop
+            } catch (error) {
+              lastError = error as Error;
+
+              // Don't retry on auth errors (401) - they need re-authentication
+              if ((error as { status?: number }).status === 401) {
+                storeLogger.warn('[Portfolio] Auth error, not retrying');
+                break;
               }
-            }));
 
-            storeLogger.info(`Loaded ${holdings.length} holdings from backend`);
-          } catch (error) {
-            storeLogger.error('Failed to load from backend:', error as Error);
-            set({ 
-              isSyncing: false, 
-              loadPromise: null, 
-              lastSyncError: String(error),
-              syncStatus: navigator.onLine ? 'error' : 'offline'
-            });
-            // Keep local data if backend fails
+              // Check if we should retry
+              if (attempt < MAX_RETRIES - 1) {
+                const delay = RETRY_DELAYS[attempt];
+                storeLogger.warn(`[Portfolio] Load failed, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+            }
           }
+
+          // All retries failed
+          storeLogger.error('[Portfolio] Failed to load from backend after retries:', lastError);
+          set({
+            isSyncing: false,
+            loadPromise: null,
+            lastSyncError: lastError ? String(lastError) : 'Unknown error',
+            syncStatus: navigator.onLine ? 'error' : 'offline'
+          });
+          // Keep local data if backend fails
         })();
 
         // Store promise in state

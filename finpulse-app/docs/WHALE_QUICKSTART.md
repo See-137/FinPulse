@@ -34,8 +34,8 @@ npm run dev
 ### Step 2: Configure
 Edit `finpulse-app/.env`:
 ```bash
-WHALE_ALERT_API_KEY=wak_your_key_here
-NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=true
+VITE_WHALE_ALERT_API_KEY=wak_your_key_here
+VITE_ENABLE_LIVE_WHALE_DATA=true
 ```
 
 ### Step 3: Start
@@ -56,7 +56,7 @@ Open browser console (F12):
 ### Check 2: Test Script
 ```bash
 cd finpulse-app
-npx ts-node scripts/testWhaleDataIntegration.ts
+npx vitest run --reporter=verbose
 ```
 
 Should show:
@@ -109,7 +109,7 @@ RATE_LIMIT_WHALE_ALERT=20  # Lower rate limit
 Check API key format in `.env`:
 ```bash
 # Should look like:
-WHALE_ALERT_API_KEY=wak_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_WHALE_ALERT_API_KEY=wak_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # No quotes, no spaces
 ```

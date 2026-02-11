@@ -131,6 +131,31 @@ resource "aws_iam_role_policy" "lambda_secrets" {
   })
 }
 
+# X-Ray tracing policy (Phase 5.1 - Observability)
+resource "aws_iam_role_policy" "lambda_xray" {
+  count = var.enable_xray_tracing ? 1 : 0
+
+  name = "${var.project_name}-lambda-xray-${var.environment}"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets",
+          "xray:GetSamplingStatisticSummaries"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # =============================================================================
 # Lambda Functions - 8 Microservices
 # =============================================================================
@@ -154,6 +179,31 @@ data "archive_file" "placeholder" {
   }
 }
 
+# =============================================================================
+# Lambda Layer for Shared Utilities
+# =============================================================================
+# Contains: validation.js, redis-cache.js, cache-manager.js, jwt-verifier.js,
+#           rate-limiter.js, request-context.js, env-validator.js
+# This eliminates code duplication across all Lambda functions
+
+resource "aws_lambda_layer_version" "shared_utils" {
+  count = var.enable_shared_layer && var.shared_layer_zip_path != "" ? 1 : 0
+
+  layer_name          = "${var.project_name}-shared-utils-${var.environment}"
+  description         = "Shared utilities: validation, caching, JWT verification, rate limiting, logging"
+  compatible_runtimes = ["nodejs20.x"]
+  filename            = var.shared_layer_zip_path
+  source_code_hash    = filebase64sha256(var.shared_layer_zip_path)
+
+  # Compatible with arm64 architecture used by all Lambdas
+  compatible_architectures = [var.lambda_architecture]
+}
+
+# Local variable to get layer ARN (empty list if layer disabled)
+locals {
+  shared_layer_arns = var.enable_shared_layer && var.shared_layer_zip_path != "" ? [aws_lambda_layer_version.shared_utils[0].arn] : []
+}
+
 # 1. Auth Service
 resource "aws_lambda_function" "auth_service" {
   function_name = "${var.project_name}-auth-${var.environment}"
@@ -164,11 +214,22 @@ resource "aws_lambda_function" "auth_service" {
   timeout       = 30
   memory_size   = 256
 
+  # Shared utilities layer (validation, JWT verification, rate limiting, etc.)
+  layers = local.shared_layer_arns
+
   # Reserved concurrency to prevent runaway costs and ensure availability
   reserved_concurrent_executions = var.auth_reserved_concurrency > 0 ? var.auth_reserved_concurrency : -1
 
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  # X-Ray tracing for observability (Phase 5.1)
+  dynamic "tracing_config" {
+    for_each = var.enable_xray_tracing ? [1] : []
+    content {
+      mode = "Active"
+    }
+  }
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -177,10 +238,11 @@ resource "aws_lambda_function" "auth_service" {
 
   environment {
     variables = {
-      ENVIRONMENT     = var.environment
-      COGNITO_POOL_ID = var.cognito_user_pool_id
-      REDIS_ENDPOINT  = var.redis_endpoint
-      ALLOWED_ORIGIN  = "https://finpulse.me"
+      ENVIRONMENT       = var.environment
+      COGNITO_POOL_ID   = var.cognito_user_pool_id
+      COGNITO_CLIENT_ID = var.cognito_client_id
+      REDIS_ENDPOINT    = var.redis_endpoint
+      ALLOWED_ORIGIN    = var.allowed_origin
     }
   }
 
@@ -192,6 +254,7 @@ resource "aws_lambda_function" "auth_service" {
       filename,
       source_code_hash,
       environment,
+      layers,
     ]
   }
 }
@@ -207,11 +270,22 @@ resource "aws_lambda_function" "market_data_service" {
   timeout       = 30
   memory_size   = 256
 
+  # Shared utilities layer
+  layers = local.shared_layer_arns
+
   # Reserved concurrency for high-traffic market data endpoint
   reserved_concurrent_executions = var.market_data_reserved_concurrency > 0 ? var.market_data_reserved_concurrency : -1
 
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  # X-Ray tracing for observability (Phase 5.1)
+  dynamic "tracing_config" {
+    for_each = var.enable_xray_tracing ? [1] : []
+    content {
+      mode = "Active"
+    }
+  }
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -223,7 +297,7 @@ resource "aws_lambda_function" "market_data_service" {
       ENVIRONMENT       = var.environment
       REDIS_ENDPOINT    = var.redis_endpoint
       ALPACA_SECRET_ARN = var.secret_arns["alpaca-credentials"]
-      ALLOWED_ORIGIN    = "https://finpulse.me"
+      ALLOWED_ORIGIN    = var.allowed_origin
     }
   }
 
@@ -234,6 +308,7 @@ resource "aws_lambda_function" "market_data_service" {
       filename,
       source_code_hash,
       environment,
+      layers,
     ]
   }
 }
@@ -249,11 +324,22 @@ resource "aws_lambda_function" "portfolio_service" {
   timeout       = 30
   memory_size   = 256
 
+  # Shared utilities layer
+  layers = local.shared_layer_arns
+
   # Reserved concurrency for portfolio operations
   reserved_concurrent_executions = var.portfolio_reserved_concurrency > 0 ? var.portfolio_reserved_concurrency : -1
 
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  # X-Ray tracing for observability (Phase 5.1)
+  dynamic "tracing_config" {
+    for_each = var.enable_xray_tracing ? [1] : []
+    content {
+      mode = "Active"
+    }
+  }
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -262,9 +348,10 @@ resource "aws_lambda_function" "portfolio_service" {
 
   environment {
     variables = {
-      ENVIRONMENT    = var.environment
-      REDIS_ENDPOINT = var.redis_endpoint
-      ALLOWED_ORIGIN = "https://finpulse.me"
+      ENVIRONMENT     = var.environment
+      COGNITO_POOL_ID = var.cognito_user_pool_id
+      REDIS_ENDPOINT  = var.redis_endpoint
+      ALLOWED_ORIGIN  = var.allowed_origin
     }
   }
 
@@ -275,6 +362,7 @@ resource "aws_lambda_function" "portfolio_service" {
       filename,
       source_code_hash,
       environment,
+      layers,
     ]
   }
 }
@@ -296,8 +384,19 @@ resource "aws_lambda_function" "ai_service" {
   timeout       = 60 # Longer for AI streaming
   memory_size   = 512
 
+  # Shared utilities layer
+  layers = local.shared_layer_arns
+
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  # X-Ray tracing for observability (Phase 5.1)
+  dynamic "tracing_config" {
+    for_each = var.enable_xray_tracing ? [1] : []
+    content {
+      mode = "Active"
+    }
+  }
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -309,7 +408,7 @@ resource "aws_lambda_function" "ai_service" {
       ENVIRONMENT       = var.environment
       REDIS_ENDPOINT    = var.redis_endpoint
       GEMINI_SECRET_ARN = var.secret_arns["gemini-api-key"]
-      ALLOWED_ORIGIN    = "https://finpulse.me"
+      ALLOWED_ORIGIN    = var.allowed_origin
     }
   }
 
@@ -320,6 +419,7 @@ resource "aws_lambda_function" "ai_service" {
       filename,
       source_code_hash,
       environment,
+      layers,
     ]
   }
 }
@@ -337,8 +437,19 @@ resource "aws_lambda_function" "news_service" {
   timeout       = 30
   memory_size   = 256
 
+  # Shared utilities layer
+  layers = local.shared_layer_arns
+
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  # X-Ray tracing for observability (Phase 5.1)
+  dynamic "tracing_config" {
+    for_each = var.enable_xray_tracing ? [1] : []
+    content {
+      mode = "Active"
+    }
+  }
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -350,7 +461,7 @@ resource "aws_lambda_function" "news_service" {
       ENVIRONMENT        = var.environment
       REDIS_ENDPOINT     = var.redis_endpoint
       NEWSAPI_SECRET_ARN = var.secret_arns["newsapi-key"]
-      ALLOWED_ORIGIN     = "https://finpulse.me"
+      ALLOWED_ORIGIN     = var.allowed_origin
     }
   }
 
@@ -361,6 +472,7 @@ resource "aws_lambda_function" "news_service" {
       filename,
       source_code_hash,
       environment,
+      layers,
     ]
   }
 }
@@ -378,8 +490,19 @@ resource "aws_lambda_function" "community_service" {
   timeout       = 30
   memory_size   = 256
 
+  # Shared utilities layer
+  layers = local.shared_layer_arns
+
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  # X-Ray tracing for observability (Phase 5.1)
+  dynamic "tracing_config" {
+    for_each = var.enable_xray_tracing ? [1] : []
+    content {
+      mode = "Active"
+    }
+  }
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -388,9 +511,10 @@ resource "aws_lambda_function" "community_service" {
 
   environment {
     variables = {
-      ENVIRONMENT    = var.environment
-      REDIS_ENDPOINT = var.redis_endpoint
-      ALLOWED_ORIGIN = "https://finpulse.me"
+      ENVIRONMENT     = var.environment
+      COGNITO_POOL_ID = var.cognito_user_pool_id
+      REDIS_ENDPOINT  = var.redis_endpoint
+      ALLOWED_ORIGIN  = var.allowed_origin
     }
   }
 
@@ -401,6 +525,7 @@ resource "aws_lambda_function" "community_service" {
       filename,
       source_code_hash,
       environment,
+      layers,
     ]
   }
 }
@@ -416,8 +541,19 @@ resource "aws_lambda_function" "admin_service" {
   timeout       = 30
   memory_size   = 256
 
+  # Shared utilities layer
+  layers = local.shared_layer_arns
+
   filename         = data.archive_file.placeholder.output_path
   source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  # X-Ray tracing for observability (Phase 5.1)
+  dynamic "tracing_config" {
+    for_each = var.enable_xray_tracing ? [1] : []
+    content {
+      mode = "Active"
+    }
+  }
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -426,10 +562,11 @@ resource "aws_lambda_function" "admin_service" {
 
   environment {
     variables = {
-      ENVIRONMENT     = var.environment
-      COGNITO_POOL_ID = var.cognito_user_pool_id
-      REDIS_ENDPOINT  = var.redis_endpoint
-      ALLOWED_ORIGIN  = "https://finpulse.me"
+      ENVIRONMENT       = var.environment
+      COGNITO_POOL_ID   = var.cognito_user_pool_id
+      COGNITO_CLIENT_ID = var.cognito_client_id
+      REDIS_ENDPOINT    = var.redis_endpoint
+      ALLOWED_ORIGIN    = var.allowed_origin
     }
   }
 
@@ -440,6 +577,7 @@ resource "aws_lambda_function" "admin_service" {
       filename,
       source_code_hash,
       environment,
+      layers,
     ]
   }
 }

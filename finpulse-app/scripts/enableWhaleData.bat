@@ -42,25 +42,25 @@ REM Backup original .env
 copy .env .env.backup >nul 2>&1
 
 REM Check if key already exists
-findstr /C:"WHALE_ALERT_API_KEY=" .env >nul 2>&1
+findstr /C:"VITE_WHALE_ALERT_API_KEY=" .env >nul 2>&1
 if %errorlevel%==0 (
     REM Update existing key (using PowerShell for better regex)
-    powershell -Command "(Get-Content .env) -replace '^WHALE_ALERT_API_KEY=.*', 'WHALE_ALERT_API_KEY=%API_KEY%' | Set-Content .env"
-    echo ✓ Updated WHALE_ALERT_API_KEY
+    powershell -Command "(Get-Content .env) -replace '^VITE_WHALE_ALERT_API_KEY=.*', 'VITE_WHALE_ALERT_API_KEY=%API_KEY%' | Set-Content .env"
+    echo ✓ Updated VITE_WHALE_ALERT_API_KEY
 ) else (
     REM Add new key
     echo. >> .env
-    echo WHALE_ALERT_API_KEY=%API_KEY% >> .env
-    echo ✓ Added WHALE_ALERT_API_KEY
+    echo VITE_WHALE_ALERT_API_KEY=%API_KEY% >> .env
+    echo ✓ Added VITE_WHALE_ALERT_API_KEY
 )
 
 REM Enable live data flag
-findstr /C:"NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=" .env >nul 2>&1
+findstr /C:"VITE_ENABLE_LIVE_WHALE_DATA=" .env >nul 2>&1
 if %errorlevel%==0 (
-    powershell -Command "(Get-Content .env) -replace '^NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=.*', 'NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=true' | Set-Content .env"
+    powershell -Command "(Get-Content .env) -replace '^VITE_ENABLE_LIVE_WHALE_DATA=.*', 'VITE_ENABLE_LIVE_WHALE_DATA=true' | Set-Content .env"
     echo ✓ Enabled live whale data
 ) else (
-    echo NEXT_PUBLIC_ENABLE_LIVE_WHALE_DATA=true >> .env
+    echo VITE_ENABLE_LIVE_WHALE_DATA=true >> .env
     echo ✓ Enabled live whale data
 )
 
@@ -94,7 +94,7 @@ echo   1. Restart your dev server:
 echo      npm run dev
 echo.
 echo   2. Test the integration:
-echo      npx ts-node scripts/testWhaleDataIntegration.ts
+echo      npx vitest run --reporter=verbose
 echo.
 echo   3. Check the UI:
 echo      - Open portfolio view

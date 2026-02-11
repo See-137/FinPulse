@@ -79,6 +79,22 @@ export const SIGNAL_SCORING = {
   MAX_CONFIDENCE: 100,
 } as const;
 
+/**
+ * PER-SYMBOL WHALE THRESHOLDS
+ * Net flow (USD) that must be exceeded to trigger a bullish/bearish signal.
+ * Higher-cap assets need larger flows; lower-cap assets are more sensitive.
+ */
+export const WHALE_THRESHOLDS: Record<string, number> = {
+  BTC: 50_000_000,   // $50M — BTC routinely moves $10M; need larger signal
+  ETH: 30_000_000,   // $30M
+  BNB: 15_000_000,   // $15M
+  SOL: 10_000_000,   // $10M
+  XRP: 10_000_000,   // $10M
+  ADA:  5_000_000,   // $5M
+  DOGE: 5_000_000,   // $5M
+} as const;
+export const DEFAULT_WHALE_THRESHOLD = 10_000_000;
+
 // Fallback stock/crypto data (real data fetched from CoinGecko API)
 // Live endpoint: https://b3fgmin9yj.execute-api.us-east-1.amazonaws.com/prod/market/prices
 export const MOCK_STOCKS = [

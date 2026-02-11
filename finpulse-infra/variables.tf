@@ -59,8 +59,26 @@ variable "enable_nat_gateway" {
   default     = true
 }
 
+variable "enable_lambda_layer" {
+  description = "Enable shared utilities Lambda layer"
+  type        = bool
+  default     = true
+}
+
+variable "lambda_layer_zip_path" {
+  description = "Path to shared-utils Lambda layer ZIP file (empty = disable layer)"
+  type        = string
+  default     = ""
+}
+
 variable "enable_api_caching" {
   description = "Enable API Gateway caching (~$15/mo)"
+  type        = bool
+  default     = false
+}
+
+variable "enable_xray_tracing" {
+  description = "Enable AWS X-Ray tracing for Lambda functions (Phase 5.1 - Observability)"
   type        = bool
   default     = false
 }
@@ -224,6 +242,12 @@ variable "waf_allowed_countries" {
   description = "List of allowed countries for WAF (ISO 3166 codes). Empty = all countries allowed"
   type        = list(string)
   default     = []
+}
+
+variable "allowed_origin" {
+  description = "CORS allowed origin for Lambda function responses"
+  type        = string
+  default     = "https://finpulse.me"
 }
 
 variable "waf_alarm_threshold_blocked" {

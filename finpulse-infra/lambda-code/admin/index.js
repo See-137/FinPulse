@@ -1,14 +1,63 @@
 /**
- * FinPulse Admin Service
+ * FinPulse Admin Service v2.0
  * Administrative functions and monitoring
  */
 
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, ScanCommand, GetCommand, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+// =============================================================================
+// Shared Utilities from Lambda Layer (with fallback)
+// =============================================================================
 
-// Initialize clients
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+let envValidator, requestContext, jwtVerifier;
+try {
+  envValidator = require('/opt/nodejs/env-validator');
+  requestContext = require('/opt/nodejs/request-context');
+  jwtVerifier = require('/opt/nodejs/jwt-verifier');
+  console.log('[Admin] Loaded shared utilities from Lambda Layer');
+} catch (e) {
+  // Minimal fallbacks
+  envValidator = {
+    ensureEnvValidated: () => true,
+    getOptionalEnv: (name, def) => process.env[name] || def,
+  };
+  requestContext = {
+    createRequestContext: (event) => ({
+      requestId: event?.requestContext?.requestId || 'unknown',
+      logger: {
+        info: (msg, data) => console.log(JSON.stringify({ level: 'INFO', message: msg, ...data })),
+        error: (msg, data) => console.error(JSON.stringify({ level: 'ERROR', message: msg, ...data })),
+        warn: (msg, data) => console.warn(JSON.stringify({ level: 'WARN', message: msg, ...data })),
+      },
+    }),
+    addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
+  };
+}
+
+// Validate environment at cold start
+try {
+  envValidator.ensureEnvValidated('admin');
+} catch (e) {
+  console.error('[Admin] Environment validation failed:', e.message);
+}
+
+// =============================================================================
+// AWS SDK Clients (lazy initialization for cold start optimization)
+// =============================================================================
+
+let dynamoClient = null;
+let docClient = null;
+
+function getDynamoClient() {
+  if (!docClient) {
+    const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+    const { DynamoDBDocumentClient } = require('@aws-sdk/lib-dynamodb');
+    dynamoClient = new DynamoDBClient({});
+    docClient = DynamoDBDocumentClient.from(dynamoClient);
+  }
+  return docClient;
+}
+
+// Import commands
+const { ScanCommand, GetCommand, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 
 const ENVIRONMENT = process.env.ENVIRONMENT || 'prod';
 
@@ -77,7 +126,7 @@ async function getStats() {
 
   for (const table of tables) {
     try {
-      const result = await docClient.send(new ScanCommand({
+      const result = await getDynamoClient().send(new ScanCommand({
         TableName: table,
         Select: 'COUNT'
       }));
@@ -96,7 +145,7 @@ async function getStats() {
  */
 async function getRecentUsers(limit = 10) {
   try {
-    const result = await docClient.send(new ScanCommand({
+    const result = await getDynamoClient().send(new ScanCommand({
       TableName: `finpulse-users-${ENVIRONMENT}`,
       Limit: limit * 2 // Get more to sort
     }));
@@ -124,7 +173,7 @@ async function getRecentUsers(limit = 10) {
  */
 async function getPlanDistribution() {
   try {
-    const result = await docClient.send(new ScanCommand({
+    const result = await getDynamoClient().send(new ScanCommand({
       TableName: `finpulse-users-${ENVIRONMENT}`,
       ProjectionExpression: '#plan',
       ExpressionAttributeNames: { '#plan': 'plan' }
@@ -150,7 +199,7 @@ async function getAIUsage(days = 7) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const result = await docClient.send(new ScanCommand({
+    const result = await getDynamoClient().send(new ScanCommand({
       TableName: `finpulse-ai-queries-${ENVIRONMENT}`,
       FilterExpression: '#ts >= :startDate',
       ExpressionAttributeNames: { '#ts': 'timestamp' },
@@ -185,7 +234,7 @@ async function updateUserPlan(userId, newPlan) {
 
   const credits = planCredits[newPlan] || planCredits.FREE;
 
-  await docClient.send(new UpdateCommand({
+  await getDynamoClient().send(new UpdateCommand({
     TableName: `finpulse-users-${ENVIRONMENT}`,
     Key: { userId },
     UpdateExpression: 'SET #plan = :plan, credits.maxAi = :maxAi, credits.maxAssets = :maxAssets, updatedAt = :updatedAt',
@@ -213,7 +262,7 @@ async function healthCheck() {
   };
 
   try {
-    await docClient.send(new ScanCommand({
+    await getDynamoClient().send(new ScanCommand({
       TableName: `finpulse-users-${ENVIRONMENT}`,
       Limit: 1
     }));

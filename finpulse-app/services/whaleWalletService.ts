@@ -8,27 +8,57 @@
 import { getWhaleAlertClient } from './dataProviders/whaleAlertAPI';
 import { cacheService, getWhaleDataCacheKey } from './cacheService';
 import { apiConfig } from '../config/apiKeys';
+import { WHALE_THRESHOLDS, DEFAULT_WHALE_THRESHOLD } from '../constants';
 import type { WhaleTransaction, WhaleMetrics, WhaleSignal, SignalDirection } from '../types';
 
+/**
+ * Deterministic hash for consistent mock values per symbol.
+ * Same algorithm as signalService.ts hashSymbol().
+ */
+function hashSymbol(symbol: string): number {
+  let hash = 0;
+  for (let i = 0; i < symbol.length; i++) {
+    const char = symbol.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+}
+
 export class WhaleWalletService {
+  /** Tracks whether the last getWhaleMetrics call returned mock data */
+  private _lastResultWasMock = false;
+
+  /** True if the most recent getWhaleMetrics() call used mock data */
+  get wasMockData(): boolean {
+    return this._lastResultWasMock;
+  }
+
   /**
    * Get whale metrics for a symbol (cached)
    */
   async getWhaleMetrics(symbol: string): Promise<WhaleMetrics> {
     // Check if live data enabled
     if (!apiConfig.features.liveWhaleData || !apiConfig.whaleAlert.enabled) {
+      this._lastResultWasMock = true;
       return this.generateMockMetrics(symbol);
     }
 
     // Try cache first
     const cacheKey = getWhaleDataCacheKey(symbol);
-    const cached = await cacheService.getOrSet(
-      cacheKey,
-      () => this.fetchWhaleMetrics(symbol),
-      apiConfig.cache.whaleDataTTL
-    );
-
-    return cached;
+    try {
+      const cached = await cacheService.getOrSet(
+        cacheKey,
+        () => this.fetchWhaleMetrics(symbol),
+        apiConfig.cache.whaleDataTTL
+      );
+      this._lastResultWasMock = false;
+      return cached;
+    } catch (error) {
+      console.error(`[WhaleService] Cache/fetch failed for ${symbol}, falling back to mock:`, error);
+      this._lastResultWasMock = true;
+      return this.generateMockMetrics(symbol);
+    }
   }
 
   /**
@@ -43,6 +73,7 @@ export class WhaleWalletService {
     } catch (error) {
       console.error(`Error fetching whale metrics for ${symbol}:`, error);
       // Fallback to mock data
+      this._lastResultWasMock = true;
       return this.generateMockMetrics(symbol);
     }
   }
@@ -110,13 +141,14 @@ export class WhaleWalletService {
 
   /**
    * Convert whale metrics to WhaleSignal format
+   * Uses per-symbol thresholds from constants
    */
   convertToWhaleSignal(metrics: WhaleMetrics): WhaleSignal {
-    // Determine direction based on net flow
+    // Determine direction based on net flow with per-symbol thresholds
     let direction: SignalDirection = 'neutral';
     let activity: 'accumulation' | 'distribution' | 'neutral' = 'neutral';
 
-    const flowThreshold = 10000000; // $10M threshold
+    const flowThreshold = WHALE_THRESHOLDS[metrics.symbol] ?? DEFAULT_WHALE_THRESHOLD;
 
     if (metrics.netFlow24h > flowThreshold) {
       direction = 'bullish';
@@ -149,18 +181,24 @@ export class WhaleWalletService {
   }
 
   /**
-   * Generate mock metrics for testing
+   * Generate deterministic mock metrics.
+   * Uses symbol hash so values are stable across re-renders.
    */
   private generateMockMetrics(symbol: string): WhaleMetrics {
-    // Generate realistic mock data
-    const netFlow = (Math.random() - 0.5) * 50000000; // -$25M to +$25M
-    const largeTransfers = Math.floor(Math.random() * 20) + 5; // 5-25 transfers
+    const h = hashSymbol(symbol);
+
+    // Deterministic values derived from hash
+    const netFlowSign = (h % 3) === 0 ? -1 : 1; // ~33% negative
+    const netFlowMagnitude = ((h % 50) + 1) * 1_000_000; // $1M–$50M
+    const netFlow = netFlowSign * netFlowMagnitude;
+    const largeTransfers = (h % 20) + 5; // 5–24 transfers
+    const topHolderChange = ((h % 200) - 100) / 100; // -1.00 to +0.99
 
     return {
       symbol,
       netFlow24h: netFlow,
       largeTransfers,
-      topHolderChange: (Math.random() - 0.5) * 2, // -1% to +1%
+      topHolderChange,
       exchangeReserves: {
         inflow: Math.abs(Math.min(0, netFlow)),
         outflow: Math.abs(Math.max(0, netFlow)),
@@ -170,26 +208,32 @@ export class WhaleWalletService {
   }
 
   /**
-   * Generate mock transactions for testing
+   * Generate deterministic mock transactions.
+   * Uses symbol hash + index so values are stable across re-renders.
    */
   private generateMockTransactions(symbol: string, count: number = 5): WhaleTransaction[] {
     const transactions: WhaleTransaction[] = [];
-    const now = Date.now();
+    const baseHash = hashSymbol(symbol);
+    const baseTime = Date.now();
 
     for (let i = 0; i < count; i++) {
-      const amountUSD = Math.random() * 10000000 + 1000000; // $1M-$11M
+      const h = hashSymbol(`${symbol}-${i}`);
+      const amountUSD = ((h % 10) + 1) * 1_000_000; // $1M–$10M
       const type: WhaleTransaction['type'] =
-        Math.random() > 0.5 ? 'exchange_inflow' : 'exchange_outflow';
+        h % 2 === 0 ? 'exchange_inflow' : 'exchange_outflow';
+
+      // Fixed offsets at 2h intervals instead of random timestamps
+      const timestamp = baseTime - (i + 1) * 7200000;
 
       transactions.push({
         blockchain: symbol === 'BTC' ? 'bitcoin' : 'ethereum',
         symbol,
-        from: `0x${Math.random().toString(16).slice(2, 42)}`,
-        to: `0x${Math.random().toString(16).slice(2, 42)}`,
+        from: `0x${baseHash.toString(16).padStart(40, 'a')}`,
+        to: `0x${h.toString(16).padStart(40, 'b')}`,
         amount: amountUSD / 50000, // Approximate token amount
         amountUSD,
-        timestamp: now - Math.random() * 86400000, // Last 24h
-        txHash: `0x${Math.random().toString(16).slice(2, 66)}`,
+        timestamp,
+        txHash: `0x${(baseHash + i).toString(16).padStart(64, '0')}`,
         type,
       });
     }
