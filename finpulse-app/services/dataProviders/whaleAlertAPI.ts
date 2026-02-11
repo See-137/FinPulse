@@ -214,21 +214,41 @@ export class WhaleAlertAPI {
  * Get symbol map for Whale Alert API
  * Maps our internal symbols to Whale Alert symbols
  */
-export function mapSymbolToWhaleAlert(symbol: string): string {
-  const symbolMap: Record<string, string> = {
-    BTC: 'bitcoin',
-    ETH: 'ethereum',
-    USDT: 'tether',
-    USDC: 'usd-coin',
-    BNB: 'binance-coin',
-    XRP: 'ripple',
-    ADA: 'cardano',
-    SOL: 'solana',
-    DOGE: 'dogecoin',
-    // Add more as needed
-  };
+/**
+ * Map of symbols that Whale Alert API actually supports.
+ * Only these symbols should be queried; anything else will error.
+ */
+const WHALE_ALERT_SYMBOL_MAP: Record<string, string> = {
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
+  USDT: 'tether',
+  USDC: 'usd-coin',
+  BNB: 'binance-coin',
+  XRP: 'ripple',
+  ADA: 'cardano',
+  SOL: 'solana',
+  DOGE: 'dogecoin',
+  PAXG: 'pax-gold',
+  AVAX: 'avalanche',
+  DOT: 'polkadot',
+  MATIC: 'polygon',
+  LINK: 'chainlink',
+  UNI: 'uniswap',
+  LTC: 'litecoin',
+  SHIB: 'shiba-inu',
+  TRX: 'tron',
+};
 
-  return symbolMap[symbol] || symbol.toLowerCase();
+/**
+ * Check if a symbol is supported by the Whale Alert API.
+ * Stocks, commodities, and unmapped tokens are NOT supported.
+ */
+export function isWhaleAlertSupported(symbol: string): boolean {
+  return symbol.toUpperCase() in WHALE_ALERT_SYMBOL_MAP;
+}
+
+export function mapSymbolToWhaleAlert(symbol: string): string {
+  return WHALE_ALERT_SYMBOL_MAP[symbol.toUpperCase()] || symbol.toLowerCase();
 }
 
 // Singleton instance
