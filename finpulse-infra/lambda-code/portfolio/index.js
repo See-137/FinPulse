@@ -762,7 +762,7 @@ exports.handler = async (event) => {
       headers: corsHeaders,
       body: JSON.stringify({
         success: false,
-        error: error.message || 'Internal server error'
+        error: process.env.ENVIRONMENT !== 'prod' ? (error.message || 'Internal server error') : 'Internal server error'
       })
     };
   }

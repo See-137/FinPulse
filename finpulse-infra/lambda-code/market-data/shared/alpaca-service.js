@@ -589,6 +589,81 @@ async function getBars(symbol, timeframe = '1Day', limit = 30) {
 }
 
 // =============================================================================
+// Stock Search via Alpaca Trading API
+// =============================================================================
+
+/**
+ * Search stocks by symbol or name using Alpaca Assets API
+ * Uses the trading API (api.alpaca.markets), not the data API
+ * @param {string} query - Search query (symbol or company name)
+ * @param {number} limit - Max results to return
+ * @returns {Promise<Array>} - Array of { symbol, name, exchange, type }
+ */
+async function searchStocks(query, limit = 15) {
+  const credentials = await getCredentials();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ALPACA_CONFIG.REST_TIMEOUT);
+
+  try {
+    // Alpaca Assets API filters by status=active and asset_class=us_equity
+    const url = `https://api.alpaca.markets/v2/assets?status=active&asset_class=us_equity`;
+    console.log(`[Alpaca] Searching stocks for: ${query}`);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'APCA-API-KEY-ID': credentials.apiKey,
+        'APCA-API-SECRET-KEY': credentials.apiSecret,
+        'Accept': 'application/json',
+      },
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.error(`[Alpaca] Search error: ${response.status}`);
+      return [];
+    }
+
+    const assets = await response.json();
+    const q = query.toUpperCase();
+
+    // Filter and rank results: exact symbol match first, then prefix, then name contains
+    const results = assets
+      .filter(a => a.tradable && (
+        a.symbol.toUpperCase().includes(q) ||
+        (a.name && a.name.toUpperCase().includes(q))
+      ))
+      .sort((a, b) => {
+        const aSymbol = a.symbol.toUpperCase();
+        const bSymbol = b.symbol.toUpperCase();
+        // Exact match first
+        if (aSymbol === q) return -1;
+        if (bSymbol === q) return 1;
+        // Prefix match second
+        if (aSymbol.startsWith(q) && !bSymbol.startsWith(q)) return -1;
+        if (bSymbol.startsWith(q) && !aSymbol.startsWith(q)) return 1;
+        // Shorter symbols first
+        return aSymbol.length - bSymbol.length;
+      })
+      .slice(0, limit)
+      .map(a => ({
+        symbol: a.symbol,
+        name: a.name,
+        exchange: a.exchange,
+        type: 'stock',
+      }));
+
+    console.log(`[Alpaca] Found ${results.length} stocks matching "${query}"`);
+    return results;
+  } catch (error) {
+    clearTimeout(timeout);
+    console.error('[Alpaca] Search error:', error.message);
+    return [];
+  }
+}
+
+// =============================================================================
 // Exports
 // =============================================================================
 
@@ -609,6 +684,7 @@ module.exports = {
   // REST API - Combined
   getQuotes,
   getBars,
+  searchStocks,
   
   // Utilities
   KNOWN_CRYPTO,

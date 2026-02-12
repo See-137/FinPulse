@@ -235,7 +235,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         response: `**Market Intelligence**\n\nI encountered an issue processing your request. For real-time market data, please check:\n\n• CoinGecko for cryptocurrency prices\n• Yahoo Finance for equity data\n• TradingView for technical analysis\n\n*This is an automated fallback response.*`,
         source: 'error-fallback',
-        error: error.message
+        error: process.env.ENVIRONMENT !== 'prod' ? error.message : undefined
       })
     };
   }

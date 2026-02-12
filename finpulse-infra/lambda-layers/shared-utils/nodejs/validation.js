@@ -171,8 +171,7 @@ function validateProfileUpdate(input) {
     const sanitized = {};
     if (validatedData.name !== undefined) sanitized.name = sanitizeString(validatedData.name, 100);
     if (validatedData.settings !== undefined) sanitized.settings = validatedData.settings;
-    if (validatedData.plan !== undefined) sanitized.plan = validatedData.plan;
-    if (validatedData.credits !== undefined) sanitized.credits = validatedData.credits;
+    // plan and credits are intentionally excluded — never allow self-service elevation
     return { valid: true, data: sanitized };
   } catch (error) {
     if (error instanceof z.ZodError) {

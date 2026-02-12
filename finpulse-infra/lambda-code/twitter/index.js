@@ -24,7 +24,7 @@ const TWITTER_API_BASE = 'https://api.twitter.com/2';
 
 // CORS headers
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://finpulse.me',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     'Access-Control-Allow-Methods': 'GET,OPTIONS',
     'Content-Type': 'application/json'
@@ -310,7 +310,11 @@ function extractSymbols(text) {
  * Lambda handler
  */
 exports.handler = async (event) => {
-    console.log('Twitter Lambda invoked:', JSON.stringify(event, null, 2));
+    // Sanitize event for logging (remove sensitive headers)
+    const sanitized = { ...event, headers: { ...event.headers } };
+    delete sanitized.headers.Authorization;
+    delete sanitized.headers.authorization;
+    console.log('Twitter Lambda invoked:', JSON.stringify(sanitized, null, 2));
 
     // Handle OPTIONS (CORS preflight)
     if (event.httpMethod === 'OPTIONS') {
@@ -383,7 +387,7 @@ exports.handler = async (event) => {
             headers: corsHeaders,
             body: JSON.stringify({
                 success: false,
-                error: error.message || 'Internal server error'
+                error: process.env.ENVIRONMENT !== 'prod' ? (error.message || 'Internal server error') : 'Internal server error'
             })
         };
     }

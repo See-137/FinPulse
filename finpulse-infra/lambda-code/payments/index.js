@@ -77,58 +77,93 @@ const headers = {
 // Uses SDK v2 style for backwards compatibility with existing code
 // =============================================================================
 
-let _dynamoDB = null;
+// AWS SDK v3 — Node 20+ runtime does not include aws-sdk v2
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, DeleteCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 
-// Lazy-loaded DynamoDB DocumentClient
-const dynamoDB = {
-  put: (params) => {
-    if (!_dynamoDB) {
-      const AWS = require('aws-sdk');
-      _dynamoDB = new AWS.DynamoDB.DocumentClient();
-    }
-    return _dynamoDB.put(params);
-  },
-  get: (params) => {
-    if (!_dynamoDB) {
-      const AWS = require('aws-sdk');
-      _dynamoDB = new AWS.DynamoDB.DocumentClient();
-    }
-    return _dynamoDB.get(params);
-  },
-  update: (params) => {
-    if (!_dynamoDB) {
-      const AWS = require('aws-sdk');
-      _dynamoDB = new AWS.DynamoDB.DocumentClient();
-    }
-    return _dynamoDB.update(params);
-  },
-  delete: (params) => {
-    if (!_dynamoDB) {
-      const AWS = require('aws-sdk');
-      _dynamoDB = new AWS.DynamoDB.DocumentClient();
-    }
-    return _dynamoDB.delete(params);
-  },
-  query: (params) => {
-    if (!_dynamoDB) {
-      const AWS = require('aws-sdk');
-      _dynamoDB = new AWS.DynamoDB.DocumentClient();
-    }
-    return _dynamoDB.query(params);
-  },
-  scan: (params) => {
-    if (!_dynamoDB) {
-      const AWS = require('aws-sdk');
-      _dynamoDB = new AWS.DynamoDB.DocumentClient();
-    }
-    return _dynamoDB.scan(params);
+let _docClient = null;
+
+function getDocClient() {
+  if (!_docClient) {
+    const client = new DynamoDBClient({});
+    _docClient = DynamoDBDocumentClient.from(client);
   }
+  return _docClient;
+}
+
+// v2-compatible wrapper so existing code keeps working with .promise()
+const dynamoDB = {
+  put: (params) => ({ promise: () => getDocClient().send(new PutCommand(params)) }),
+  get: (params) => ({ promise: () => getDocClient().send(new GetCommand(params)) }),
+  update: (params) => ({ promise: () => getDocClient().send(new UpdateCommand(params)) }),
+  delete: (params) => ({ promise: () => getDocClient().send(new DeleteCommand(params)) }),
+  scan: (params) => ({ promise: () => getDocClient().send(new ScanCommand(params)) }),
 };
 
 const ENVIRONMENT = process.env.ENVIRONMENT || 'prod';
 const USERS_TABLE = process.env.USERS_TABLE || 'finpulse-users';
 const SUBSCRIPTIONS_TABLE = process.env.SUBSCRIPTIONS_TABLE || 'finpulse-subscriptions';
 const CACHE_TABLE = `finpulse-api-cache-${ENVIRONMENT}`;
+
+/**
+ * Parse cookies from request header
+ */
+function parseCookies(cookieHeader) {
+  const cookies = {};
+  if (!cookieHeader) return cookies;
+  cookieHeader.split(';').forEach(cookie => {
+    const [name, ...rest] = cookie.trim().split('=');
+    if (name) cookies[name] = rest.join('=');
+  });
+  return cookies;
+}
+
+/**
+ * Decode JWT token (without signature verification)
+ * API Gateway authorizer handles real verification
+ */
+function decodeJwt(token) {
+  try {
+    const cleanToken = token.replace(/^Bearer\s+/i, '');
+    const parts = cleanToken.split('.');
+    if (parts.length !== 3) return null;
+    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
+    return JSON.parse(payload);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Extract authenticated user ID from event
+ * Checks: API Gateway authorizer → cookies → Authorization header
+ */
+function getUserIdFromEvent(event) {
+  // From API Gateway Cognito authorizer (verified)
+  if (event.requestContext?.authorizer?.claims?.sub) {
+    return event.requestContext.authorizer.claims.sub;
+  }
+
+  // From httpOnly cookies
+  const cookieHeader = event.headers?.Cookie || event.headers?.cookie;
+  if (cookieHeader) {
+    const cookies = parseCookies(cookieHeader);
+    const idToken = cookies.finpulse_id_token;
+    if (idToken) {
+      const claims = decodeJwt(idToken);
+      if (claims?.sub) return claims.sub;
+    }
+  }
+
+  // From Authorization header
+  const authHeader = event.headers?.Authorization || event.headers?.authorization;
+  if (authHeader) {
+    const claims = decodeJwt(authHeader);
+    if (claims?.sub) return claims.sub;
+  }
+
+  return null;
+}
 
 /**
  * Check if a webhook event has already been processed (idempotency)
@@ -248,37 +283,60 @@ exports.handler = async (event) => {
   const method = event.httpMethod;
 
   try {
-    // Create checkout session
-    if (path.endsWith('/checkout') && method === 'POST') {
-      return await handleCreateCheckout(JSON.parse(event.body));
-    }
-    
-    // Customer portal
-    if (path.endsWith('/portal') && method === 'POST') {
-      return await handleCustomerPortal(JSON.parse(event.body));
-    }
-    
-    // Get subscription status
-    if (path.includes('/subscription/') && method === 'GET') {
-      const userId = path.split('/subscription/')[1].split('/')[0];
-      return await handleGetSubscription(userId);
-    }
-    
-    // Cancel subscription
-    if (path.includes('/cancel') && method === 'POST') {
-      const userId = path.split('/subscription/')[1].split('/cancel')[0];
-      return await handleCancelSubscription(userId);
-    }
-    
-    // Resume subscription
-    if (path.includes('/resume') && method === 'POST') {
-      const userId = path.split('/subscription/')[1].split('/resume')[0];
-      return await handleResumeSubscription(userId);
-    }
-    
-    // Webhook
+    // Webhook — no JWT required (uses HMAC signature verification)
     if (path.endsWith('/webhook') && method === 'POST') {
       return await handleWebhook(event);
+    }
+
+    // GET /payments/plans — public, no auth required
+    if (path.endsWith('/plans') && method === 'GET') {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          plans: Object.entries(PLAN_LIMITS).map(([name, limits]) => ({ name, ...limits }))
+        })
+      };
+    }
+
+    // All other endpoints require authentication
+    const userId = getUserIdFromEvent(event);
+    if (!userId) {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ message: 'Unauthorized', hint: 'Please log in to manage subscriptions' })
+      };
+    }
+
+    // Create checkout session — userId from JWT, not body
+    if (path.endsWith('/checkout') && method === 'POST') {
+      const body = JSON.parse(event.body);
+      body.userId = userId; // Override with authenticated userId
+      return await handleCreateCheckout(body);
+    }
+
+    // Customer portal — userId from JWT
+    if (path.endsWith('/portal') && method === 'POST') {
+      const body = JSON.parse(event.body);
+      body.userId = userId; // Override with authenticated userId
+      return await handleCustomerPortal(body);
+    }
+
+    // Get subscription status — only for own subscription
+    if (path.includes('/subscription/') && method === 'GET') {
+      return await handleGetSubscription(userId);
+    }
+
+    // Cancel subscription — only own subscription
+    if (path.includes('/cancel') && method === 'POST') {
+      return await handleCancelSubscription(userId);
+    }
+
+    // Resume subscription — only own subscription
+    if (path.includes('/resume') && method === 'POST') {
+      return await handleResumeSubscription(userId);
     }
 
     return {
@@ -292,7 +350,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: error.message })
+      body: JSON.stringify({ error: ENVIRONMENT !== 'prod' ? error.message : 'Internal server error' })
     };
   }
 };

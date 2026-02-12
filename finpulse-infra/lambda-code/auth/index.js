@@ -184,10 +184,10 @@ function decodeJwt(token) {
  */
 async function verifyJwtSecure(token, tokenUse = 'id') {
   if (!jwtVerifier || !jwtVerifier.verifyJwt) {
-    // Verifier layer not deployed yet — fall back to decode-only.
-    // This path will be eliminated once the Lambda Layer is attached.
-    console.warn('[Auth] JWT verifier not available, falling back to decode-only (layer not deployed)');
-    return decodeJwt(token);
+    // Verifier layer not deployed yet — FAIL CLOSED.
+    // Do NOT fall back to decode-only as it allows JWT forgery.
+    console.error('[Auth] JWT verifier not available — rejecting token (fail-closed)');
+    return null;
   }
 
   return await jwtVerifier.verifyJwt(token, tokenUse);
@@ -334,8 +334,6 @@ async function getUserFromEventSecure(event) {
 async function getOrCreateUser(cognitoUser) {
   // Define internal tester emails upfront for both new and existing user checks
   const INTERNAL_TESTER_EMAILS = [
-    'tester@finpulse.internal',
-    'realsee137@gmail.com',
     process.env.INTERNAL_TESTER_EMAIL
   ].filter(Boolean);
   
@@ -1391,12 +1389,43 @@ exports.handler = async (event, context) => {
         };
       }
 
+      // SECURITY: Require a valid Cognito JWT to prove the user actually
+      // completed the OAuth flow through Cognito. Without this, an attacker
+      // could send arbitrary provider/providerSubject/email values.
+      if (!idToken) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: false,
+            error: 'idToken is required for federated sign-in'
+          })
+        };
+      }
+
+      // Verify the Cognito ID token
+      const federatedClaims = await verifyJwtSecure(idToken, 'id');
+      if (!federatedClaims || !federatedClaims.sub) {
+        return {
+          statusCode: 401,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: false,
+            error: 'Invalid or expired identity token'
+          })
+        };
+      }
+
+      // Use verified claims from the token, not client-provided values
+      const verifiedEmail = federatedClaims.email || email;
+      const verifiedSub = federatedClaims.sub;
+
       try {
         const result = await handleFederatedSignIn({
           provider,
-          providerSubject,
-          email,
-          name,
+          providerSubject: verifiedSub,
+          email: verifiedEmail,
+          name: federatedClaims.name || name,
           accessToken
         });
 
@@ -1452,7 +1481,7 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({
             success: false,
             error: 'Failed to process federated sign-in',
-            message: error.message
+            message: ENVIRONMENT !== 'prod' ? error.message : undefined
           })
         };
       }
@@ -1542,7 +1571,7 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({
             success: false,
             error: 'Failed to link identity',
-            message: error.message
+            message: ENVIRONMENT !== 'prod' ? error.message : undefined
           })
         };
       }
@@ -1684,7 +1713,7 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({
             success: false,
             error: 'Failed to migrate identity',
-            message: error.message
+            message: ENVIRONMENT !== 'prod' ? error.message : undefined
           })
         };
       }
@@ -1812,7 +1841,7 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({
             success: false,
             error: 'Failed to update user tier',
-            message: error.message
+            message: ENVIRONMENT !== 'prod' ? error.message : undefined
           })
         };
       }
