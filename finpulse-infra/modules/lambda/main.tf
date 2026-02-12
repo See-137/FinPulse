@@ -629,6 +629,10 @@ resource "aws_lambda_function" "twitter_service" {
     ignore_changes = [
       filename,
       source_code_hash,
+      s3_bucket,
+      s3_key,
+      s3_object_version,
+      architectures,
       environment,
       layers,
     ]
