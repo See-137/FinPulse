@@ -4,6 +4,8 @@
   "description": "Twitter/X API proxy for FinPulse",
   "main": "index.js",
   "dependencies": {
-    "@aws-sdk/client-secrets-manager": "^3.470.0"
+    "@aws-sdk/client-secrets-manager": "^3.470.0",
+    "@aws-sdk/client-dynamodb": "^3.470.0",
+    "@aws-sdk/lib-dynamodb": "^3.470.0"
   }
 }
