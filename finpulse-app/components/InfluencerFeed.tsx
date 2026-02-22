@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Users, Zap, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react';
 import { TweetCard } from './TweetCard';
 import { useInfluencerTweets } from '../hooks/useInfluencerTweets';
@@ -9,6 +9,7 @@ interface InfluencerFeedProps {
   user: User | null;
   holdings: Holding[];
   onUpgradeClick?: () => void;
+  isAuthInitializing?: boolean;
 }
 
 // Tier badge colors
@@ -26,8 +27,11 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
   user,
   holdings,
   onUpgradeClick,
+  isAuthInitializing = false,
 }) => {
-  const holdingSymbols = holdings.map(h => h.symbol);
+  // Memoize to keep a stable array reference — prevents infinite re-fetch loop
+  // caused by a new array being created on every render
+  const holdingSymbols = useMemo(() => holdings.map(h => h.symbol), [holdings]);
 
   const {
     tweets,
@@ -37,8 +41,8 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
     lastUpdated,
   } = useInfluencerTweets(user?.plan, holdingSymbols);
 
-  // Loading skeleton
-  if (!user) {
+  // Auth still initializing — show loading skeleton
+  if (!user && isAuthInitializing) {
     return (
       <div className="space-y-4">
         {Array(3).fill(0).map((_, i) => (
@@ -57,8 +61,22 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
     );
   }
 
+  // Auth resolved but no user — show sign-in prompt
+  if (!user) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center mx-auto mb-4">
+          <Users className="w-6 h-6 text-slate-600" />
+        </div>
+        <p className="text-slate-400 text-sm font-bold mb-1">Sign in to see influencer tweets</p>
+        <p className="text-slate-600 text-xs">Track what top traders are saying about your holdings</p>
+      </div>
+    );
+  }
+
   const limits = influencerService.getInfluencerLimits();
   const accessibleCount = influencerService.getAccessibleInfluencers(user.plan).length;
+  const totalInfluencers = limits['SUPERPULSE']; // max tier count — avoids magic number
   const upgrade = influencerService.getUpgradeSuggestion(user.plan);
 
   return (
@@ -101,7 +119,7 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
               <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full transition-all duration-500"
-                  style={{ width: `${(accessibleCount / 30) * 100}%` }}
+                  style={{ width: `${(accessibleCount / totalInfluencers) * 100}%` }}
                 />
               </div>
             </div>

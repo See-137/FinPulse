@@ -9,6 +9,7 @@ import { NewsArticle, filterArticlesByHoldings, formatNewsTime } from '../types/
 interface NewsSidebarProps {
   user?: User | null;
   onUpgradeClick?: () => void;
+  isAuthInitializing?: boolean;
 }
 
 // Internal article type with tags for display
@@ -16,11 +17,13 @@ interface DisplayArticle extends NewsArticle {
   tags: string[];
 }
 
-export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick }) => {
+export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, isAuthInitializing = false }) => {
   const [activeFilter, setActiveFilter] = useState<'Holdings' | 'Whales' | 'All'>('All');
   const { articles, loading, source: newsSource, refresh } = useNews({ maxArticles: 8 });
-  const { getHoldings } = usePortfolioStore();
-  const holdings = getHoldings();
+  // Subscribe to the raw per-user map + currentUserId so we only re-render when
+  // holdings actually change, and memoize to keep the array reference stable.
+  const { getHoldings, currentUserId, userHoldings } = usePortfolioStore();
+  const holdings = useMemo(() => getHoldings(), [currentUserId, userHoldings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get user's holding symbols
   const userSymbols = useMemo(() =>
@@ -54,7 +57,7 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick }
   // Render content based on filter
   const renderContent = () => {
     if (activeFilter === 'Whales') {
-      return <InfluencerFeed user={user || null} holdings={holdings} onUpgradeClick={onUpgradeClick} />;
+      return <InfluencerFeed user={user || null} holdings={holdings} onUpgradeClick={onUpgradeClick} isAuthInitializing={isAuthInitializing} />;
     }
 
     if (loading && articles.length === 0) {

@@ -448,30 +448,33 @@ export const useOnboarding = (userCreatedAt?: string, userId?: string) => {
     // Wait for userId to be available
     if (!userId) return;
 
+    // Wait for userCreatedAt to arrive from the backend before evaluating.
+    // Without this guard, the effect fires when userId is set but userCreatedAt
+    // is still undefined (async /auth/me not resolved yet), skipping the
+    // returning-user check and incorrectly showing onboarding for all users.
+    if (userCreatedAt === undefined) return;
+
     const storageKey = getStorageKey();
     const hasCompleted = localStorage.getItem(storageKey);
-    
+
     // If already completed for this user, don't show
     if (hasCompleted) {
       return;
     }
-    
-    // If we have user creation date, check if this is a returning user
-    if (userCreatedAt) {
-      const createdTime = new Date(userCreatedAt).getTime();
-      const now = Date.now();
-      const fiveMinutes = 5 * 60 * 1000;
-      
-      // If account is older than 5 minutes, this is a returning user
-      // who cleared localStorage - auto-complete onboarding
-      if (now - createdTime > fiveMinutes) {
-        localStorage.setItem(storageKey, 'true');
-        componentLogger.debug('Returning user detected, skipping onboarding');
-        return;
-      }
+
+    const createdTime = new Date(userCreatedAt).getTime();
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    // If account is older than 5 minutes, this is a returning user
+    // who cleared localStorage — auto-complete onboarding silently
+    if (now - createdTime > fiveMinutes) {
+      localStorage.setItem(storageKey, 'true');
+      componentLogger.debug('Returning user detected, skipping onboarding');
+      return;
     }
-    
-    // For new users (or unknown state), show onboarding after delay
+
+    // Account is fresh — show onboarding after a short delay
     const timer = setTimeout(() => setShowOnboarding(true), 500);
     return () => clearTimeout(timer);
   }, [userCreatedAt, userId, getStorageKey]);

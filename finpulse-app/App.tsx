@@ -83,7 +83,7 @@ const AppContent: React.FC = () => {
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   
   // Notification & Onboarding State
-  const { showChangelog, currentChangelog, dismissChangelog } = useChangelog();
+  const { showChangelog, currentChangelog, dismissChangelog } = useChangelog(user?.id);
   const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding(userCreatedAt, user?.id);
   const [activeMilestone, setActiveMilestone] = useState<Milestone | null>(null);
   const [isMilestoneOpen, setIsMilestoneOpen] = useState(false);
@@ -494,7 +494,7 @@ const AppContent: React.FC = () => {
         <div className="h-full relative w-[85vw] sm:w-[380px] lg:w-[380px]">
            <ErrorBoundary fallback={<div className="p-4 text-center text-slate-400">News unavailable</div>}>
              <Suspense fallback={<LoadingSpinner />}>
-               <NewsSidebar user={user} onUpgradeClick={() => setIsPricingOpen(true)} />
+               <NewsSidebar user={user} onUpgradeClick={() => setIsPricingOpen(true)} isAuthInitializing={isAuthInitializing} />
              </Suspense>
            </ErrorBoundary>
            <button onClick={() => setIsNewsSidebarOpen(false)} aria-label="Close news sidebar" className="absolute top-6 left-[-3rem] lg:hidden p-3 text-white bg-[#00e5ff] rounded-full">
