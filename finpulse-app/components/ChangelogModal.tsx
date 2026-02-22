@@ -128,11 +128,19 @@ export const ChangelogModal: React.FC<ChangelogModalProps> = ({ isOpen, onClose,
 };
 
 // Hook to manage changelog visibility
-export const useChangelog = () => {
+// userId is required to scope the "seen" state per user — prevents the modal
+// from appearing for every user on shared devices and ensures returning users
+// don't see it again after clearing global storage.
+export const useChangelog = (userId?: string) => {
   const [showChangelog, setShowChangelog] = useState(false);
   const [currentChangelog, setCurrentChangelog] = useState<ChangelogEntry | null>(null);
 
   useEffect(() => {
+    // Wait for auth to resolve before checking changelog
+    if (!userId) return;
+
+    const storageKey = `${NOTIFICATION_STORAGE_KEYS.LAST_SEEN_CHANGELOG}_${userId}`;
+
     const checkChangelog = async () => {
       try {
         // Fetch changelogs from static file
@@ -142,9 +150,9 @@ export const useChangelog = () => {
 
         if (!latestChangelog) return;
 
-        // Check if user has seen this version
-        const lastSeenVersion = localStorage.getItem(NOTIFICATION_STORAGE_KEYS.LAST_SEEN_CHANGELOG);
-        
+        // Check if this user has seen this version
+        const lastSeenVersion = localStorage.getItem(storageKey);
+
         if (lastSeenVersion !== latestChangelog.version) {
           setCurrentChangelog(latestChangelog);
           setShowChangelog(true);
@@ -157,11 +165,12 @@ export const useChangelog = () => {
     // Small delay to let the app load first
     const timer = setTimeout(checkChangelog, 1000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [userId]);
 
   const dismissChangelog = () => {
-    if (currentChangelog) {
-      localStorage.setItem(NOTIFICATION_STORAGE_KEYS.LAST_SEEN_CHANGELOG, currentChangelog.version);
+    if (currentChangelog && userId) {
+      const storageKey = `${NOTIFICATION_STORAGE_KEYS.LAST_SEEN_CHANGELOG}_${userId}`;
+      localStorage.setItem(storageKey, currentChangelog.version);
     }
     setShowChangelog(false);
   };

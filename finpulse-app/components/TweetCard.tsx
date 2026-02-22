@@ -1,6 +1,7 @@
 import React from 'react';
 import { Heart, Repeat2, MessageCircle, Eye, ExternalLink } from 'lucide-react';
 import type { TweetData } from '../types';
+import { influencerService } from '../services/influencerService';
 
 interface TweetCardProps {
   tweet: TweetData;
@@ -35,6 +36,7 @@ const formatNumber = (num: number): string => {
  */
 export const TweetCard: React.FC<TweetCardProps> = ({ tweet, holdingSymbols = [] }) => {
   const tweetUrl = `https://x.com/${tweet.authorUsername}/status/${tweet.id}`;
+  const influencer = influencerService.getInfluencer(tweet.authorUsername);
 
   // Highlight symbols that match user holdings
   const relevantSymbols = tweet.mentionedSymbols.filter(s =>
@@ -61,7 +63,12 @@ export const TweetCard: React.FC<TweetCardProps> = ({ tweet, holdingSymbols = []
             </svg>
           </div>
           <div>
-            <span className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">
+            {influencer && (
+              <p className="text-[11px] font-bold text-white group-hover:text-cyan-400 transition-colors leading-tight">
+                {influencer.name}
+              </p>
+            )}
+            <span className="text-[10px] text-slate-500">
               @{tweet.authorUsername}
             </span>
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { influencerService } from '../services/influencerService';
 import type { TweetData, PlanType } from '../types';
 
@@ -65,19 +65,17 @@ export function useInfluencerTweets(
     return influencerService.getAccessibleInfluencers(userPlan);
   }, [userPlan]);
 
-  // Build search keywords from holdings (reserved for future use)
-  const _searchKeywords = useMemo(() => {
-    const keywords: string[] = [];
-    holdingSymbols.forEach(symbol => {
-      const upperSymbol = symbol.toUpperCase();
-      keywords.push(`$${upperSymbol}`);
-      const extraKeywords = SYMBOL_KEYWORDS[upperSymbol];
-      if (extraKeywords) {
-        keywords.push(...extraKeywords);
-      }
-    });
-    return [...new Set(keywords)];
-  }, [holdingSymbols]);
+  // Stable string key derived from holdingSymbols array — prevents fetchTweets from
+  // being recreated on every render just because the array reference changed (Bug 2)
+  const holdingSymbolsKey = useMemo(
+    () => [...holdingSymbols].sort().join(','),
+    [holdingSymbols]
+  );
+
+  // Keep a ref so the latest holdingSymbols are always accessible inside fetchTweets
+  // without needing to add the array itself to the dep array
+  const holdingSymbolsRef = useRef<string[]>(holdingSymbols);
+  holdingSymbolsRef.current = holdingSymbols;
 
   const fetchTweets = useCallback(async () => {
     if (!userPlan || accessibleInfluencers.length === 0) {
@@ -101,6 +99,12 @@ export function useInfluencerTweets(
       });
 
       const response = await fetch(`${TWITTER_API_URL}?${params}`);
+
+      // Guard against non-JSON responses (e.g. API Gateway 502/504 HTML error pages)
+      if (!response.ok) {
+        throw new Error(`Feed unavailable (${response.status})`);
+      }
+
       const data = await response.json();
 
       if (data.success && data.tweets && data.tweets.length > 0) {
@@ -111,7 +115,8 @@ export function useInfluencerTweets(
         }));
 
         // Client-side filtering: prioritize tweets mentioning user's holdings
-        const filtered = filterTweetsByHoldings(allTweets, holdingSymbols, usernames);
+        // Use ref so we always have the latest symbols without them being a dep
+        const filtered = filterTweetsByHoldings(allTweets, holdingSymbolsRef.current, usernames);
         setTweets(filtered.slice(0, maxTweets));
         setIsDemo(false);
         setError(null);
@@ -141,7 +146,9 @@ export function useInfluencerTweets(
     } finally {
       setLoading(false);
     }
-  }, [userPlan, accessibleInfluencers, holdingSymbols, maxTweets]);
+  // Use holdingSymbolsKey (stable string) instead of holdingSymbols (new array ref
+  // each render) to prevent fetchTweets from being recreated on every render (Bug 2)
+  }, [userPlan, accessibleInfluencers, holdingSymbolsKey, maxTweets]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial fetch
   useEffect(() => {
