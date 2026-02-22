@@ -5,18 +5,37 @@
  * Endpoints:
  * - GET /twitter/tweets?usernames=elonmusk,saylor&keywords=BTC,ETH - Search tweets
  * - GET /twitter/user/:username/tweets - Get user's recent tweets
+ *
+ * Caching strategy (two-tier):
+ *   Tier 1 — In-memory Map (5 min TTL, per-instance, fastest)
+ *   Tier 2 — DynamoDB finpulse-api-cache-{env} (15 min TTL, survives cold starts)
+ * On rate-limit: DynamoDB stale fallback up to 2 hours old
  */
 
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION });
+
+// DynamoDB client — shared layer has the SDK, Twitter Lambda's package.json
+// does not list it explicitly, but Lambda layers expose it at runtime.
+const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const ddb = DynamoDBDocumentClient.from(ddbClient);
+
+const API_CACHE_TABLE = process.env.API_CACHE_TABLE || `finpulse-api-cache-${process.env.ENVIRONMENT || 'prod'}`;
+const API_QUOTA_TABLE = process.env.API_QUOTA_TABLE || `finpulse-api-quota-${process.env.ENVIRONMENT || 'prod'}`;
+
+// TTLs
+const DDB_CACHE_TTL_SECONDS  = 15 * 60;      // 15 min — normal DynamoDB write TTL
+const DDB_STALE_TTL_SECONDS  = 2 * 60 * 60;  // 2 hours — stale fallback on rate-limit
 
 // Bearer token cache
 let bearerToken = null;
 let tokenCacheTime = 0;
 const TOKEN_CACHE_TTL = 300000; // 5 minutes
 
-// Response cache to minimize API calls
+// Tier-1 in-memory response cache
 const tweetsCache = new Map();
 const TWEETS_CACHE_TTL = 300000; // 5 minutes
 
@@ -29,6 +48,95 @@ const corsHeaders = {
     'Access-Control-Allow-Methods': 'GET,OPTIONS',
     'Content-Type': 'application/json'
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DynamoDB cache helpers — all non-fatal (failures fall through to live API)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Read a cache entry. Returns null on miss, error, or expired item.
+ * Performs a client-side expiry check to handle DynamoDB's eventual-consistent TTL.
+ */
+async function ddbGet(cacheKey) {
+    try {
+        const result = await ddb.send(new GetCommand({
+            TableName: API_CACHE_TABLE,
+            Key: { cacheKey }
+        }));
+        const item = result.Item;
+        if (!item || !item.data) return null;
+        // Guard against DynamoDB TTL lag (eventually consistent deletion)
+        if (item.expiresAt && Math.floor(Date.now() / 1000) > item.expiresAt) return null;
+        return { data: item.data, timestamp: item.cachedAt || Date.now() };
+    } catch (err) {
+        console.warn('DynamoDB get failed (non-fatal):', err.message);
+        return null;
+    }
+}
+
+/**
+ * Read a cache entry ignoring its TTL, but respecting a custom stale window.
+ * Used as a last resort on rate-limit when the item may already be "expired"
+ * by DynamoDB but is still recent enough to show.
+ */
+async function ddbGetStale(cacheKey, staleWindowSeconds) {
+    try {
+        const result = await ddb.send(new GetCommand({
+            TableName: API_CACHE_TABLE,
+            Key: { cacheKey }
+        }));
+        const item = result.Item;
+        if (!item || !item.data || !item.cachedAt) return null;
+        const ageSeconds = (Date.now() - item.cachedAt) / 1000;
+        if (ageSeconds > staleWindowSeconds) return null;
+        return { data: item.data, timestamp: item.cachedAt };
+    } catch (err) {
+        console.warn('DynamoDB stale get failed (non-fatal):', err.message);
+        return null;
+    }
+}
+
+/**
+ * Write a cache entry with an explicit TTL (Unix epoch seconds for DynamoDB TTL).
+ */
+async function ddbPut(cacheKey, data, ttlSeconds) {
+    try {
+        await ddb.send(new PutCommand({
+            TableName: API_CACHE_TABLE,
+            Item: {
+                cacheKey,
+                data,
+                cachedAt: Date.now(),
+                expiresAt: Math.floor(Date.now() / 1000) + ttlSeconds
+            }
+        }));
+    } catch (err) {
+        console.warn('DynamoDB put failed (non-fatal):', err.message);
+    }
+}
+
+/**
+ * Increment a daily request counter in the quota table.
+ * Fire-and-forget — never blocks the response.
+ */
+function trackQuotaUsage() {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    ddb.send(new UpdateCommand({
+        TableName: API_QUOTA_TABLE,
+        Key: { providerDate: `twitter#${today}` },
+        UpdateExpression: 'ADD #cnt :one SET #provider = :p, expiresAt = if_not_exists(expiresAt, :ttl)',
+        ExpressionAttributeNames: { '#cnt': 'requestCount', '#provider': 'provider' },
+        ExpressionAttributeValues: {
+            ':one': 1,
+            ':p': 'twitter',
+            ':ttl': Math.floor(Date.now() / 1000) + 90 * 24 * 3600 // 90-day retention
+        }
+    })).catch(err => console.warn('Quota tracking failed (non-fatal):', err.message));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Twitter API helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Get Twitter Bearer Token from Secrets Manager
@@ -73,25 +181,46 @@ async function getBearerToken() {
 }
 
 /**
- * Search tweets from multiple users with optional keywords
- * Handles Twitter's 512 character query limit by batching users
+ * Search tweets from multiple users with optional keywords.
+ * Handles Twitter's 512-character query limit by batching users.
+ *
+ * Cache hierarchy:
+ *   1. In-memory (5 min) — fastest, resets on cold start
+ *   2. DynamoDB (15 min) — survives cold starts, shared across concurrent instances
+ *   3. Live Twitter API — counted against monthly quota
+ *   4. DynamoDB stale (2 h) — last resort on rate-limit
+ *   5. In-memory stale (30 min) — final fallback on rate-limit
  */
 async function searchTweets(usernames, keywords, maxResults = 20) {
     const token = await getBearerToken();
 
-    // Twitter API has 512 char query limit
-    // We need to batch usernames to stay under the limit
+    // Stable cache key — sort usernames so order doesn't matter
+    const cacheKey = `twitter:search:${[...usernames].sort().join(',')}:${keywords.join(',')}:${maxResults}`;
+
+    // ── Tier 1: in-memory ────────────────────────────────────────────────────
+    const memCached = tweetsCache.get(cacheKey);
+    if (memCached && (Date.now() - memCached.timestamp) < TWEETS_CACHE_TTL) {
+        console.log('Returning in-memory cached results');
+        return memCached.data;
+    }
+
+    // ── Tier 2: DynamoDB ─────────────────────────────────────────────────────
+    const ddbCached = await ddbGet(cacheKey);
+    if (ddbCached) {
+        console.log('Returning DynamoDB cached results');
+        tweetsCache.set(cacheKey, ddbCached); // seed in-memory for subsequent requests
+        return ddbCached.data;
+    }
+
+    // ── Tier 3: Live Twitter API ──────────────────────────────────────────────
+    // Twitter API has 512 char query limit — batch usernames to stay under it
     const MAX_QUERY_LENGTH = 512;
     const SUFFIX = ' -is:retweet';
     const keywordPart = keywords.length > 0 ? ` (${keywords.join(' OR ')})` : '';
 
-    // Calculate how many usernames we can fit per batch
-    // Each username takes ~"from:username OR " = ~20-30 chars average
-    // Reserve space for parentheses, keywords, and suffix
     const reservedLength = 2 + keywordPart.length + SUFFIX.length + 10; // 10 for safety margin
     const availableLength = MAX_QUERY_LENGTH - reservedLength;
 
-    // Split usernames into batches that fit within query limit
     const batches = [];
     let currentBatch = [];
     let currentLength = 0;
@@ -116,14 +245,6 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
 
     console.log(`Split ${usernames.length} usernames into ${batches.length} batches`);
 
-    // Check cache for full request
-    const cacheKey = `search:${usernames.sort().join(',')}:${keywords.join(',')}:${maxResults}`;
-    const cached = tweetsCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < TWEETS_CACHE_TTL) {
-        console.log('Returning cached search results');
-        return cached.data;
-    }
-
     // Fetch tweets from each batch (max 2 batches to avoid rate limits)
     const batchesToFetch = batches.slice(0, 2);
     const allTweets = [];
@@ -145,16 +266,14 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
         url.searchParams.append('user.fields', 'username,name');
 
         const response = await fetch(url.toString(), {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-            },
+            headers: { 'Authorization': `Bearer ${token}` },
         });
 
         if (!response.ok) {
             if (response.status === 429) {
                 console.warn('Twitter rate limit hit');
                 rateLimited = true;
-                break; // Stop fetching, try to return cached/partial data
+                break; // Stop fetching, fall through to stale cache
             }
             const errorText = await response.text();
             console.error('Twitter API error:', response.status, errorText);
@@ -164,14 +283,26 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
         const data = await response.json();
         const tweets = transformTweets(data);
         allTweets.push(...tweets);
+
+        // Count each successful API call toward the daily quota
+        trackQuotaUsage();
     }
 
-    // If rate limited and we got nothing, try to return stale cache (up to 30 min old)
-    if (rateLimited && allTweets.length === 0 && cached) {
-        const STALE_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-        if ((Date.now() - cached.timestamp) < STALE_CACHE_TTL) {
-            console.log('Rate limited - returning stale cached results');
-            return cached.data;
+    // ── Rate-limited fallback ─────────────────────────────────────────────────
+    if (rateLimited && allTweets.length === 0) {
+        // Tier 4: DynamoDB stale (2-hour window, ignores TTL expiry)
+        const ddbStale = await ddbGetStale(cacheKey, DDB_STALE_TTL_SECONDS);
+        if (ddbStale) {
+            console.log('Rate limited — returning DynamoDB stale results');
+            return ddbStale.data;
+        }
+        // Tier 5: in-memory stale (30-minute window)
+        if (memCached) {
+            const STALE_MEM_TTL = 30 * 60 * 1000;
+            if ((Date.now() - memCached.timestamp) < STALE_MEM_TTL) {
+                console.log('Rate limited — returning in-memory stale results');
+                return memCached.data;
+            }
         }
     }
 
@@ -180,9 +311,10 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, maxResults);
 
-    // Only cache if we got results
+    // Write to both caches on success (DynamoDB write is fire-and-forget)
     if (uniqueTweets.length > 0) {
         tweetsCache.set(cacheKey, { data: uniqueTweets, timestamp: Date.now() });
+        ddbPut(cacheKey, uniqueTweets, DDB_CACHE_TTL_SECONDS); // intentionally not awaited
     }
 
     return uniqueTweets;
@@ -194,7 +326,7 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
 async function getUserTweets(username, maxResults = 10) {
     const token = await getBearerToken();
 
-    // Check cache
+    // Check in-memory cache
     const cacheKey = `user:${username}:${maxResults}`;
     const cached = tweetsCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < TWEETS_CACHE_TTL) {
@@ -248,6 +380,7 @@ async function getUserTweets(username, maxResults = 10) {
 
     // Cache results
     tweetsCache.set(cacheKey, { data: tweets, timestamp: Date.now() });
+    trackQuotaUsage();
 
     return tweets;
 }
@@ -310,11 +443,7 @@ function extractSymbols(text) {
  * Lambda handler
  */
 exports.handler = async (event) => {
-    // Sanitize event for logging (remove sensitive headers)
-    const sanitized = { ...event, headers: { ...event.headers } };
-    delete sanitized.headers.Authorization;
-    delete sanitized.headers.authorization;
-    console.log('Twitter Lambda invoked:', JSON.stringify(sanitized, null, 2));
+    console.log('Twitter Lambda invoked:', event.httpMethod, event.path);
 
     // Handle OPTIONS (CORS preflight)
     if (event.httpMethod === 'OPTIONS') {
