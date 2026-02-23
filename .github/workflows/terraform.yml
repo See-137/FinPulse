@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -86,7 +86,7 @@ jobs:
     needs: fmt
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -94,7 +94,7 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -121,7 +121,7 @@ jobs:
       has_changes: ${{ steps.plan.outputs.has_changes }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -130,7 +130,7 @@ jobs:
           terraform_wrapper: false
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -164,7 +164,7 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Upload Plan
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: tfplan
           path: ${{ env.TF_WORKING_DIR }}/tfplan
@@ -172,7 +172,7 @@ jobs:
 
       - name: Comment PR with Plan
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
@@ -215,7 +215,7 @@ jobs:
     environment: production  # Requires manual approval
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -223,14 +223,14 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Download Plan
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: tfplan
           path: ${{ env.TF_WORKING_DIR }}
