@@ -10,6 +10,7 @@ import { useLanguage } from '../i18n';
 import { Currency } from '../types';
 import { CURRENCY_RATES } from '../constants';
 import { WatchlistItemCard } from './WatchlistItemCard';
+import { marketWebSocket } from '../services/websocketService';
 
 interface WatchlistProps {
   currency: Currency;
@@ -63,6 +64,12 @@ const FALLBACK_PRICES: Record<string, { price: number; change24h: number }> = {
   UNG: { price: 17.35, change24h: -2.1 },
 };
 
+// Default fallback symbols — stable reference to prevent useEffect re-subscription loops
+const DEFAULT_WS_SYMBOLS = ['BTC', 'ETH'];
+
+// Stable hook options to prevent re-creating objects on every render
+const MARKET_DATA_OPTIONS_BASE = { fetchNews: false, fetchFx: false, refreshInterval: 30000 };
+
 export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio }) => {
   const { t } = useLanguage();
   const { getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, setWatchlistAlert } = usePortfolioStore();
@@ -72,50 +79,92 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
   const [alertModal, setAlertModal] = useState<{ symbol: string; currentPrice: number } | null>(null);
   const [alertPrice, setAlertPrice] = useState('');
   const [alertType, setAlertType] = useState<'above' | 'below'>('above');
-  
+
   // Track triggered alerts to avoid repeated notifications
   const [triggeredAlerts, setTriggeredAlerts] = useState<Set<string>>(new Set());
 
-  // Get watchlist symbols for WebSocket (crypto only)
-  const watchlistSymbols = useMemo(() => 
-    watchlist.filter(w => w.type === 'CRYPTO').map(w => w.symbol),
-    [watchlist]
-  );
+  // Stabilize symbol arrays — only recalculate when watchlist items actually change
+  const watchlistSymbols = useMemo(() => {
+    const cryptoSymbols = watchlist.filter(w => w.type === 'CRYPTO').map(w => w.symbol);
+    return cryptoSymbols.length > 0 ? cryptoSymbols : DEFAULT_WS_SYMBOLS;
+  }, [watchlist]);
 
-  // Get all watchlist symbols for REST API (stocks + commodities)
-  const allWatchlistSymbols = useMemo(() => 
+  const allWatchlistSymbols = useMemo(() =>
     watchlist.map(w => w.symbol),
     [watchlist]
   );
 
-  const { prices: wsPrices, isConnected } = useWebSocketPrices({
-    symbols: watchlistSymbols.length > 0 ? watchlistSymbols : ['BTC', 'ETH'],
+  // Stabilize hook options objects to prevent re-renders from new object refs
+  const wsOptions = useMemo(() => ({
+    symbols: watchlistSymbols,
     enabled: true,
-  });
+  }), [watchlistSymbols]);
 
-  // Fetch stock/commodity prices via REST API
-  const { prices: marketPrices } = useMarketData({
+  const marketDataOptions = useMemo(() => ({
+    ...MARKET_DATA_OPTIONS_BASE,
     symbols: allWatchlistSymbols,
-    refreshInterval: 30000,
-    fetchNews: false,
-    fetchFx: false,
-  });
+  }), [allWatchlistSymbols]);
+
+  // Use hooks for connection management + data fetching, but avoid re-rendering from price state.
+  // The hooks internally call setPrices on every WS tick, which would normally cascade re-renders.
+  // We mitigate this by reading prices from the singleton + refs on a controlled interval.
+  const { isConnected } = useWebSocketPrices(wsOptions);
+  const marketResult = useMarketData(marketDataOptions);
 
   const rate = CURRENCY_RATES[currency];
   const currencySymbol = currency === 'USD' ? '$' : '₪';
 
-  // Store latest prices in refs to avoid re-creating getPrice on every tick
-  const wsPricesRef = useRef(wsPrices);
-  const marketPricesRef = useRef(marketPrices);
-  wsPricesRef.current = wsPrices;
-  marketPricesRef.current = marketPrices;
+  // Ref to latest REST market prices — avoids depending on marketResult.prices directly in render
+  const marketPricesRef = useRef(marketResult.prices);
+  marketPricesRef.current = marketResult.prices;
 
-  // Get price for a symbol - prefers WebSocket for crypto, REST API for stocks
-  // Stable reference: reads from refs, so callers don't re-run when prices change
+  // Controlled price snapshot — only updates every 3 seconds via setInterval.
+  // This is the ONLY state that drives card rendering, completely decoupled from WS tick rate.
+  const [priceSnapshot, setPriceSnapshot] = useState<Record<string, { price: number; change24h: number }>>({});
+  const watchlistRef = useRef(watchlist);
+  watchlistRef.current = watchlist;
+
+  useEffect(() => {
+    const updateSnapshot = () => {
+      const items = watchlistRef.current;
+      if (items.length === 0) return;
+
+      const snapshot: Record<string, { price: number; change24h: number }> = {};
+      for (const item of items) {
+        const upper = item.symbol.toUpperCase();
+        // Read directly from the WebSocket singleton (no React state dependency)
+        const wsPrice = marketWebSocket.getPrice(upper);
+        if (wsPrice) {
+          snapshot[upper] = { price: wsPrice.price, change24h: wsPrice.change24h };
+        } else {
+          // Fallback to REST API data
+          const mp = marketPricesRef.current;
+          if (mp && mp[upper]) {
+            snapshot[upper] = { price: mp[upper].price, change24h: mp[upper].change24h };
+          } else {
+            snapshot[upper] = FALLBACK_PRICES[upper] || { price: 0, change24h: 0 };
+          }
+        }
+      }
+      setPriceSnapshot(prev => {
+        // Avoid re-render if prices haven't actually changed
+        const keys = Object.keys(snapshot);
+        const unchanged = keys.length === Object.keys(prev).length &&
+          keys.every(k => prev[k]?.price === snapshot[k].price && prev[k]?.change24h === snapshot[k].change24h);
+        return unchanged ? prev : snapshot;
+      });
+    };
+
+    updateSnapshot();
+    const interval = setInterval(updateSnapshot, 3000);
+    return () => clearInterval(interval);
+  }, [watchlist]);
+
+  // Stable getPrice reads from singleton + refs — used by alert checking (not render)
   const getPrice = useCallback((symbol: string): { price: number; change24h: number } => {
     const upperSymbol = symbol.toUpperCase();
 
-    const wsPrice = wsPricesRef.current.get(upperSymbol);
+    const wsPrice = marketWebSocket.getPrice(upperSymbol);
     if (wsPrice) {
       return { price: wsPrice.price, change24h: wsPrice.change24h };
     }
@@ -302,7 +351,9 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {watchlist.map((item) => {
-            const { price, change24h } = getPrice(item.symbol);
+            const snap = priceSnapshot[item.symbol.toUpperCase()];
+            const price = snap?.price ?? 0;
+            const change24h = snap?.change24h ?? 0;
 
             return (
               <WatchlistItemCard
