@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Eye, Plus, Search, Bell,
   Bitcoin, Activity, Gem, Star, X, Wifi, WifiOff
@@ -104,34 +104,39 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
   const rate = CURRENCY_RATES[currency];
   const currencySymbol = currency === 'USD' ? '$' : '₪';
 
+  // Store latest prices in refs to avoid re-creating getPrice on every tick
+  const wsPricesRef = useRef(wsPrices);
+  const marketPricesRef = useRef(marketPrices);
+  wsPricesRef.current = wsPrices;
+  marketPricesRef.current = marketPrices;
+
   // Get price for a symbol - prefers WebSocket for crypto, REST API for stocks
+  // Stable reference: reads from refs, so callers don't re-run when prices change
   const getPrice = useCallback((symbol: string): { price: number; change24h: number } => {
     const upperSymbol = symbol.toUpperCase();
 
-    // Try WebSocket prices first (best for crypto)
-    const wsPrice = wsPrices.get(upperSymbol);
+    const wsPrice = wsPricesRef.current.get(upperSymbol);
     if (wsPrice) {
       return { price: wsPrice.price, change24h: wsPrice.change24h };
     }
 
-    // Try REST API prices (works for both stocks and crypto)
-    if (marketPrices && marketPrices[upperSymbol]) {
-      return {
-        price: marketPrices[upperSymbol].price,
-        change24h: marketPrices[upperSymbol].change24h
-      };
+    const mp = marketPricesRef.current;
+    if (mp && mp[upperSymbol]) {
+      return { price: mp[upperSymbol].price, change24h: mp[upperSymbol].change24h };
     }
 
-    // Fallback to static prices
     return FALLBACK_PRICES[upperSymbol] || { price: 0, change24h: 0 };
-  }, [wsPrices, marketPrices]);
+  }, []);
 
-  // Filter assets for search
-  const filteredAssets = POPULAR_ASSETS.filter(asset => 
-    (asset.symbol.toLowerCase().includes(search.toLowerCase()) ||
-    asset.name.toLowerCase().includes(search.toLowerCase())) &&
-    !isInWatchlist(asset.symbol)
-  );
+  // Filter assets for search — memoized to avoid recalculating on every render
+  const filteredAssets = useMemo(() => {
+    const q = search.toLowerCase();
+    return POPULAR_ASSETS.filter(asset =>
+      (asset.symbol.toLowerCase().includes(q) ||
+      asset.name.toLowerCase().includes(q)) &&
+      !isInWatchlist(asset.symbol)
+    );
+  }, [search, isInWatchlist]);
 
   const getTypeIcon = (type: AssetType) => {
     switch (type) {
@@ -148,6 +153,15 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
       case 'COMMODITY': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     }
   };
+
+  // Stable callbacks for memoized WatchlistItemCard children
+  const handleSetAlertModal = useCallback((symbol: string, currentPrice: number) => {
+    setAlertModal({ symbol, currentPrice });
+  }, []);
+
+  const handleRemoveFromWatchlist = useCallback((symbol: string) => {
+    removeFromWatchlist(symbol);
+  }, [removeFromWatchlist]);
 
   const handleAddToWatchlist = (asset: typeof POPULAR_ASSETS[0]) => {
     addToWatchlist({
@@ -185,39 +199,45 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
     }
   }, []);
 
-  // Check price alerts
+  // Check price alerts on a 2-second interval instead of reacting to every price tick.
+  // This prevents the infinite re-render loop (getPrice → setTriggeredAlerts → effect re-run).
+  const triggeredAlertsRef = useRef(triggeredAlerts);
+  triggeredAlertsRef.current = triggeredAlerts;
+
   useEffect(() => {
-    watchlist.forEach(item => {
-      if (!item.alertPrice || !item.alertType) return;
-      
-      const alertKey = `${item.symbol}-${item.alertPrice}-${item.alertType}`;
-      if (triggeredAlerts.has(alertKey)) return; // Already triggered
-      
-      const { price } = getPrice(item.symbol);
-      if (price === 0) return; // No price data yet
-      
-      const shouldTrigger = 
-        (item.alertType === 'above' && price >= item.alertPrice) ||
-        (item.alertType === 'below' && price <= item.alertPrice);
-      
-      if (shouldTrigger) {
-        // Mark as triggered
-        setTriggeredAlerts(prev => new Set(prev).add(alertKey));
-        
-        // Show browser notification
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(`🔔 FinPulse Price Alert`, {
-            body: `${item.symbol} is now ${item.alertType === 'above' ? 'above' : 'below'} $${item.alertPrice.toLocaleString()} (Current: $${price.toLocaleString()})`,
-            icon: '/favicon.ico',
-            tag: alertKey, // Prevents duplicate notifications
-          });
+    const itemsWithAlerts = watchlist.filter(item => item.alertPrice && item.alertType);
+    if (itemsWithAlerts.length === 0) return;
+
+    const checkAlerts = () => {
+      itemsWithAlerts.forEach(item => {
+        const alertKey = `${item.symbol}-${item.alertPrice}-${item.alertType}`;
+        if (triggeredAlertsRef.current.has(alertKey)) return;
+
+        const { price } = getPrice(item.symbol);
+        if (price === 0) return;
+
+        const shouldTrigger =
+          (item.alertType === 'above' && price >= item.alertPrice!) ||
+          (item.alertType === 'below' && price <= item.alertPrice!);
+
+        if (shouldTrigger) {
+          setTriggeredAlerts(prev => new Set(prev).add(alertKey));
+
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('FinPulse Price Alert', {
+              body: `${item.symbol} is now ${item.alertType === 'above' ? 'above' : 'below'} $${item.alertPrice!.toLocaleString()} (Current: $${price.toLocaleString()})`,
+              icon: '/favicon.ico',
+              tag: alertKey,
+            });
+          }
         }
-        
-        // Also show in-page toast (fallback)
-        console.log(`[Alert] ${item.symbol} triggered: ${item.alertType} $${item.alertPrice}`);
-      }
-    });
-  }, [watchlist, triggeredAlerts, getPrice]);
+      });
+    };
+
+    checkAlerts(); // Run once immediately
+    const interval = setInterval(checkAlerts, 2000);
+    return () => clearInterval(interval);
+  }, [watchlist, getPrice]);
 
   return (
     <div className="space-y-6">
@@ -292,8 +312,8 @@ export const Watchlist: React.FC<WatchlistProps> = ({ currency, onAddToPortfolio
                 change24h={change24h}
                 rate={rate}
                 currencySymbol={currencySymbol}
-                onSetAlert={(symbol, currentPrice) => setAlertModal({ symbol, currentPrice })}
-                onRemove={removeFromWatchlist}
+                onSetAlert={handleSetAlertModal}
+                onRemove={handleRemoveFromWatchlist}
                 onAddToPortfolio={onAddToPortfolio}
               />
             );
