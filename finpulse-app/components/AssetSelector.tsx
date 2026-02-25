@@ -95,6 +95,13 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
     }
   }, [isOpen]);
 
+  // Clear search when asset type filter changes (tab switch)
+  const filterKey = filterTypes?.join(',') ?? '';
+  useEffect(() => {
+    setSearch('');
+    setApiResults([]);
+  }, [filterKey]);
+
   // Search API when user types (debounced)
   useEffect(() => {
     if (searchTimeoutRef.current) {

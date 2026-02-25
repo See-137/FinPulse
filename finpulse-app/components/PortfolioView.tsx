@@ -149,7 +149,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Holding | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-  
+  const [deleteConfirmSymbol, setDeleteConfirmSymbol] = useState<string | null>(null);
+
   // CSV Import state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<Holding[]>([]);
@@ -241,7 +242,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
   };
 
   const handleDelete = (symbol: string) => {
-    removeHolding(symbol);
+    setDeleteConfirmSymbol(symbol);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmSymbol) {
+      removeHolding(deleteConfirmSymbol);
+      setDeleteConfirmSymbol(null);
+    }
   };
 
   const handleSort = (key: string) => {
@@ -1289,6 +1297,36 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
       />
 
       {/* Share Modal */}
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmSymbol && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setDeleteConfirmSymbol(null)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative card-surface w-full max-w-sm rounded-3xl p-8 animate-in zoom-in-95 duration-200 shadow-2xl dark:text-white text-slate-900" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
+                <AlertTriangle className="w-8 h-8 text-rose-500" />
+              </div>
+              <h3 className="text-lg font-black">Remove {deleteConfirmSymbol}?</h3>
+              <p className="text-sm text-slate-500 mt-1">This will remove the asset from your portfolio. This action cannot be undone.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmSymbol(null)}
+                className="flex-1 py-3 font-bold text-sm rounded-2xl border border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-3 font-bold text-sm rounded-2xl bg-rose-500 text-white hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20"
+              >
+                {t('common.delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isShareOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setIsShareOpen(false)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
