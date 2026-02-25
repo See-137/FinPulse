@@ -5,6 +5,7 @@ import { getMarketInsightStream } from '../services/aiService';
 import { Send, Sparkles, X, Crown } from 'lucide-react';
 import { User } from '../types';
 import { usePortfolioStore } from '../store/portfolioStore';
+import { useLanguage } from '../i18n';
 
 interface AIAssistantProps {
   user: User;
@@ -163,6 +164,7 @@ const _renderMarkdown = (text: string): React.ReactNode => {
 };
 
 export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage }) => {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
@@ -247,8 +249,8 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
                <Crown className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-black text-sm text-white">Market Intelligence</h2>
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Market observations based on available data. No predictions.</p>
+              <h2 className="font-black text-sm text-white">{t('aiAssistant.title')}</h2>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{t('aiAssistant.subtitle')}</p>
             </div>
           </div>
         </div>
@@ -259,8 +261,8 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ user, onUpdateUsage })
               <div className="w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-cyan-500/20">
                 <Sparkles className="w-8 h-8 text-cyan-400" />
               </div>
-              <p className="text-slate-400 text-sm font-bold mb-2">How can I assist your Pulse Node today?</p>
-              <p className="text-slate-500 text-xs">Ask about markets, crypto, stocks, or economic trends</p>
+              <p className="text-slate-400 text-sm font-bold mb-2">{t('aiAssistant.welcomeMessage')}</p>
+              <p className="text-slate-500 text-xs">{t('aiAssistant.welcomeSubtitle')}</p>
             </div>
           )}
           {messages.map((m, i) => (

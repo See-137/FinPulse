@@ -8,6 +8,7 @@ import { XAxis, YAxis, ResponsiveContainer, Tooltip, AreaChart, Area, BarChart, 
 import { TrendingUp, TrendingDown, Shield, Zap, Target, PieChart, Lock, BarChart3, Activity, Calendar, Download, Info, RefreshCw, DollarSign, Clock } from 'lucide-react';
 import { Holding, User } from '../types';
 import { usePortfolioHistory } from '../hooks/usePortfolioHistory';
+import { useLanguage } from '../i18n';
 
 interface PremiumAnalyticsProps {
   holdings: Holding[];
@@ -171,23 +172,24 @@ const getTopPerformers = (holdings: Holding[]) => {
 
 // Locked Preview Component
 const LockedOverlay: React.FC<{ onUpgrade: () => void }> = ({ onUpgrade }) => {
+  const { t } = useLanguage();
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-b from-transparent via-slate-900/80 to-slate-900/95 backdrop-blur-[2px] rounded-[32px]">
       <div className="text-center p-8">
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-purple-500/20 flex items-center justify-center">
           <Lock className="w-8 h-8 text-purple-400" />
         </div>
-        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Premium Analytics</h3>
+        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{t('analytics.title')}</h3>
         <p className="text-slate-400 text-sm mb-6 max-w-xs">
-          Unlock advanced portfolio insights, risk metrics, and performance tracking with SuperPulse.
+          {t('analytics.unlockDesc')}
         </p>
         <button
           onClick={onUpgrade}
           className="px-6 py-3 bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-bold rounded-xl hover:opacity-90 transition-all shadow-lg shadow-purple-500/20"
         >
-          Upgrade to SuperPulse
+          {t('analytics.upgradeToSuper')}
         </button>
-        <p className="text-xs text-slate-500 mt-3">$29.90/month • Cancel anytime</p>
+        <p className="text-xs text-slate-500 mt-3">{t('analytics.priceInfo')}</p>
       </div>
     </div>
   );
@@ -264,6 +266,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
   exchangeRate,
   isPrivate
 }) => {
+  const { t } = useLanguage();
   // Unlock for SUPERPULSE plan OR internal_tester role
   const isUnlocked = user.plan === 'SUPERPULSE' || user.userRole === 'internal_tester';
   
@@ -342,8 +345,8 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
     return (
       <div className="card-surface p-8 rounded-[32px] text-center">
         <BarChart3 className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">No Data Available</h3>
-        <p className="text-sm text-slate-500">Add some assets to your portfolio to see analytics.</p>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{t('analytics.noData')}</h3>
+        <p className="text-sm text-slate-500">{t('analytics.noDataDesc')}</p>
       </div>
     );
   }
@@ -359,9 +362,9 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
           <div>
             <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
               <BarChart3 className="w-6 h-6 text-purple-400" />
-              Premium Analytics
+              {t('analytics.title')}
             </h2>
-            <p className="text-sm text-slate-500 mt-1">Advanced portfolio insights and risk metrics</p>
+            <p className="text-sm text-slate-500 mt-1">{t('analytics.subtitle')}</p>
           </div>
           <div className="flex items-center gap-3">
             {/* Time Period Selector */}
@@ -415,8 +418,8 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-black text-slate-900 dark:text-white text-lg">AI Portfolio Insight</h3>
-                <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full bg-purple-500/30 text-purple-300 border border-purple-500/40">Live Analysis</span>
+                <h3 className="font-black text-slate-900 dark:text-white text-lg">{t('analytics.aiInsight')}</h3>
+                <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full bg-purple-500/30 text-purple-300 border border-purple-500/40">{t('analytics.liveAnalysis')}</span>
               </div>
               <p className="text-sm text-slate-300 leading-relaxed">
                 {metrics.diversificationScore < 50 
@@ -449,7 +452,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
         {/* Key Metrics Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
-            label="Total P/L"
+            label={t('analytics.totalPL')}
             value={`${metrics.totalPnL >= 0 ? '+' : ''}${formatValue(metrics.totalPnL)}`}
             subValue={`${metrics.pnlPercent >= 0 ? '+' : ''}${metrics.pnlPercent.toFixed(2)}%`}
             icon={metrics.totalPnL >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
@@ -458,30 +461,30 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             tooltip="Total unrealized profit/loss based on current prices vs. average buy price"
           />
           <MetricCard
-            label="Volatility"
+            label={t('analytics.volatility')}
             value={`${metrics.volatility.toFixed(1)}%`}
-            subValue="annualized"
+            subValue={t('analytics.annualized')}
             icon={<Activity className="w-4 h-4" />}
-            tooltip="Annualized standard deviation of daily returns - measures price fluctuation risk"
+            tooltip={t('analytics.volatilityDesc')}
             color={metrics.volatility > 30 ? 'amber' : 'cyan'}
             simulated={isEstimated}
           />
           <MetricCard
-            label="Sharpe Ratio"
+            label={t('analytics.sharpeRatio')}
             value={metrics.sharpeRatio.toFixed(2)}
-            subValue={metrics.sharpeRatio > 1 ? 'Good' : metrics.sharpeRatio > 0 ? 'Fair' : 'Poor'}
+            subValue={metrics.sharpeRatio > 1 ? t('analytics.sharpeGood') : metrics.sharpeRatio > 0 ? t('analytics.sharpeFair') : t('analytics.sharpePoor')}
             icon={<Target className="w-4 h-4" />}
             color={metrics.sharpeRatio > 1 ? 'emerald' : metrics.sharpeRatio > 0 ? 'amber' : 'rose'}
-            tooltip="Risk-adjusted return metric - higher is better (>1 is good, >2 is excellent)"
+            tooltip={t('analytics.sharpeDesc')}
             simulated={isEstimated}
           />
           <MetricCard
-            label="Max Drawdown"
+            label={t('analytics.maxDrawdown')}
             value={`-${metrics.maxDrawdown.toFixed(1)}%`}
-            subValue={`${periodDays} days`}
+            subValue={`${periodDays} ${t('analytics.days')}`}
             icon={<Shield className="w-4 h-4" />}
             color={metrics.maxDrawdown > 20 ? 'rose' : 'cyan'}
-            tooltip="Largest peak-to-trough decline in the selected period"
+            tooltip={t('analytics.maxDrawdownDesc')}
             simulated={isEstimated}
           />
         </div>
@@ -489,24 +492,24 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
         {/* Additional Return Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <MetricCard
-            label="Total Return $"
+            label={t('analytics.totalReturnDollar')}
             value={isPrivate ? '••••••' : `${metrics.totalReturnDollar >= 0 ? '+' : ''}${formatValue(metrics.totalReturnDollar)}`}
-            subValue="Unrealized P&L"
+            subValue={t('analytics.unrealizedPL')}
             icon={<DollarSign className="w-4 h-4" />}
             trend={metrics.totalReturnDollar >= 0 ? 'up' : 'down'}
             color={metrics.totalReturnDollar >= 0 ? 'emerald' : 'rose'}
-            tooltip="Total unrealized profit/loss in dollars across all holdings"
+            tooltip={t('analytics.totalReturnDollarDesc')}
           />
           <MetricCard
-            label="Total Return %"
+            label={t('analytics.totalReturnPercent')}
             value={`${metrics.totalReturnPercent >= 0 ? '+' : ''}${metrics.totalReturnPercent.toFixed(1)}%`}
-            subValue="Portfolio gain/loss"
+            subValue={t('analytics.portfolioGainLoss')}
             icon={<TrendingUp className="w-4 h-4" />}
             color={metrics.totalReturnPercent >= 0 ? 'emerald' : 'rose'}
-            tooltip="Portfolio-level return percentage relative to total cost basis"
+            tooltip={t('analytics.totalReturnPercentDesc')}
           />
           <MetricCard
-            label="Avg Holding Age"
+            label={t('analytics.avgHoldingAge')}
             value={metrics.avgHoldingAgeDays < 7
               ? `${metrics.avgHoldingAgeDays}d`
               : metrics.avgHoldingAgeDays < 30
@@ -515,10 +518,10 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
               ? `${Math.floor(metrics.avgHoldingAgeDays / 30)}mo`
               : `${(metrics.avgHoldingAgeDays / 365).toFixed(1)}y`
             }
-            subValue="Avg investment time"
+            subValue={t('analytics.avgInvestTime')}
             icon={<Clock className="w-4 h-4" />}
             color="purple"
-            tooltip="Average time assets have been held in your portfolio"
+            tooltip={t('analytics.avgHoldingAgeDesc')}
           />
         </div>
 
@@ -602,7 +605,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
           {/* Risk Analysis - Enhanced */}
           <div className="card-surface p-6 rounded-[32px]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-black uppercase tracking-widest text-slate-500">Risk Analysis</h3>
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-500">{t('analytics.riskAnalysis')}</h3>
               <div className="group relative">
                 <Info className="w-4 h-4 text-slate-500 cursor-help" />
                 <div className="absolute right-0 top-6 w-48 p-2 bg-slate-800 rounded-lg text-xs text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-white/10">
@@ -614,12 +617,12 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             {/* Risk Score Gauge */}
             <div className="mb-6 p-4 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/5">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-slate-400 uppercase tracking-wide">Overall Risk Level</span>
+                <span className="text-xs text-slate-400 uppercase tracking-wide">{t('analytics.overallRisk')}</span>
                 <span className={`text-sm font-bold ${
-                  metrics.volatility < 15 ? 'text-emerald-400' : 
+                  metrics.volatility < 15 ? 'text-emerald-400' :
                   metrics.volatility < 30 ? 'text-amber-400' : 'text-rose-400'
                 }`}>
-                  {metrics.volatility < 15 ? 'Low' : metrics.volatility < 30 ? 'Moderate' : 'High'}
+                  {metrics.volatility < 15 ? t('analytics.riskLow') : metrics.volatility < 30 ? t('analytics.riskModerate') : t('analytics.riskHigh')}
                 </span>
               </div>
               <div className="relative h-3 rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 overflow-hidden">
@@ -629,9 +632,9 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
                 />
               </div>
               <div className="flex justify-between mt-1 text-[10px] text-slate-500">
-                <span>Conservative</span>
-                <span>Balanced</span>
-                <span>Aggressive</span>
+                <span>{t('analytics.riskConservative')}</span>
+                <span>{t('analytics.riskBalanced')}</span>
+                <span>{t('analytics.riskAggressive')}</span>
               </div>
             </div>
             
@@ -642,8 +645,8 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
                     <TrendingUp className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div>
-                    <span className="text-sm text-slate-300">Best Day</span>
-                    <p className="text-[10px] text-slate-500">Highest single-day gain</p>
+                    <span className="text-sm text-slate-300">{t('analytics.bestDay')}</span>
+                    <p className="text-[10px] text-slate-500">{t('analytics.bestDayDesc')}</p>
                   </div>
                 </div>
                 <span className="font-bold text-emerald-400">+{metrics.bestDay.toFixed(2)}%</span>
@@ -654,8 +657,8 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
                     <TrendingDown className="w-4 h-4 text-rose-400" />
                   </div>
                   <div>
-                    <span className="text-sm text-slate-300">Worst Day</span>
-                    <p className="text-[10px] text-slate-500">Largest single-day loss</p>
+                    <span className="text-sm text-slate-300">{t('analytics.worstDay')}</span>
+                    <p className="text-[10px] text-slate-500">{t('analytics.worstDayDesc')}</p>
                   </div>
                 </div>
                 <span className="font-bold text-rose-400">{metrics.worstDay.toFixed(2)}%</span>
@@ -666,8 +669,8 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
                     <PieChart className="w-4 h-4 text-purple-400" />
                   </div>
                   <div>
-                    <span className="text-sm text-slate-300">Diversification</span>
-                    <p className="text-[10px] text-slate-500">Portfolio balance score</p>
+                    <span className="text-sm text-slate-300">{t('analytics.diversification')}</span>
+                    <p className="text-[10px] text-slate-500">{t('analytics.diversificationDesc')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -686,7 +689,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
           {/* Top Performers - Enhanced */}
           <div className="card-surface p-6 rounded-[32px]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-black uppercase tracking-widest text-slate-500">Top Performers</h3>
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-500">{t('analytics.topPerformers')}</h3>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
                   {topGainers.length} ↑
@@ -725,8 +728,8 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
               ) : (
                 <div className="text-center py-6">
                   <TrendingUp className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">No gainers yet</p>
-                  <p className="text-[10px] text-slate-600">Add more assets to track performance</p>
+                  <p className="text-sm text-slate-500">{t('analytics.noGainersYet')}</p>
+                  <p className="text-[10px] text-slate-600">{t('analytics.addMoreAssets')}</p>
                 </div>
               )}
               
@@ -735,7 +738,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
                   <div className="relative my-3">
                     <div className="border-t border-white/5" />
                     <span className="absolute left-1/2 -translate-x-1/2 -top-2 bg-slate-900 px-2 text-[10px] text-slate-500">
-                      Underperformers
+                      {t('analytics.underperformers')}
                     </span>
                   </div>
                   {topLosers.slice(0, 2).map((asset) => (
@@ -771,7 +774,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
         {/* Allocation Breakdown - Enhanced */}
         <div className="card-surface p-6 rounded-[32px]">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-black uppercase tracking-widest text-slate-500">Asset Allocation</h3>
+            <h3 className="text-sm font-black uppercase tracking-widest text-slate-500">{t('analytics.assetAllocation')}</h3>
             <div className="flex items-center gap-1 text-xs text-slate-500">
               <Info className="w-3 h-3" />
               <span>{holdings.length} assets</span>

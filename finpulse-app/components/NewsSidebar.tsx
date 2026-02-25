@@ -5,6 +5,7 @@ import { usePortfolioStore } from '../store/portfolioStore';
 import { InfluencerFeed } from './InfluencerFeed';
 import { useNews } from '../hooks/useNews';
 import { NewsArticle, filterArticlesByHoldings, formatNewsTime } from '../types/news';
+import { useLanguage } from '../i18n';
 
 interface NewsSidebarProps {
   user?: User | null;
@@ -18,6 +19,7 @@ interface DisplayArticle extends NewsArticle {
 }
 
 export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, isAuthInitializing = false }) => {
+  const { t } = useLanguage();
   const [activeFilter, setActiveFilter] = useState<'Holdings' | 'X Feed' | 'All'>('All');
   const { articles, loading, source: newsSource, refresh } = useNews({ maxArticles: 8 });
   // Subscribe to the raw per-user map + currentUserId so we only re-render when
@@ -84,10 +86,10 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, 
             </svg>
           </div>
           <p className="text-slate-400 text-sm font-bold mb-1">
-            {activeFilter === 'Holdings' ? 'No news for your holdings' : 'No news available'}
+            {activeFilter === 'Holdings' ? t('news.noNewsHoldings') : t('news.noNewsAvailable')}
           </p>
           <p className="text-slate-600 text-xs">
-            {activeFilter === 'Holdings' ? 'Add assets to see relevant news' : 'Check back later'}
+            {activeFilter === 'Holdings' ? t('news.addAssetsForNews') : t('news.checkBackLater')}
           </p>
         </div>
       );
@@ -128,7 +130,7 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, 
             ))}
           </div>
           {!hasUrl && (
-            <div className="mt-3 text-[10px] text-slate-500 italic">No source available</div>
+            <div className="mt-3 text-[10px] text-slate-500 italic">{t('news.noSource')}</div>
           )}
         </CardWrapper>
       );
@@ -145,15 +147,15 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path>
               </svg>
             </div>
-            <h2 className="font-black text-lg tracking-tight text-white">Market News</h2>
+            <h2 className="font-black text-lg tracking-tight text-white">{t('news.marketNews')}</h2>
             {newsSource === 'live' && (
-              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-black rounded-full animate-pulse">LIVE</span>
+              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-black rounded-full animate-pulse">{t('news.live')}</span>
             )}
             {newsSource === 'cached' && (
-              <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-[9px] font-black rounded-full">CACHED</span>
+              <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-[9px] font-black rounded-full">{t('news.cached')}</span>
             )}
             {newsSource === 'offline' && articles.length > 0 && (
-              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] font-black rounded-full">OFFLINE</span>
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] font-black rounded-full">{t('news.offline')}</span>
             )}
           </div>
           <button
@@ -168,17 +170,17 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, 
         </div>
 
         <div className="flex bg-[#0b0e14] p-1.5 rounded-xl gap-1 border border-white/5">
-          {(['Holdings', 'X Feed', 'All'] as const).map(filter => (
+          {([{ key: 'Holdings', label: t('news.holdings') }, { key: 'X Feed', label: t('news.xFeed') }, { key: 'All', label: t('news.all') }] as const).map(({ key, label }) => (
             <button
-              key={filter}
-              onClick={() => setActiveFilter(filter)}
+              key={key}
+              onClick={() => setActiveFilter(key as 'Holdings' | 'X Feed' | 'All')}
               className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-200 ${
-                activeFilter === filter
+                activeFilter === key
                   ? 'bg-[#00e5ff] text-[#0b0e14] shadow-lg shadow-[#00e5ff]/30'
                   : 'text-slate-500 hover:text-white hover:bg-white/5'
               }`}
             >
-              {filter}
+              {label}
             </button>
           ))}
         </div>

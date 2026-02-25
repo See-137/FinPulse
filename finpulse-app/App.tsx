@@ -281,31 +281,33 @@ const AppContent: React.FC = () => {
   const handleContinue = () => setView('dashboard');
 
   // Legal pages (accessible via URL hash: #terms, #privacy, #pricing, #accessibility)
+  // If user is authenticated, back navigates to dashboard; otherwise to landing
+  const handleLegalBack = () => { window.location.hash = ''; setView(user ? 'dashboard' : 'landing'); };
   if (view === 'terms') return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingSpinner size="lg" />}>
-        <TermsOfService onBack={() => { window.location.hash = ''; setView('landing'); }} />
+        <TermsOfService onBack={handleLegalBack} />
       </Suspense>
     </ErrorBoundary>
   );
   if (view === 'privacy') return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingSpinner size="lg" />}>
-        <PrivacyPolicy onBack={() => { window.location.hash = ''; setView('landing'); }} />
+        <PrivacyPolicy onBack={handleLegalBack} />
       </Suspense>
     </ErrorBoundary>
   );
   if (view === 'pricing') return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingSpinner size="lg" />}>
-        <PricingPage onBack={() => { window.location.hash = ''; setView('landing'); }} />
+        <PricingPage onBack={handleLegalBack} />
       </Suspense>
     </ErrorBoundary>
   );
   if (view === 'accessibility') return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingSpinner size="lg" />}>
-        <AccessibilityStatement onBack={() => { window.location.hash = ''; setView('landing'); }} />
+        <AccessibilityStatement onBack={handleLegalBack} />
       </Suspense>
     </ErrorBoundary>
   );
