@@ -49,8 +49,8 @@ export class TwitterAPI {
   constructor(bearerToken?: string) {
     this.bearerToken = bearerToken || apiConfig.twitter.bearerToken || '';
 
-    if (!this.bearerToken) {
-      console.warn('⚠️  Twitter Bearer Token not configured - using mock data');
+    if (!this.bearerToken && !import.meta.env.PROD) {
+      console.log('Twitter Bearer Token not configured - using mock data'); // eslint-disable-line no-console
     }
   }
 

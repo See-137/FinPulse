@@ -152,7 +152,7 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, 
               <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-black rounded-full animate-pulse">{t('news.live')}</span>
             )}
             {newsSource === 'cached' && (
-              <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-[9px] font-black rounded-full">{t('news.cached')}</span>
+              <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-[9px] font-black rounded-full" title={t('news.cachedTooltip')}>{t('news.recent')}</span>
             )}
             {newsSource === 'offline' && articles.length > 0 && (
               <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] font-black rounded-full">{t('news.offline')}</span>

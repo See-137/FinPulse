@@ -139,9 +139,9 @@ const sendCAPI = async (
         utm: getStoredUTM(),
       }),
     });
-  } catch (err) {
-    // Non-blocking — analytics failures must never break the app
-    analyticsLogger.warn('CAPI relay failed', err);
+  } catch {
+    // Non-blocking — analytics endpoint may not be deployed yet
+    // Silently swallow to avoid console noise in production
   }
 };
 

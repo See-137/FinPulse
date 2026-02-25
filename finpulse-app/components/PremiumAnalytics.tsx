@@ -548,7 +548,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             </div>
           </div>
           <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={150}>
               <AreaChart data={historicalData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
@@ -785,7 +785,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
           <div className="grid md:grid-cols-2 gap-6">
             {/* Pie Chart */}
             <div className="h-[160px] flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={100}>
                 <RechartsPie>
                   <Pie
                     data={allocation}
@@ -820,7 +820,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             
             {/* Bar Chart */}
             <div className="h-[160px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={100}>
                 <BarChart data={allocation} layout="vertical" margin={{ left: 0, right: 20 }}>
                   <XAxis type="number" hide />
                   <YAxis 
