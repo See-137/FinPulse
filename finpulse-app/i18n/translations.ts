@@ -163,6 +163,7 @@ export const translations = {
       noAssetsFound: 'No assets found',
       typeToSearch: 'Type to search for assets',
       searchPoweredBy: 'Search powered by',
+      typeCommoditySymbol: 'Type commodity symbol (e.g. GLD, SLV)',
     },
     
     // Pricing Modal
@@ -441,6 +442,7 @@ export const translations = {
       noAssetsFound: 'לא נמצאו נכסים',
       typeToSearch: 'הקלד לחיפוש נכסים',
       searchPoweredBy: 'חיפוש מופעל על ידי',
+      typeCommoditySymbol: 'הקלד סימול סחורה (למשל GLD, SLV)',
     },
     
     // Pricing Modal

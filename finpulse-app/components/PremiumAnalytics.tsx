@@ -177,7 +177,7 @@ const LockedOverlay: React.FC<{ onUpgrade: () => void }> = ({ onUpgrade }) => {
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-purple-500/20 flex items-center justify-center">
           <Lock className="w-8 h-8 text-purple-400" />
         </div>
-        <h3 className="text-xl font-black text-white mb-2">Premium Analytics</h3>
+        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Premium Analytics</h3>
         <p className="text-slate-400 text-sm mb-6 max-w-xs">
           Unlock advanced portfolio insights, risk metrics, and performance tracking with SuperPulse.
         </p>
@@ -243,9 +243,9 @@ const MetricCard: React.FC<{
       </div>
       <div className="flex items-baseline gap-2">
         <span className={`text-2xl font-black ${
-          trend === 'up' ? 'text-emerald-400' : 
-          trend === 'down' ? 'text-rose-400' : 
-          'text-white'
+          trend === 'up' ? 'text-emerald-600 dark:text-emerald-400' :
+          trend === 'down' ? 'text-rose-600 dark:text-rose-400' :
+          'text-slate-900 dark:text-white'
         }`}>
           {value}
         </span>
@@ -342,7 +342,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
     return (
       <div className="card-surface p-8 rounded-[32px] text-center">
         <BarChart3 className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-        <h3 className="text-lg font-bold text-white mb-2">No Data Available</h3>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">No Data Available</h3>
         <p className="text-sm text-slate-500">Add some assets to your portfolio to see analytics.</p>
       </div>
     );
@@ -357,7 +357,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
         {/* Header with controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-black text-white flex items-center gap-3">
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
               <BarChart3 className="w-6 h-6 text-purple-400" />
               Premium Analytics
             </h2>
@@ -415,7 +415,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-black text-white text-lg">AI Portfolio Insight</h3>
+                <h3 className="font-black text-slate-900 dark:text-white text-lg">AI Portfolio Insight</h3>
                 <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full bg-purple-500/30 text-purple-300 border border-purple-500/40">Live Analysis</span>
               </div>
               <p className="text-sm text-slate-300 leading-relaxed">
@@ -677,7 +677,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
                       style={{ width: `${metrics.diversificationScore}%` }}
                     />
                   </div>
-                  <span className="font-bold text-white text-sm">{metrics.diversificationScore}</span>
+                  <span className="font-bold text-slate-900 dark:text-white text-sm">{metrics.diversificationScore}</span>
                 </div>
               </div>
             </div>
@@ -706,7 +706,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-white group-hover:text-emerald-400 transition-colors">{asset.symbol}</span>
+                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-emerald-400 transition-colors">{asset.symbol}</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">{asset.type}</span>
                         </div>
                         <p className="text-[10px] text-slate-500">
@@ -746,7 +746,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-white group-hover:text-rose-400 transition-colors">{asset.symbol}</span>
+                            <span className="font-bold text-slate-900 dark:text-white group-hover:text-rose-400 transition-colors">{asset.symbol}</span>
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">{asset.type}</span>
                           </div>
                           <p className="text-[10px] text-slate-500">
@@ -856,7 +856,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
               <div key={a.name} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: a.color }} />
                 <span className="text-xs font-medium text-slate-300">{a.name}</span>
-                <span className="text-xs font-bold text-white">{a.percent.toFixed(1)}%</span>
+                <span className="text-xs font-bold text-slate-900 dark:text-white">{a.percent.toFixed(1)}%</span>
                 <span className="text-xs text-slate-500">({formatValue(a.value)})</span>
               </div>
             ))}
