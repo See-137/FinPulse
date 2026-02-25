@@ -115,18 +115,19 @@ module "lambda" {
 module "api_gateway" {
   source = "./modules/api-gateway"
 
-  project_name             = local.project_name
-  environment              = var.environment
-  cognito_user_pool_arn    = module.cognito.user_pool_arn
-  lambda_function_names    = module.lambda.function_names
-  lambda_invoke_arns       = module.lambda.invoke_arns
-  enable_ai_service        = var.enable_ai_service
-  enable_news_service      = var.enable_news_service
-  enable_community_service = var.enable_community_service
-  enable_twitter_service   = var.enable_twitter_service
-  enable_caching           = var.enable_api_caching
-  log_retention_days       = var.cloudwatch_log_retention_days
-  tags                     = local.common_tags
+  project_name              = local.project_name
+  environment               = var.environment
+  cognito_user_pool_arn     = module.cognito.user_pool_arn
+  lambda_function_names     = module.lambda.function_names
+  lambda_invoke_arns        = module.lambda.invoke_arns
+  enable_ai_service         = var.enable_ai_service
+  enable_news_service       = var.enable_news_service
+  enable_community_service  = var.enable_community_service
+  enable_twitter_service    = var.enable_twitter_service
+  enable_caching            = var.enable_api_caching
+  log_retention_days        = var.cloudwatch_log_retention_days
+  api_gateway_logging_level = "ERROR" # INFO generates costly execution logs; access logs still active
+  tags                      = local.common_tags
 
   depends_on = [module.lambda]
 }
@@ -144,12 +145,10 @@ module "cloudwatch" {
   alert_email            = var.budget_alert_email
   lambda_function_names  = module.lambda.function_names
   lambda_error_threshold = var.lambda_error_threshold
-  dynamodb_table_names   = module.dynamodb.all_table_names
   redis_cluster_id       = module.redis.cluster_id
   redis_memory_threshold = var.redis_memory_threshold
   api_gateway_name       = module.api_gateway.api_name
   api_5xx_threshold      = var.api_5xx_threshold
-  api_latency_threshold  = var.api_latency_threshold
   tags                   = local.common_tags
 
   depends_on = [module.lambda, module.api_gateway]

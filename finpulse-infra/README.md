@@ -1,45 +1,45 @@
 # FinPulse Infrastructure
 
-**Sweet middle ground** - Production-ready Terraform infrastructure with essential SRE features.
+**Production-ready** Terraform infrastructure for [finpulse.me](https://finpulse.me) — a SaaS financial insights platform.
 
 ## 🎯 What's Included
 
-| Component | Description | Cost |
-|-----------|-------------|------|
-| **VPC + NAT Gateway** | Private networking for Lambda | ~$35/mo |
-| **7 DynamoDB Tables** | All microservices data | ~$12/mo |
-| **Cognito User Pool** | User authentication | Free |
-| **Redis Cache** | API response caching | ~$12/mo |
-| **Secrets Manager** | API key storage | ~$2/mo |
-| **8 Lambda Functions** | Microservices (placeholder code) | ~$5/mo |
-| **API Gateway** | REST API with JWT auth | ~$5/mo |
-| **CloudWatch Alarms** | Error rate, latency, memory alerts | ~$2/mo |
-| **CloudWatch Dashboard** | Visual monitoring | Free |
-| **Budget Alerts** | Cost monitoring | Free |
+| Component | Description | Monthly Cost |
+|-----------|-------------|-------------|
+| **VPC + NAT Gateway** | Private networking for Lambda + Redis | ~$16/mo |
+| **ElastiCache Redis** | API response caching (cache.t4g.micro) | ~$15/mo |
+| **11 DynamoDB Tables** | All microservices data (on-demand) | ~$1/mo |
+| **Cognito User Pool** | User auth + Google SSO | Free tier |
+| **Secrets Manager** | 6 active API key secrets | ~$2.40/mo |
+| **8 Lambda Functions** | Microservices (ARM64, Node.js 20) | ~$1/mo |
+| **API Gateway** | REST API with Cognito JWT auth | ~$4/mo |
+| **CloudFront** | CDN for finpulse.me | ~$1/mo |
+| **CloudWatch** | 8 alarms, 7-day log retention | ~$1/mo |
+| **Budget Alerts** | 80% forecasted + 100% actual | Free |
 
-**Total: ~$75/month**
+**Total: ~$47/month** (as of Feb 2026)
 
 ## 📁 Structure
 
 ```
-finpulse-infrastructure/
-├── main.tf                    # Root config
+finpulse-infra/
+├── main.tf                    # Root config, providers, backend
 ├── variables.tf               # All variables
-├── secrets.tf                 # API key variables
-├── networking.tf              # VPC, subnets, NAT
+├── networking.tf              # VPC, subnets, NAT Gateway, security groups
 ├── infrastructure.tf          # Module deployments
+├── cloudfront.tf              # CloudFront distribution
 ├── outputs.tf                 # All outputs
-├── terraform.tfvars.example   # Example config
+├── terraform.tfvars           # Production config
 ├── .gitignore
 │
 └── modules/
-    ├── dynamodb/              # 7 tables
-    ├── cognito/               # User auth
-    ├── redis/                 # ElastiCache
-    ├── secrets/               # Secrets Manager
+    ├── api-gateway/           # REST API + JWT + CORS + throttling
+    ├── cloudwatch/            # 8 alarms + dashboard
+    ├── cognito/               # User auth + Google SSO
+    ├── dynamodb/              # 11 tables
     ├── lambda/                # 8 Lambda functions + IAM
-    ├── api-gateway/           # REST API + JWT + CORS
-    └── cloudwatch/            # Alarms + Dashboard
+    ├── redis/                 # ElastiCache (cache.t4g.micro)
+    └── secrets/               # Secrets Manager data sources
 ```
 
 ## 🚀 Quick Start
@@ -127,33 +127,32 @@ aws lambda update-function-code `
   --zip-file fileb://market-data.zip
 ```
 
-## 🔔 CloudWatch Alarms
+## 🔔 CloudWatch Alarms (8 active, within 10-alarm Free Tier)
 
-| Alarm | Threshold | When |
-|-------|-----------|------|
-| Lambda Error Rate | > 5% | Any Lambda has high errors |
-| Lambda Duration | > 24s | Lambda approaching timeout |
-| DynamoDB Throttle | > 1 | Table being throttled |
-| Redis Memory | > 80% | Cache filling up |
-| API 5xx Errors | > 10/min | Backend failures |
-| API Latency | > 3000ms p95 | Slow responses |
+| Alarm | Count | Threshold |
+|-------|-------|-----------|
+| Lambda Error Rate | 6 | > 5% per function (excludes admin + ai) |
+| Redis Memory | 1 | > 80% usage |
+| API 5xx Errors | 1 | > 10/min |
 
-Alerts go to your `budget_alert_email`.
+Alerts go to your `budget_alert_email` via SNS.
 
-## 💰 Cost Breakdown
+## 💰 Cost Breakdown (Feb 2026)
 
-| Service | Monthly Cost |
-|---------|--------------|
-| NAT Gateway | $35 |
-| DynamoDB (On-Demand) | $12 |
-| ElastiCache Redis | $12 |
-| Lambda | $5 |
-| API Gateway | $5 |
-| Secrets Manager | $2 |
-| CloudWatch | $2 |
-| **Total** | **~$75** |
+| Service | Monthly Cost | Notes |
+|---------|-------------|-------|
+| NAT Gateway + EIP | ~$16 | Single NAT in us-east-1a |
+| ElastiCache Redis | ~$15 | cache.t4g.micro, 1 node |
+| API Gateway | ~$4 | Requests only (cache disabled) |
+| Secrets Manager | ~$2.40 | 6 active secrets |
+| DynamoDB | ~$1 | On-demand, 11 tables |
+| Lambda | ~$1 | 8 functions, ARM64 |
+| CloudFront | ~$1 | finpulse.me CDN |
+| CloudWatch | ~$1 | 8 alarms, 7-day retention |
+| S3 | ~$0.10 | Frontend + state bucket |
+| **Total** | **~$47** | |
 
-*Costs are estimates for ~250 users/month*
+*AWS Free Tier (account created Jan 2026) covers Lambda requests, DynamoDB, API Gateway requests, and CloudFront until Jan 2027. Costs shown are real charges — services without free tier.*
 
 ## 🛠️ Customization
 
@@ -175,7 +174,7 @@ terraform apply
 
 ```hcl
 # In terraform.tfvars
-enable_api_caching = true  # Adds ~$15/mo
+enable_api_caching = true  # Adds ~$11/mo — redundant when Redis + DynamoDB caching is active
 ```
 
 ### Multi-AZ Redis (Production)

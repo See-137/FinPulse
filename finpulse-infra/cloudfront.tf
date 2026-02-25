@@ -2,6 +2,11 @@
 # =============================================================================
 # This manages the CloudFront distribution for the frontend SPA
 # Import existing distribution: terraform import aws_cloudfront_distribution.frontend E2Y4NTEFQ5LYOK
+#
+# WAF: Removed Feb 2026 — was deployed but never attached (no web_acl_id),
+# costing $15/mo for zero protection. API Gateway throttling + Cognito auth
+# provide sufficient protection for a hobby project. To re-add WAF, create a
+# new module and set web_acl_id on this distribution.
 # =============================================================================
 
 # S3 bucket for frontend (reference existing bucket)

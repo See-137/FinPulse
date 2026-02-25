@@ -677,3 +677,27 @@ resource "aws_cloudwatch_log_group" "twitter" {
   tags              = var.tags
 }
 
+# NOTE: Every new Lambda MUST have an explicit log group here to enforce
+# retention. Without one, AWS auto-creates log groups with infinite retention.
+
+resource "aws_cloudwatch_log_group" "news" {
+  count             = var.enable_news_service ? 1 : 0
+  name              = "/aws/lambda/${aws_lambda_function.news_service[0].function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "community" {
+  count             = var.enable_community_service ? 1 : 0
+  name              = "/aws/lambda/${aws_lambda_function.community_service[0].function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "ai" {
+  count             = var.enable_ai_service ? 1 : 0
+  name              = "/aws/lambda/${aws_lambda_function.ai_service[0].function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+

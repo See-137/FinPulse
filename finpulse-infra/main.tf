@@ -50,19 +50,3 @@ locals {
     ManagedBy   = "Terraform"
   }
 }
-# ============================================================
-# WAF Module - DDoS and Bot Protection
-# ============================================================
-
-module "waf" {
-  source = "./modules/waf"
-
-  project_name = local.project_name
-  environment  = var.environment
-  tags         = local.common_tags
-
-  waf_rate_limit                 = var.waf_rate_limit
-  waf_allowed_countries          = var.waf_allowed_countries
-  waf_alarm_threshold_blocked    = var.waf_alarm_threshold_blocked
-  waf_alarm_threshold_rate_limit = var.waf_alarm_threshold_rate_limit
-}

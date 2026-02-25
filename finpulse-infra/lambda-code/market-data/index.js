@@ -736,32 +736,12 @@ const corsHeaders = {
   'Access-Control-Allow-Credentials': 'true'
 };
 
-/**
- * Sanitize event for logging (remove sensitive headers)
- */
-function sanitizeEvent(event) {
-  const sanitized = { ...event };
-  if (sanitized.headers) {
-    sanitized.headers = { ...sanitized.headers };
-    delete sanitized.headers.Authorization;
-    delete sanitized.headers.authorization;
-    delete sanitized.headers.Cookie;
-    delete sanitized.headers.cookie;
-  }
-  if (sanitized.multiValueHeaders) {
-    sanitized.multiValueHeaders = { ...sanitized.multiValueHeaders };
-    delete sanitized.multiValueHeaders.Authorization;
-    delete sanitized.multiValueHeaders.authorization;
-  }
-  return sanitized;
-}
-
 // =============================================================================
 // Main Handler
 // =============================================================================
 
 exports.handler = async (event) => {
-  console.log('Event:', JSON.stringify(sanitizeEvent(event)));
+  console.log('Market Data Lambda invoked:', event.httpMethod, event.path);
 
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {

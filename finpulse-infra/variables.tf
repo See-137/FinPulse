@@ -78,7 +78,7 @@ variable "lambda_layer_zip_path" {
 }
 
 variable "enable_api_caching" {
-  description = "Enable API Gateway caching (~$15/mo)"
+  description = "Enable API Gateway caching (~$11/mo). Redundant when Lambda-level caching (Redis/DDB) is active."
   type        = bool
   default     = false
 }
@@ -126,9 +126,9 @@ variable "redis_num_cache_nodes" {
 variable "cloudwatch_log_retention_days" {
   description = "CloudWatch log retention in days"
   type        = number
-  # SECURITY FIX: Increase production log retention for audit/compliance
-  # Production should use 30 days minimum for audit trail
-  default = 30
+  # 7 days balances debuggability with Free Tier log storage limits.
+  # Override in terraform.tfvars if longer retention is needed.
+  default = 7
 }
 
 # =============================================================================
@@ -153,11 +153,6 @@ variable "api_5xx_threshold" {
   default     = 10
 }
 
-variable "api_latency_threshold" {
-  description = "API Gateway p95 latency threshold (ms)"
-  type        = number
-  default     = 3000
-}
 # =============================================================================
 # LemonSqueezy Settings (replaces Stripe - Israeli merchants not supported)
 # =============================================================================
@@ -234,36 +229,8 @@ variable "oauth_logout_urls" {
   type        = list(string)
   default     = ["http://localhost:5173"]
 }
-# =============================================================================
-# WAF Configuration
-# =============================================================================
-
-variable "waf_rate_limit" {
-  description = "WAF request rate limit per 5 minutes (per IP)"
-  type        = number
-  default     = 2000
-}
-
-variable "waf_allowed_countries" {
-  description = "List of allowed countries for WAF (ISO 3166 codes). Empty = all countries allowed"
-  type        = list(string)
-  default     = []
-}
-
 variable "allowed_origin" {
   description = "CORS allowed origin for Lambda function responses"
   type        = string
   default     = "https://finpulse.me"
-}
-
-variable "waf_alarm_threshold_blocked" {
-  description = "CloudWatch alarm threshold for WAF blocked requests (per 5 minutes)"
-  type        = number
-  default     = 100
-}
-
-variable "waf_alarm_threshold_rate_limit" {
-  description = "CloudWatch alarm threshold for WAF rate-limited requests (per minute)"
-  type        = number
-  default     = 50
 }

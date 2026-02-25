@@ -150,19 +150,7 @@ variable "public_quota_period" {
   }
 }
 
-# CloudWatch alarm thresholds
-variable "error_4xx_threshold" {
-  description = "Threshold for 4xx error alarm (count per 5 minutes)"
-  type        = number
-  default     = 100 # Alert if >100 4xx errors in 5 minutes
-}
-
-variable "error_5xx_threshold" {
-  description = "Threshold for 5xx error alarm (count per 5 minutes)"
-  type        = number
-  default     = 50 # Alert if >50 5xx errors in 5 minutes
-}
-
+# CloudWatch alarm thresholds (4xx/5xx alarms removed for Free Tier budget)
 variable "latency_threshold_ms" {
   description = "Latency threshold in milliseconds"
   type        = number
@@ -179,7 +167,7 @@ variable "request_count_threshold" {
 variable "api_gateway_logging_level" {
   description = "API Gateway logging level (OFF, ERROR, INFO)"
   type        = string
-  default     = "INFO"
+  default     = "ERROR"
 
   validation {
     condition     = contains(["OFF", "ERROR", "INFO"], var.api_gateway_logging_level)

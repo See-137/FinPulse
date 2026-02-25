@@ -9,7 +9,7 @@ const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, DeleteCom
 const { CognitoIdentityProviderClient, AdminGetUserCommand, AdminUpdateUserAttributesCommand, AdminDeleteUserCommand, AdminInitiateAuthCommand } = require('@aws-sdk/client-cognito-identity-provider');
 
 // Import shared utilities from Lambda Layer (or fallback to local for development)
-let jwtVerifier, envValidator, requestContext, rateLimiter, validation;
+let jwtVerifier, envValidator, requestContext, rateLimiter, validation, planConfig;
 try {
   // Production: Load from Lambda Layer
   jwtVerifier = require('/opt/nodejs/jwt-verifier');
@@ -17,6 +17,7 @@ try {
   requestContext = require('/opt/nodejs/request-context');
   rateLimiter = require('/opt/nodejs/rate-limiter');
   validation = require('/opt/nodejs/validation');
+  planConfig = require('/opt/nodejs/plan-config');
 } catch (e) {
   // Development/Local: Load from shared directory
   try {
@@ -25,6 +26,7 @@ try {
     requestContext = require('./shared/request-context');
     rateLimiter = require('./shared/rate-limiter');
     validation = require('./shared/validation');
+    planConfig = require('./shared/plan-config');
   } catch (e2) {
     console.warn('Shared utilities not available, using minimal fallbacks');
     // Minimal fallbacks for backward compatibility
@@ -33,6 +35,7 @@ try {
     requestContext = { getRequestId: (event) => event?.requestContext?.requestId || 'unknown' };
     rateLimiter = { checkRateLimitForRequest: async () => ({ blocked: false }) };
     validation = null;
+    planConfig = { PLAN_LIMITS: { FREE: { maxAssets: 20, maxAiQueries: 10 }, PROPULSE: { maxAssets: 50, maxAiQueries: 50 }, SUPERPULSE: { maxAssets: 9999, maxAiQueries: 9999 } }, getPlanLimits: (p) => planConfig.PLAN_LIMITS[(p || 'FREE').toUpperCase()] || planConfig.PLAN_LIMITS.FREE };
   }
 }
 
@@ -412,9 +415,9 @@ async function getOrCreateUser(cognitoUser) {
       maxAssets: 9999
     } : {
       ai: 0,
-      maxAi: 10,
+      maxAi: planConfig.getPlanLimits('FREE').maxAiQueries,
       assets: 0,
-      maxAssets: 5
+      maxAssets: planConfig.getPlanLimits('FREE').maxAssets
     },
     settings: {
       currency: 'USD',
@@ -507,13 +510,12 @@ async function recordLogin(userId) {
  * Check user subscription/plan limits
  */
 function checkLimits(user, action) {
-  const limits = {
-    FREE: { maxAssets: 5, maxAiQueries: 10, features: ['portfolio', 'news'] },
-    PRO: { maxAssets: 50, maxAiQueries: 100, features: ['portfolio', 'news', 'ai', 'community'] },
-    ENTERPRISE: { maxAssets: -1, maxAiQueries: -1, features: ['*'] }
+  const userPlanLimits = planConfig.getPlanLimits(user.plan);
+  const planLimits = {
+    maxAssets: userPlanLimits.maxAssets,
+    maxAiQueries: userPlanLimits.maxAiQueries,
+    features: userPlanLimits.features || ['portfolio', 'news']
   };
-
-  const planLimits = limits[user.plan] || limits.FREE;
 
   if (action === 'add_asset') {
     if (planLimits.maxAssets !== -1 && user.credits.assets >= planLimits.maxAssets) {
@@ -741,9 +743,9 @@ async function handleFederatedSignIn(federatedUser) {
     plan: 'FREE',
     credits: {
       ai: 0,
-      maxAi: 10,
+      maxAi: planConfig.getPlanLimits('FREE').maxAiQueries,
       assets: 0,
-      maxAssets: 5
+      maxAssets: planConfig.getPlanLimits('FREE').maxAssets
     },
     settings: {
       currency: 'USD',
@@ -1748,22 +1750,16 @@ exports.handler = async (event, context) => {
       }
 
       const { targetUserId, targetEmail, tier } = body;
-      
-      // Validate tier
-      const VALID_TIERS = ['free', 'premium', 'pro'];
-      const TIER_LIMITS = {
-        free: { maxAssets: 5, maxAi: 10 },
-        premium: { maxAssets: 50, maxAi: 100 },
-        pro: { maxAssets: 999999, maxAi: 999999 }
-      };
-      
-      if (!VALID_TIERS.includes(tier)) {
+
+      // Validate tier — canonical names: FREE, PROPULSE, SUPERPULSE
+      const normalizedTier = (tier || '').toUpperCase();
+      if (!planConfig.VALID_PLAN_NAMES.includes(normalizedTier)) {
         return {
           statusCode: 400,
           headers: corsHeaders,
-          body: JSON.stringify({ 
-            success: false, 
-            error: `Invalid tier. Must be one of: ${VALID_TIERS.join(', ')}` 
+          body: JSON.stringify({
+            success: false,
+            error: `Invalid tier. Must be one of: ${planConfig.VALID_PLAN_NAMES.join(', ')}`
           })
         };
       }
@@ -1801,18 +1797,18 @@ exports.handler = async (event, context) => {
         }
 
         // Update user tier and limits
-        const limits = TIER_LIMITS[tier];
+        const limits = planConfig.getPlanLimits(normalizedTier);
         await getDynamoClient().send(new UpdateCommand({
           TableName: USERS_TABLE,
           Key: { userId: userToUpdate.userId },
           UpdateExpression: 'SET #plan = :plan, tier = :tier, tierUpdatedAt = :ts, credits.maxAssets = :maxAssets, credits.maxAi = :maxAi',
           ExpressionAttributeNames: { '#plan': 'plan' },
           ExpressionAttributeValues: {
-            ':plan': tier.toUpperCase(),
-            ':tier': tier,
+            ':plan': normalizedTier,
+            ':tier': normalizedTier,
             ':ts': new Date().toISOString(),
             ':maxAssets': limits.maxAssets,
-            ':maxAi': limits.maxAi
+            ':maxAi': limits.maxAiQueries
           }
         }));
 

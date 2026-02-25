@@ -1,7 +1,7 @@
 # FinPulse AWS Expense & Capacity Report
-**Generated:** January 19, 2026
+**Last Updated:** February 2026
 **Budget Threshold:** $150/month
-**Current Spend:** ~$18/month
+**Current Spend:** ~$47/month
 
 ---
 
@@ -9,12 +9,13 @@
 
 | Metric | Value |
 |--------|-------|
-| **Current Monthly Cost** | ~$18 |
+| **Current Monthly Cost** | ~$47 |
 | **Budget Limit** | $150 |
-| **Budget Utilization** | 12% |
-| **Remaining Headroom** | $132/month |
-| **Estimated User Capacity** | ~5,000 MAU at current config |
-| **Primary Cost Driver** | ElastiCache ($11.52/mo) |
+| **Budget Utilization** | 31% |
+| **Remaining Headroom** | ~$103/month |
+| **Primary Cost Drivers** | ElastiCache ($15.49) + NAT Gateway ($16.38) |
+| **Free Tier Expiry** | January 2027 |
+| **Lambda Concurrency** | 10 (quota increase to 1,000 pending) |
 
 ---
 
@@ -25,7 +26,7 @@
 | Service | Resource | Configuration | Monthly Cost |
 |---------|----------|---------------|--------------|
 | **Lambda** | 8 functions | 128-512MB, ARM64, Node.js 20 | ~$0.85 |
-| **ElastiCache** | 1 cluster | cache.t4g.micro (0.5GB RAM) | $11.52 |
+| **ElastiCache** | 1 cluster | cache.t4g.micro (0.5GB RAM) | $15.49 |
 
 ### Storage Resources
 
@@ -39,25 +40,23 @@
 | Service | Resource | Configuration | Monthly Cost |
 |---------|----------|---------------|--------------|
 | **CloudFront** | 1 distribution | finpulse.me | ~$0.43 |
-| **API Gateway** | 1 REST API | Pay-per-request | ~$0.35 |
-| **VPC** | 1 VPC | 4 subnets, NAT Gateway enabled | ~$0.00* |
-
-*NAT Gateway removed for cost savings
+| **API Gateway** | 1 REST API | Pay-per-request (cache disabled) | ~$3.70 |
+| **VPC** | 1 VPC | 4 subnets, NAT Gateway active | ~$16.38 |
+| **VPC Endpoints** | DynamoDB + S3 | Gateway type (free) | $0.00 |
 
 ### Security & Auth
 
 | Service | Resource | Configuration | Monthly Cost |
 |---------|----------|---------------|--------------|
-| **Cognito** | 1 user pool | 9 registered users | Free tier |
-| **Secrets Manager** | 6 secrets | API keys storage | $2.40 |
-| **WAF** | 1 Web ACL | Rate limiting enabled | ~$5.00 |
+| **Cognito** | 1 user pool | Google SSO enabled | Free tier |
+| **Secrets Manager** | 6 secrets | 5 Terraform-managed + 1 hardcoded (openai) | $2.40 |
 
 ### Monitoring
 
 | Service | Resource | Configuration | Monthly Cost |
 |---------|----------|---------------|--------------|
-| **CloudWatch** | Logs + Alarms | 30-day retention | ~$1.00 |
-| **Budgets** | 1 budget | 80% + 100% alerts | Free |
+| **CloudWatch** | 8 alarms + logs | 7-day retention, ERROR-level execution logs | ~$1.00 |
+| **Budgets** | 1 budget | 80% forecasted + 100% actual alerts | Free |
 
 ---
 
@@ -88,20 +87,23 @@
 
 ### Lambda Concurrency Limits
 
-| Function | Memory | Timeout | Default Concurrency | Burst Limit |
-|----------|--------|---------|---------------------|-------------|
-| auth | 256MB | 30s | 1,000 | 3,000 |
-| market-data | 256MB | 30s | 1,000 | 3,000 |
-| portfolio | 256MB | 30s | 1,000 | 3,000 |
-| fx | 128MB | 15s | 1,000 | 3,000 |
-| ai | 512MB | 60s | 1,000 | 3,000 |
-| news | 256MB | 30s | 1,000 | 3,000 |
-| community | 256MB | 30s | 1,000 | 3,000 |
-| admin | 256MB | 30s | 1,000 | 3,000 |
+| Function | Memory | Timeout | Concurrency |
+|----------|--------|---------|-------------|
+| auth | 256MB | 30s | Shared pool |
+| market-data | 256MB | 30s | Shared pool |
+| portfolio | 256MB | 30s | Shared pool |
+| fx | 128MB | 15s | Shared pool |
+| ai | 512MB | 60s | Shared pool |
+| news | 256MB | 30s | Shared pool |
+| community | 256MB | 30s | Shared pool |
+| admin | 256MB | 30s | Shared pool |
 
 **Account-wide Lambda limits (us-east-1):**
-- Concurrent executions: 1,000 (soft limit, can request increase)
-- Burst concurrency: 3,000
+- Applied concurrent executions: **10** (new account restriction)
+- Quota increase to **1,000** submitted Feb 2026 (pending AWS approval)
+- Burst concurrency: 3,000 (once quota is raised)
+
+> ⚠️ **IMPORTANT**: The current limit of 10 concurrent executions is the primary scaling bottleneck. This supports approximately 50-250 concurrent users depending on request patterns. Monitor the quota increase request status.
 
 ### ElastiCache Limits
 
@@ -122,16 +124,15 @@
 | Metric | Current | Soft Limit | Hard Limit |
 |--------|---------|------------|------------|
 | Requests/second | Low | 10,000 | 10,000 |
-| WebSocket connections | N/A | 500 | - |
 | REST API payload | <6MB | 10MB | 10MB |
+| Throttle (default) | 500 burst / 100 rate | Configurable | 10,000 |
 
 ### Cognito Limits
 
 | Metric | Current | Free Tier | Limit |
 |--------|---------|-----------|-------|
-| Monthly Active Users | 9 | 50,000 | Unlimited |
+| Monthly Active Users | ~10 | 50,000 | Unlimited |
 | Sign-ins/second | Low | - | 20/sec (soft) |
-| Tokens/day | Low | - | Unlimited |
 
 ---
 
@@ -154,33 +155,41 @@
 
 ```
 Fixed costs (regardless of users):
-  - ElastiCache:        $11.52
+  - ElastiCache:        $15.49
+  - NAT Gateway + EIP:  $16.38
   - Secrets Manager:    $2.40
-  - WAF:                $5.00
   - CloudWatch base:    $1.00
   ─────────────────────────────
-  Fixed Total:          $19.92
+  Fixed Total:          $35.27
 
-Variable budget:        $150 - $19.92 = $130.08
+Variable budget:        $150 - $35.27 = $114.73
 Cost per 1K users:      $1.18
 ─────────────────────────────────────────────
-Max users at budget:    ~110,000 MAU
+Max users at budget:    ~97,000 MAU
 ```
 
 ### Realistic Capacity Estimates
 
 | Scenario | Users (MAU) | Monthly Cost | % of Budget |
 |----------|-------------|--------------|-------------|
-| **Current** | 9 | $18 | 12% |
-| **Low Growth** | 500 | $20 | 13% |
-| **Medium Growth** | 5,000 | $26 | 17% |
-| **High Growth** | 25,000 | $50 | 33% |
-| **Scale Limit** | 50,000 | $80 | 53% |
-| **Budget Cap** | ~110,000 | $150 | 100% |
+| **Current** | ~10 | $47 | 31% |
+| **Low Growth** | 500 | $49 | 33% |
+| **Medium Growth** | 5,000 | $53 | 35% |
+| **High Growth** | 25,000 | $65 | 43% |
+| **Scale Limit** | 50,000 | $95 | 63% |
+| **Budget Cap** | ~97,000 | $150 | 100% |
+
+> Note: Fixed costs ($35/mo) dominate at low user counts. The infrastructure can handle significant growth within budget.
 
 ---
 
 ## 5. First Bottlenecks (What Breaks First)
+
+### At ~250 Concurrent Users (CURRENT RISK)
+**Bottleneck:** Lambda concurrency limit (account-level = 10)
+
+**Status:** Quota increase to 1,000 submitted, pending AWS approval.
+**Mitigation:** Monitor via `aws service-quotas list-requested-service-quota-change-history --service-code lambda`
 
 ### At ~2,500 Concurrent Users
 **Bottleneck:** ElastiCache memory (cache.t4g.micro = 0.5GB)
@@ -188,47 +197,59 @@ Max users at budget:    ~110,000 MAU
 **Solution:** Upgrade to cache.t4g.small (1.37GB) = +$12/month
 
 ### At ~1,000 Concurrent Lambda Executions
-**Bottleneck:** Lambda concurrency limit (account default)
+**Bottleneck:** Lambda concurrency (after quota increase)
 
-**Solution:** Request limit increase (free) or use reserved concurrency
+**Solution:** Request further limit increase (free) or use reserved concurrency
 
 ### At ~50,000 MAU
 **Bottleneck:** Cognito free tier expires, API costs become significant
 
-**Solution:** Budget increase or implement caching layer
-
-### At ~10,000 Requests/Second
-**Bottleneck:** API Gateway throttling
-
-**Solution:** Request limit increase or implement request coalescing
+**Solution:** Budget increase or optimize caching
 
 ---
 
-## 6. Cost Optimization Status
+## 6. Cost Optimization History
 
-### Applied Optimizations (Saving ~$45/month)
+### Applied Optimizations (Total Savings: ~$30.78/month)
 
-| Optimization | Savings | Status |
-|--------------|---------|--------|
-| NAT Gateway removed | $32/mo | Applied |
-| ARM64 Lambda | $2/mo | Applied |
-| cache.t4g.micro (ARM) | $2/mo | Applied |
-| DynamoDB on-demand | Variable | Applied |
-| Removed duplicate Cognito pools | $0 | Applied |
-| Removed duplicate VPCs | $32/mo | Applied |
+| Optimization | Savings | Date | Status |
+|--------------|---------|------|--------|
+| WAF removed (was unattached) | $15.12/mo | Feb 2026 | ✅ Applied |
+| API Gateway cache disabled | $10.96/mo | Feb 2026 | ✅ Applied |
+| Deprecated secrets deleted (5) | $2.00/mo | Feb 2026 | ✅ Applied |
+| CloudWatch alarms reduced (38→8) | $2.70/mo | Feb 2026 | ✅ Applied |
+| Log retention reduced (30→7 days) | included above | Feb 2026 | ✅ Applied |
+| ARM64 Lambda (Graviton2) | ~$2/mo | Jan 2026 | ✅ Applied |
+| cache.t4g.micro (ARM) | ~$2/mo | Jan 2026 | ✅ Applied |
+| DynamoDB on-demand | Variable | Jan 2026 | ✅ Applied |
+| VPC endpoints (DynamoDB + S3) | Data transfer | Jan 2026 | ✅ Applied |
 
-### Available Optimizations
+### Remaining Opportunities
 
-| Optimization | Potential Savings | Complexity |
-|--------------|-------------------|------------|
-| ElastiCache Reserved (1yr) | $4/mo | Low |
-| Parameter Store vs Secrets | $2.40/mo | Medium |
-| CloudWatch retention 7 days | $0.50/mo | Low |
-| WAF rule consolidation | $1-2/mo | Medium |
+| Optimization | Potential Savings | Risk | Complexity |
+|--------------|-------------------|------|------------|
+| Remove Redis + NAT + VPC | $31.87/mo | High | High |
+| Parameter Store vs Secrets | $2.40/mo | Medium | Medium |
+| ElastiCache Reserved (1yr) | $5/mo | Low | Low |
 
 ---
 
-## 7. Budget Alert Configuration
+## 7. Active Secrets Inventory
+
+| Secret Name | Used By | Status |
+|-------------|---------|--------|
+| `finpulse/prod/alpaca-credentials` | market-data Lambda | ✅ Active (Terraform) |
+| `finpulse/prod/gemini-api-key` | ai Lambda | ✅ Active (Terraform) |
+| `finpulse/prod/gnews-api-key` | news Lambda | ✅ Active (Terraform) |
+| `finpulse/prod/newsapi-key` | news Lambda | ✅ Active (Terraform) |
+| `finpulse/prod/twitter-bearer-token` | twitter Lambda | ✅ Active (Terraform) |
+| `finpulse/prod/openai-api-key` | ai Lambda (hardcoded) | ✅ Active (NOT in Terraform) |
+
+**Deleted (Feb 2026):** coingecko, alphavantage, exchangerate, internal-tester, lemonsqueezy — 7-day recovery window until Feb 28, 2026.
+
+---
+
+## 8. Budget Alert Configuration
 
 | Alert Type | Threshold | Action |
 |------------|-----------|--------|
@@ -239,90 +260,69 @@ Max users at budget:    ~110,000 MAU
 
 ---
 
-## 8. Resource Allocation Summary
+## 9. Resource Allocation by User Scale
 
 ### To Support 1,000 Users (Moderate Usage)
 
 | Resource | Current | Required | Status |
 |----------|---------|----------|--------|
-| Lambda memory | 128-512MB | Same | OK |
-| ElastiCache | 0.5GB | 0.5GB | OK |
-| DynamoDB | On-demand | On-demand | OK |
-| API Gateway | Unlimited | Unlimited | OK |
-| Cognito | Free tier | Free tier | OK |
-| **Estimated Cost** | $18 | $21 | +$3/mo |
+| Lambda concurrency | 10 | 1,000 | ⚠️ Quota increase pending |
+| Lambda memory | 128-512MB | Same | ✅ OK |
+| ElastiCache | 0.5GB | 0.5GB | ✅ OK |
+| DynamoDB | On-demand | On-demand | ✅ OK |
+| **Estimated Cost** | $47 | $48 | +$1/mo |
 
 ### To Support 10,000 Users (Growth Phase)
 
 | Resource | Current | Required | Status |
 |----------|---------|----------|--------|
-| Lambda memory | 128-512MB | Same | OK |
-| ElastiCache | 0.5GB | 1.37GB | Upgrade needed |
-| DynamoDB | On-demand | On-demand | OK |
-| API Gateway | Unlimited | Unlimited | OK |
-| Cognito | Free tier | Free tier | OK |
-| **Estimated Cost** | $18 | $42 | +$24/mo |
+| Lambda concurrency | 10 | 1,000+ | ⚠️ Quota increase needed |
+| ElastiCache | 0.5GB | 1.37GB | ⚠️ Upgrade needed |
+| DynamoDB | On-demand | On-demand | ✅ OK |
+| **Estimated Cost** | $47 | $62 | +$15/mo |
 
 ### To Support 50,000 Users (Scale Phase)
 
 | Resource | Current | Required | Status |
 |----------|---------|----------|--------|
+| Lambda concurrency | 10 | 3,000+ | ⚠️ Quota increase needed |
 | Lambda memory | 128-512MB | 512MB-1GB | Consider upgrade |
-| ElastiCache | 0.5GB | 3GB+ | Upgrade needed |
-| DynamoDB | On-demand | On-demand | OK |
-| API Gateway | 10K rps | Request increase | OK |
-| Cognito | Free tier | Paid tier | Cost increase |
-| **Estimated Cost** | $18 | $80 | +$62/mo |
-
----
-
-## 9. Data Growth Projections
-
-### DynamoDB Storage Growth
-
-| Table | Records/User/Month | 10K Users Storage | Cost |
-|-------|-------------------|-------------------|------|
-| users | 1 | 10MB | $0.003 |
-| portfolios | 10 | 50MB | $0.01 |
-| ai-queries | 5 (TTL) | 100MB | $0.03 |
-| community-posts | 2 | 10MB | $0.003 |
-| historical-prices | Shared | 500MB | $0.13 |
-| **Total** | - | ~670MB | ~$0.18/mo |
-
-DynamoDB storage: $0.25/GB/month - storage costs remain negligible until TB scale.
+| ElastiCache | 0.5GB | 3GB+ | ⚠️ Upgrade needed |
+| DynamoDB | On-demand | On-demand | ✅ OK |
+| **Estimated Cost** | $47 | $95 | +$48/mo |
 
 ---
 
 ## 10. Recommendations
 
 ### Immediate (No Cost)
-1. Monitor CloudWatch dashboards for actual usage patterns
-2. Set up cost anomaly detection alerts
-3. Review Lambda cold start metrics
+1. ✅ ~~Monitor CloudWatch dashboards~~ — 8 alarms active
+2. **Monitor Lambda concurrency quota increase** — critical for scaling beyond 50-250 users
+3. Review Lambda cold start metrics after quota increase
 
-### Short-term (< $10/mo increase)
-1. Purchase ElastiCache Reserved Instance (1-year) - saves $4/mo
-2. Reduce CloudWatch log retention to 7 days for non-critical functions
-3. Migrate to Parameter Store for non-secret configs
+### Short-term (When Users > 1,000)
+1. Upgrade ElastiCache to cache.t4g.small if Redis memory > 60%
+2. Consider ElastiCache Reserved Instance if committing to Redis long-term
+3. Request further Lambda concurrency increase if needed
 
 ### Growth Phase (> 5,000 users)
-1. Upgrade ElastiCache to cache.t4g.small
-2. Implement request caching at CloudFront
+1. Evaluate Redis necessity — DynamoDB-only caching may suffice
+2. Implement request caching at CloudFront level
 3. Consider provisioned DynamoDB for predictable workloads
 
 ---
 
 ## Appendix: AWS Service Quotas Reference
 
-| Service | Quota | Default | Adjustable |
-|---------|-------|---------|------------|
-| Lambda concurrent executions | Account | 1,000 | Yes |
-| API Gateway requests/second | Per API | 10,000 | Yes |
-| DynamoDB tables | Account | 2,500 | Yes |
-| Cognito user pools | Account | 1,000 | Yes |
-| Secrets Manager secrets | Account | 500,000 | No |
-| ElastiCache nodes | Account | 300 | Yes |
+| Service | Quota | Current Applied | Default | Adjustable |
+|---------|-------|-----------------|---------|------------|
+| Lambda concurrent executions | Account | **10** (pending → 1,000) | 1,000 | Yes |
+| API Gateway requests/second | Per API | 10,000 | 10,000 | Yes |
+| DynamoDB tables | Account | 2,500 | 2,500 | Yes |
+| Cognito user pools | Account | 1,000 | 1,000 | Yes |
+| Secrets Manager secrets | Account | 500,000 | 500,000 | No |
+| ElastiCache nodes | Account | 300 | 300 | Yes |
 
 ---
 
-*Report generated from Terraform configuration analysis. Actual costs may vary based on usage patterns.*
+*Report based on AWS Cost Explorer data and Terraform configuration analysis. Actual costs may vary based on usage patterns.*
