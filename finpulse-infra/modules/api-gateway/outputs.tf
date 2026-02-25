@@ -35,16 +35,6 @@ output "usage_plan_public_id" {
   value       = aws_api_gateway_usage_plan.public.id
 }
 
-output "cloudwatch_alarm_4xx_arn" {
-  description = "CloudWatch alarm ARN for 4xx errors"
-  value       = aws_cloudwatch_metric_alarm.high_4xx_errors.arn
-}
-
-output "cloudwatch_alarm_5xx_arn" {
-  description = "CloudWatch alarm ARN for 5xx errors"
-  value       = aws_cloudwatch_metric_alarm.high_5xx_errors.arn
-}
-
 output "cloudwatch_alarm_latency_arn" {
   description = "CloudWatch alarm ARN for high latency"
   value       = aws_cloudwatch_metric_alarm.high_latency.arn

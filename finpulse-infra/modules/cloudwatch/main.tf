@@ -27,11 +27,20 @@ resource "aws_sns_topic_subscription" "email" {
 }
 
 # =============================================================================
-# Lambda Alarms - Error Rate
+# Lambda Alarms - Error Rate (limited to stay within 10-alarm Free Tier)
 # =============================================================================
 
+locals {
+  # Only create error alarms for critical functions to stay within Free Tier.
+  # admin + ai are low-traffic and covered by the API 5xx alarm.
+  lambda_alarm_functions = {
+    for k, v in var.lambda_function_names : k => v
+    if v != null && !contains(["admin", "ai"], k)
+  }
+}
+
 resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
-  for_each = var.lambda_function_names
+  for_each = local.lambda_alarm_functions
 
   alarm_name          = "${var.project_name}-${each.key}-errors-${var.environment}"
   alarm_description   = "Lambda ${each.key} error rate > ${var.lambda_error_threshold}%"
@@ -79,82 +88,9 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   tags               = var.tags
 }
 
-# =============================================================================
-# Lambda Duration Alarm (Approaching Timeout)
-# =============================================================================
-
-resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
-  for_each = var.lambda_function_names
-
-  alarm_name          = "${var.project_name}-${each.key}-duration-${var.environment}"
-  alarm_description   = "Lambda ${each.key} duration > 80% of timeout"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 3
-  metric_name         = "Duration"
-  namespace           = "AWS/Lambda"
-  period              = 300
-  extended_statistic  = "p95"
-  threshold           = 24000 # 24 seconds (80% of 30s timeout)
-
-  dimensions = {
-    FunctionName = each.value
-  }
-
-  alarm_actions      = [aws_sns_topic.alerts.arn]
-  treat_missing_data = "notBreaching"
-  tags               = var.tags
-}
-
-# =============================================================================
-# DynamoDB Throttling Alarm
-# =============================================================================
-
-resource "aws_cloudwatch_metric_alarm" "dynamodb_throttle" {
-  for_each = toset(var.dynamodb_table_names)
-
-  alarm_name          = "${var.project_name}-dynamodb-throttle-${each.value}-${var.environment}"
-  alarm_description   = "DynamoDB table ${each.value} is being throttled"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
-  threshold           = 1
-
-  metric_query {
-    id          = "throttles"
-    expression  = "read_throttle + write_throttle"
-    label       = "Total Throttles"
-    return_data = true
-  }
-
-  metric_query {
-    id = "read_throttle"
-    metric {
-      metric_name = "ReadThrottledRequests"
-      namespace   = "AWS/DynamoDB"
-      period      = 60
-      stat        = "Sum"
-      dimensions = {
-        TableName = each.value
-      }
-    }
-  }
-
-  metric_query {
-    id = "write_throttle"
-    metric {
-      metric_name = "WriteThrottledRequests"
-      namespace   = "AWS/DynamoDB"
-      period      = 60
-      stat        = "Sum"
-      dimensions = {
-        TableName = each.value
-      }
-    }
-  }
-
-  alarm_actions      = [aws_sns_topic.alerts.arn]
-  treat_missing_data = "notBreaching"
-  tags               = var.tags
-}
+# Lambda Duration and DynamoDB Throttle alarms removed to stay within
+# CloudWatch Free Tier (10 alarms). Duration alarms are low-value for
+# non-latency-critical apps, and DynamoDB PAY_PER_REQUEST auto-scales.
 
 # =============================================================================
 # Redis Memory Alarm
@@ -208,31 +144,8 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
   tags               = var.tags
 }
 
-# =============================================================================
-# API Gateway Latency (p95)
-# =============================================================================
-
-resource "aws_cloudwatch_metric_alarm" "api_latency" {
-  count = var.api_gateway_name != "" ? 1 : 0
-
-  alarm_name          = "${var.project_name}-api-latency-${var.environment}"
-  alarm_description   = "API Gateway p95 latency > ${var.api_latency_threshold}ms"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 3
-  metric_name         = "Latency"
-  namespace           = "AWS/ApiGateway"
-  period              = 300
-  extended_statistic  = "p95"
-  threshold           = var.api_latency_threshold
-
-  dimensions = {
-    ApiName = var.api_gateway_name
-  }
-
-  alarm_actions      = [aws_sns_topic.alerts.arn]
-  treat_missing_data = "notBreaching"
-  tags               = var.tags
-}
+# API Gateway p95 latency alarm removed — covered by api-gateway module's
+# high_latency alarm. Reduces alarm count for Free Tier compliance.
 
 # =============================================================================
 # Dashboard (Simple Overview)

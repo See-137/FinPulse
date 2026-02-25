@@ -12,10 +12,11 @@ const crypto = require('crypto');
 // Shared Utilities from Lambda Layer (with fallback)
 // =============================================================================
 
-let envValidator, requestContext;
+let envValidator, requestContext, planConfig;
 try {
   envValidator = require('/opt/nodejs/env-validator');
   requestContext = require('/opt/nodejs/request-context');
+  planConfig = require('/opt/nodejs/plan-config');
   console.log('[Payments] Loaded shared utilities from Lambda Layer');
 } catch (e) {
   // Minimal fallbacks
@@ -33,6 +34,7 @@ try {
     }),
     addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
   };
+  planConfig = { PLAN_LIMITS: { FREE: { maxAssets: 20, maxAiQueries: 10 }, PROPULSE: { maxAssets: 50, maxAiQueries: 50 }, SUPERPULSE: { maxAssets: 9999, maxAiQueries: 9999 } }, getPlanLimits: (p) => planConfig.PLAN_LIMITS[(p || 'FREE').toUpperCase()] || planConfig.PLAN_LIMITS.FREE };
 }
 
 // Validate environment at cold start
@@ -58,11 +60,8 @@ const VARIANT_TO_PLAN = {
   [process.env.LEMONSQUEEZY_VARIANT_SUPERPULSE]: 'SUPERPULSE',
 };
 
-const PLAN_LIMITS = {
-  FREE: { maxAssets: 10, maxAiQueries: 10 },
-  PROPULSE: { maxAssets: 50, maxAiQueries: 100 },
-  SUPERPULSE: { maxAssets: 500, maxAiQueries: 1000 }
-};
+// Plan limits sourced from shared plan-config (Lambda Layer)
+const PLAN_LIMITS = planConfig.PLAN_LIMITS;
 
 // CORS headers
 const headers = {
@@ -253,27 +252,9 @@ function verifyWebhookSignature(payload, signature) {
   return crypto.timingSafeEqual(sigBuf, digestBuf);
 }
 
-/**
- * Sanitize event for logging
- */
-function sanitizeEvent(event) {
-  const sanitized = { ...event };
-  if (sanitized.headers) {
-    sanitized.headers = { ...sanitized.headers };
-    delete sanitized.headers.Authorization;
-    delete sanitized.headers.authorization;
-    delete sanitized.headers['X-Signature'];
-    delete sanitized.headers['x-signature'];
-  }
-  if (sanitized.body && sanitized.path?.includes('webhook')) {
-    sanitized.body = '[REDACTED - webhook payload]';
-  }
-  return sanitized;
-}
-
 exports.handler = async (event) => {
-  console.log('Payment event:', JSON.stringify(sanitizeEvent(event), null, 2));
-  
+  console.log('Payments Lambda invoked:', event.httpMethod, event.path);
+
   // Handle preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
@@ -680,7 +661,8 @@ async function handleSubscriptionCreated(payload) {
   const plan = VARIANT_TO_PLAN[variantId] || 'PROPULSE';
   const limits = PLAN_LIMITS[plan];
 
-  // Store subscription
+  // Store subscription (including receipt URL if available)
+  const receiptUrl = attributes.urls?.receipt || data.attributes?.urls?.receipt || null;
   await dynamoDB.put({
     TableName: SUBSCRIPTIONS_TABLE,
     Item: {
@@ -692,6 +674,7 @@ async function handleSubscriptionCreated(payload) {
       status: attributes.status,
       currentPeriodEnd: attributes.renews_at,
       cancelAtPeriodEnd: attributes.cancelled || false,
+      ...(receiptUrl && { receiptUrl }),
       createdAt: attributes.created_at,
       updatedAt: new Date().toISOString()
     }
@@ -878,12 +861,18 @@ async function handlePaymentFailed(payload) {
     }
   }
 
+  // Set past_due with a timestamp for 7-day grace period.
+  // LemonSqueezy retries payments 3x over ~10 days.
+  // After 7 days of past_due, subscription_expired webhook will downgrade to FREE.
   await dynamoDB.update({
     TableName: USERS_TABLE,
     Key: { userId },
-    UpdateExpression: 'SET subscriptionStatus = :status',
-    ExpressionAttributeValues: { ':status': 'past_due' }
+    UpdateExpression: 'SET subscriptionStatus = :status, paymentFailedAt = :failedAt',
+    ExpressionAttributeValues: {
+      ':status': 'past_due',
+      ':failedAt': new Date().toISOString()
+    }
   }).promise();
 
-  console.log(`Payment failed for ${userId}`);
+  console.log(`Payment failed for ${userId}, grace period started`);
 }

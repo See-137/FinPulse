@@ -1,7 +1,7 @@
 # API Gateway Rate Limiting Guide
 
-**Date**: January 11, 2026
-**Status**: ✅ **CONFIGURED - READY FOR DEPLOYMENT**
+**Date**: January 11, 2026 | **Last Updated**: February 2026
+**Status**: ✅ **DEPLOYED IN PRODUCTION**
 
 ---
 
@@ -21,10 +21,10 @@ This document describes the comprehensive rate limiting and throttling configura
 - **Resource Exhaustion**: Protects backend services from overload
 
 ### Monitoring & Alerting:
-- CloudWatch alarms for high error rates (4xx, 5xx)
-- Latency monitoring and alerts
+- CloudWatch alarms for Lambda error rates and API 5xx errors
+- Redis memory usage monitoring
 - Request volume spike detection
-- Detailed API Gateway logging
+- API Gateway access logs (ERROR-level execution logs)
 
 ---
 
@@ -116,57 +116,49 @@ public_quota_period  = "DAY"
 
 #### CloudWatch Alarm Thresholds
 ```hcl
-error_4xx_threshold       = 100   # Alert if >100 4xx errors in 5 min
-error_5xx_threshold       = 50    # Alert if >50 5xx errors in 5 min
-latency_threshold_ms      = 2000  # Alert if avg latency >2s
-request_count_threshold   = 5000  # Alert if >5000 req/min (potential DoS)
+lambda_error_threshold = 5    # Alert if Lambda error rate > 5%
+redis_memory_threshold = 80   # Alert if Redis memory > 80%
+api_5xx_threshold      = 10   # Alert if > 10 API 5xx errors/min
 ```
+
+> **Note (Feb 2026):** The 4xx errors, latency, and request count alarms were removed during CloudWatch optimization to stay within Free Tier (10-alarm limit). 8 alarms are currently active. The remaining alarms cover the most critical failure modes.
 
 #### Logging Configuration
 ```hcl
-api_gateway_logging_level = "INFO"  # OFF, ERROR, INFO
-enable_xray_tracing       = false   # Enable in prod for X-Ray tracing
+api_gateway_logging_level = "ERROR"  # Changed from INFO to reduce costs
+enable_xray_tracing       = false    # Enable for debugging (adds cost)
 ```
 
 ---
 
-## 🚨 CloudWatch Alarms
+## 🚨 CloudWatch Alarms (Active)
 
-### 1. High 4xx Errors Alarm
-**Name**: `finpulse-api-gateway-high-4xx-{environment}`
-**Trigger**: More than 100 4xx errors in 5 minutes (2 consecutive periods)
-**Indicates**:
-- Rate limiting is actively blocking requests
-- Authentication failures
-- Client errors or malformed requests
-- Potential abuse attempts
+> **Note (Feb 2026):** Alarms were reduced from 38 to 8 to stay within CloudWatch Free Tier (10-alarm limit). The 4xx, latency, and excessive request alarms were removed. Current alarms focus on the most critical failure modes.
 
-### 2. High 5xx Errors Alarm
-**Name**: `finpulse-api-gateway-high-5xx-{environment}`
-**Trigger**: More than 50 5xx errors in 5 minutes (2 consecutive periods)
+### 1. Lambda Error Rate Alarms (6 alarms — excludes admin + ai)
+**Name**: `finpulse-{function}-errors-{environment}`
+**Trigger**: Error rate > 5% over 5 minutes
 **Indicates**:
 - Backend Lambda failures
 - DynamoDB throttling
 - Service outages
 - Integration issues
 
-### 3. High Latency Alarm
-**Name**: `finpulse-api-gateway-high-latency-{environment}`
-**Trigger**: Average latency >2000ms for 5 minutes (2 consecutive periods)
+### 2. API 5xx Errors Alarm
+**Name**: `finpulse-api-5xx-{environment}`
+**Trigger**: More than 10 5xx errors per minute
 **Indicates**:
-- Performance degradation
-- Lambda cold starts
-- DynamoDB slow queries
-- Network issues
+- Backend failures reaching API consumers
+- Lambda timeouts or crashes
+- Integration configuration issues
 
-### 4. Excessive Requests Alarm
-**Name**: `finpulse-api-gateway-excessive-requests-{environment}`
-**Trigger**: More than 5000 requests in 1 minute
+### 3. Redis Memory Alarm
+**Name**: `finpulse-redis-memory-{environment}`
+**Trigger**: Memory usage > 80%
 **Indicates**:
-- Potential DoS attack
-- Traffic spike
-- Bot activity
-- Load testing (if planned)
+- Cache filling up (cache.t4g.micro = 0.5GB)
+- Possible memory leak or missing TTLs
+- Need to upgrade node type or evict stale keys
 
 ---
 
@@ -211,10 +203,9 @@ enable_xray_tracing       = false   # Enable in prod for X-Ray tracing
 
 ### Method Settings Logging
 
-**Default (all methods)**: `INFO` level
-**Admin endpoints**: `INFO` level + full request/response tracing
-**Dev/Staging**: Data trace enabled for debugging
-**Production**: Data trace disabled (performance + security)
+**Default (all methods)**: `ERROR` level (changed from INFO in Feb 2026 to reduce log costs)
+**Admin endpoints**: `ERROR` level
+**Production**: Data trace disabled (performance + security + cost)
 
 ### Viewing Logs
 
@@ -263,24 +254,22 @@ terraform validate
 
 ```bash
 terraform plan -out=tfplan-rate-limiting
-
-# Expected output:
-# Plan: 10 to add, 2 to change, 0 to destroy
 ```
 
 ### Step 4: Review Plan
 
-Check that the following resources will be created:
-- ✅ `aws_api_gateway_method_settings.all` (global throttling)
-- ✅ `aws_api_gateway_method_settings.market_prices` (public)
-- ✅ `aws_api_gateway_method_settings.fx_rates` (public)
-- ✅ `aws_api_gateway_method_settings.admin` (restrictive)
-- ✅ `aws_api_gateway_usage_plan.authenticated`
-- ✅ `aws_api_gateway_usage_plan.public`
-- ✅ `aws_cloudwatch_metric_alarm.high_4xx_errors`
-- ✅ `aws_cloudwatch_metric_alarm.high_5xx_errors`
-- ✅ `aws_cloudwatch_metric_alarm.high_latency`
-- ✅ `aws_cloudwatch_metric_alarm.excessive_requests`
+Key rate-limiting resources in the current deployment:
+- `aws_api_gateway_method_settings.all` (global throttling)
+- `aws_api_gateway_method_settings.market_prices` (public)
+- `aws_api_gateway_method_settings.fx_rates` (public)
+- `aws_api_gateway_method_settings.admin` (restrictive)
+- `aws_api_gateway_usage_plan.authenticated`
+- `aws_api_gateway_usage_plan.public`
+
+CloudWatch alarms (managed by cloudwatch module, not api-gateway):
+- `aws_cloudwatch_metric_alarm.lambda_errors` (6 × per-function)
+- `aws_cloudwatch_metric_alarm.redis_memory`
+- `aws_cloudwatch_metric_alarm.api_5xx`
 
 ### Step 5: Apply Changes
 
@@ -504,7 +493,7 @@ aws cloudwatch get-metric-statistics \
 **Actions**:
 1. Verify if traffic is legitimate (check IP distribution)
 2. If legitimate: Increase rate limits temporarily
-3. If attack: Consider WAF rules or IP blocking
+3. If attack: Reduce API Gateway throttle limits via Terraform
 4. Monitor Lambda concurrency and DynamoDB capacity
 
 ### Scenario 2: DoS Attack Detected
@@ -526,7 +515,7 @@ terraform apply \
   -var="public_throttle_burst_limit=50" \
   -var="public_throttle_rate_limit=10"
 
-# 3. Enable WAF (if not already)
+# 3. Block IPs via API Gateway resource policy if needed
 # 4. Contact AWS Support if severe
 ```
 
@@ -561,7 +550,7 @@ aws cloudwatch get-metric-statistics \
 1. Reduce API Gateway rate limits to protect backend
 2. Increase Lambda memory/timeout if needed
 3. Scale DynamoDB capacity (if throttling detected)
-4. Enable API Gateway caching
+4. Check Redis connectivity (redis-cache.js has graceful degradation)
 
 ---
 
@@ -602,17 +591,16 @@ aws cloudwatch get-metric-statistics \
 - ✅ Verify CloudWatch alarms trigger correctly
 - ✅ Update frontend to handle 429 responses gracefully
 
-### Short-Term (Next 2 Weeks)
-- [ ] Enable API Gateway caching for public endpoints
+### Short-Term
 - [ ] Implement per-user API key tracking (optional)
-- [ ] Add AWS WAF for advanced threat protection
-- [ ] Create CloudWatch dashboard for monitoring
+- [ ] Create CloudWatch dashboard for API metrics visualization
+- [ ] Monitor Lambda concurrency quota increase (pending)
 
-### Long-Term (Next Month)
+### Long-Term
 - [ ] Implement dynamic rate limiting based on load
-- [ ] Add geo-blocking for suspicious regions
 - [ ] Integrate with Sentry for error tracking
 - [ ] Consider API Gateway v2 (HTTP API) for cost savings
+- [ ] Re-evaluate WAF if traffic/abuse increases (was removed Feb 2026 — not cost-effective at current scale)
 
 ---
 
@@ -640,6 +628,6 @@ aws cloudwatch get-metric-statistics \
 
 ---
 
-**Last Updated**: January 11, 2026
+**Last Updated**: February 2026
 **Created By**: Claude Code
-**Next Review**: After production deployment
+**Changes**: Feb 2026 — Updated alarm section (38→8), fixed logging level (INFO→ERROR), removed WAF references (module deleted), updated incident response procedures.

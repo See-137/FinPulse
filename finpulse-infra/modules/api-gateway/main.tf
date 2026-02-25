@@ -863,47 +863,8 @@ resource "aws_api_gateway_usage_plan" "public" {
 # CloudWatch Alarms for Rate Limiting
 # =============================================================================
 
-# Alarm for high 4xx errors (potential abuse or rate limiting)
-resource "aws_cloudwatch_metric_alarm" "high_4xx_errors" {
-  alarm_name          = "${var.project_name}-api-gateway-high-4xx-${var.environment}"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
-  metric_name         = "4XXError"
-  namespace           = "AWS/ApiGateway"
-  period              = 300 # 5 minutes
-  statistic           = "Sum"
-  threshold           = var.error_4xx_threshold
-  alarm_description   = "Alert when API Gateway has high 4xx errors (potential abuse or auth failures)"
-  treat_missing_data  = "notBreaching"
-
-  dimensions = {
-    ApiName = aws_api_gateway_rest_api.main.name
-    Stage   = aws_api_gateway_stage.main.stage_name
-  }
-
-  tags = var.tags
-}
-
-# Alarm for high 5xx errors (backend issues)
-resource "aws_cloudwatch_metric_alarm" "high_5xx_errors" {
-  alarm_name          = "${var.project_name}-api-gateway-high-5xx-${var.environment}"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
-  metric_name         = "5XXError"
-  namespace           = "AWS/ApiGateway"
-  period              = 300
-  statistic           = "Sum"
-  threshold           = var.error_5xx_threshold
-  alarm_description   = "Alert when API Gateway has high 5xx errors (backend failures)"
-  treat_missing_data  = "notBreaching"
-
-  dimensions = {
-    ApiName = aws_api_gateway_rest_api.main.name
-    Stage   = aws_api_gateway_stage.main.stage_name
-  }
-
-  tags = var.tags
-}
+# 4xx and 5xx alarms removed — 5xx covered by cloudwatch module's api_5xx,
+# 4xx too noisy for Free Tier alarm budget (10 alarms total).
 
 # Alarm for high latency
 resource "aws_cloudwatch_metric_alarm" "high_latency" {

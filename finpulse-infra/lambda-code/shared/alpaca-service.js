@@ -246,7 +246,7 @@ async function getStockQuotes(symbols) {
   
   try {
     // Use snapshots endpoint for comprehensive data
-    const data = await alpacaFetch(`/v2/stocks/snapshots?symbols=${symbolsParam}&feed=iex`);
+    const data = await alpacaFetch(`/v2/stocks/snapshots?symbols=${symbolsParam}&feed=sip`);
     
     const results = {};
     for (const [symbol, snapshot] of Object.entries(data)) {
@@ -324,7 +324,7 @@ async function searchStocks(query, limit = 15) {
   try {
     // Try to fetch a snapshot for this symbol to validate it exists
     console.log(`[Alpaca] Validating stock symbol: ${upperQuery}`);
-    const data = await alpacaFetch(`/v2/stocks/${encodeURIComponent(upperQuery)}/snapshot?feed=iex`);
+    const data = await alpacaFetch(`/v2/stocks/${encodeURIComponent(upperQuery)}/snapshot?feed=sip`);
     
     // If we get data back, the symbol is valid
     if (data && data.latestTrade) {
@@ -558,7 +558,7 @@ async function getStockBars(symbol, timeframe = '1Day', limit = 30) {
   
   try {
     const data = await alpacaFetch(
-      `/v2/stocks/${encodeURIComponent(upper)}/bars?timeframe=${encodeURIComponent(timeframe)}&limit=${limit}&feed=iex`
+      `/v2/stocks/${encodeURIComponent(upper)}/bars?timeframe=${encodeURIComponent(timeframe)}&limit=${limit}&feed=sip`
     );
     
     return (data.bars || []).map(bar => ({

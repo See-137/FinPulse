@@ -471,28 +471,8 @@ function getAnalytics(portfolio) {
 /**
  * Main handler
  */
-/**
- * Sanitize event for logging (remove sensitive headers)
- */
-function sanitizeEvent(event) {
-  const sanitized = { ...event };
-  if (sanitized.headers) {
-    sanitized.headers = { ...sanitized.headers };
-    delete sanitized.headers.Authorization;
-    delete sanitized.headers.authorization;
-    delete sanitized.headers.Cookie;
-    delete sanitized.headers.cookie;
-  }
-  if (sanitized.multiValueHeaders) {
-    sanitized.multiValueHeaders = { ...sanitized.multiValueHeaders };
-    delete sanitized.multiValueHeaders.Authorization;
-    delete sanitized.multiValueHeaders.authorization;
-  }
-  return sanitized;
-}
-
 exports.handler = async (event) => {
-  console.log('Event:', JSON.stringify(sanitizeEvent(event)));
+  console.log('Portfolio Lambda invoked:', event.httpMethod, event.path);
 
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
@@ -645,6 +625,65 @@ exports.handler = async (event) => {
       };
     }
 
+    // GET /portfolio/history - Get daily portfolio value snapshots
+    if (path.includes('/history') && method === 'GET') {
+      const days = parseInt(event.queryStringParameters?.days || '30', 10);
+      const clampedDays = Math.min(Math.max(days, 1), 365);
+      const snapshotsTable = process.env.SNAPSHOTS_TABLE || `finpulse-portfolio-snapshots-${ENVIRONMENT}`;
+
+      try {
+        // Calculate the start date
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - clampedDays);
+        const startDateStr = startDate.toISOString().split('T')[0];
+
+        const { DynamoDBClient: DDBClient } = require('@aws-sdk/client-dynamodb');
+        const { DynamoDBDocumentClient: DDBDocClient, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+        const snapClient = DDBDocClient.from(new DDBClient({ region: process.env.AWS_REGION || 'us-east-1' }), {
+          marshallOptions: { removeUndefinedValues: true }
+        });
+
+        const result = await snapClient.send(new QueryCommand({
+          TableName: snapshotsTable,
+          KeyConditionExpression: 'userId = :uid AND #d >= :startDate',
+          ExpressionAttributeNames: { '#d': 'date' },
+          ExpressionAttributeValues: {
+            ':uid': userId,
+            ':startDate': startDateStr
+          },
+          ScanIndexForward: true // oldest first
+        }));
+
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: true,
+            data: (result.Items || []).map(item => ({
+              date: item.date,
+              totalValue: item.totalValue,
+              holdings: item.holdings || []
+            })),
+            count: (result.Items || []).length,
+            days: clampedDays
+          })
+        };
+      } catch (err) {
+        console.error('[Portfolio] History query error:', err.message);
+        // Return empty array on error (table may not exist yet)
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: true,
+            data: [],
+            count: 0,
+            days: clampedDays
+          })
+        };
+      }
+    }
+
     // POST /portfolio/batch - Batch sync holdings (10x faster than sequential)
     if (path.includes('/batch') && method === 'POST') {
       // Rate limit check
@@ -750,7 +789,8 @@ exports.handler = async (event) => {
           'DELETE /portfolio/holdings/{id}',
           'POST /portfolio/batch',
           'POST /portfolio/prices',
-          'GET /portfolio/analytics'
+          'GET /portfolio/analytics',
+          'GET /portfolio/history?days=30'
         ]
       })
     };

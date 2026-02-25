@@ -34,13 +34,6 @@ variable "lambda_error_threshold" {
   default     = 5
 }
 
-# DynamoDB monitoring
-variable "dynamodb_table_names" {
-  description = "List of DynamoDB table names to monitor"
-  type        = list(string)
-  default     = []
-}
-
 # Redis monitoring
 variable "redis_cluster_id" {
   description = "Redis cluster ID"
@@ -65,12 +58,6 @@ variable "api_5xx_threshold" {
   description = "API Gateway 5xx error threshold"
   type        = number
   default     = 10
-}
-
-variable "api_latency_threshold" {
-  description = "API Gateway p95 latency threshold (ms)"
-  type        = number
-  default     = 3000
 }
 
 variable "tags" {

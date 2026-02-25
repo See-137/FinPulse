@@ -298,28 +298,8 @@ async function searchNews(query, limit = 10) {
     return { articles, source, fromCache: false };
 }
 
-/**
- * Sanitize event for logging (remove sensitive headers)
- */
-function sanitizeEvent(event) {
-  const sanitized = { ...event };
-  if (sanitized.headers) {
-    sanitized.headers = { ...sanitized.headers };
-    delete sanitized.headers.Authorization;
-    delete sanitized.headers.authorization;
-    delete sanitized.headers.Cookie;
-    delete sanitized.headers.cookie;
-  }
-  if (sanitized.multiValueHeaders) {
-    sanitized.multiValueHeaders = { ...sanitized.multiValueHeaders };
-    delete sanitized.multiValueHeaders.Authorization;
-    delete sanitized.multiValueHeaders.authorization;
-  }
-  return sanitized;
-}
-
 exports.handler = async (event) => {
-    console.log('Event:', JSON.stringify(sanitizeEvent(event)));
+    console.log('News Lambda invoked:', event.httpMethod, event.path);
 
     // SECURITY FIX: Restrict CORS to allowed origin only (no wildcard)
     const headers = {
