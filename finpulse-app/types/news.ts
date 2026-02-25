@@ -52,6 +52,12 @@ export const SYMBOL_KEYWORDS: Record<string, string[]> = {
   'SHIB': ['shiba', 'shib'],
   'DN': ['deepnode', 'dn'],
   'LAVA': ['lava network', 'lava'],
+  'PAXG': ['pax gold', 'paxg', 'paxos gold', 'gold token'],
+  // Commodities / ETFs
+  'GLD': ['gold', 'gld', 'spdr gold', 'gold etf'],
+  'SLV': ['silver', 'slv', 'ishares silver', 'silver etf'],
+  'USO': ['oil', 'uso', 'crude oil', 'oil fund'],
+  'UNG': ['natural gas', 'ung', 'gas fund'],
   // Stocks
   'NVDA': ['nvidia', 'nvda', 'gpu', 'ai chip'],
   'MSTR': ['microstrategy', 'mstr', 'saylor'],

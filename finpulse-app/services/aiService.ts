@@ -72,8 +72,9 @@ export const getMarketInsightStream = async (
   } catch (error) {
     console.error('[AI Query] Error:', error);
     
-    // User-friendly error message
-    const errorResponse = `**Service Temporarily Unavailable**\n\nThe AI Market Intelligence service is temporarily unavailable. Please try again in a moment.\n\nIn the meantime, you can:\n• Check real-time prices in your **Portfolio**\n• Monitor assets in your **Watchlist**\n• Read latest news in the **News** sidebar`;
+    // User-friendly error message that acknowledges the user's query
+    const queryHint = query.length > 80 ? query.slice(0, 80) + '...' : query;
+    const errorResponse = `**Service Temporarily Unavailable**\n\nI couldn't process your question about "${queryHint}" right now. The AI service is temporarily unavailable.\n\nPlease try again in a moment. In the meantime, you can:\n• Check real-time prices in your **Portfolio**\n• Monitor assets in your **Watchlist**\n• Read latest news in the **News** sidebar`;
     callback(errorResponse);
     return errorResponse;
   }

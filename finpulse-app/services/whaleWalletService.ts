@@ -61,7 +61,10 @@ export class WhaleWalletService {
       this._lastResultWasMock = false;
       return cached;
     } catch (error) {
-      console.error(`[WhaleService] Cache/fetch failed for ${symbol}, falling back to mock:`, error);
+      const isKeyMissing = error instanceof Error && error.message.includes('not configured');
+      if (!isKeyMissing) {
+        console.error(`[WhaleService] Cache/fetch failed for ${symbol}, falling back to mock:`, error);
+      }
       this._lastResultWasMock = true;
       return this.generateMockMetrics(symbol);
     }
@@ -77,7 +80,10 @@ export class WhaleWalletService {
 
       return this.calculateMetrics(symbol, transactions);
     } catch (error) {
-      console.error(`Error fetching whale metrics for ${symbol}:`, error);
+      const isKeyMissing = error instanceof Error && error.message.includes('not configured');
+      if (!isKeyMissing) {
+        console.error(`Error fetching whale metrics for ${symbol}:`, error);
+      }
       // Fallback to mock data
       this._lastResultWasMock = true;
       return this.generateMockMetrics(symbol);
@@ -140,7 +146,10 @@ export class WhaleWalletService {
       const client = getWhaleAlertClient();
       return await client.getTransactionsBySymbol(symbol, minUSD);
     } catch (error) {
-      console.error(`Error fetching large transactions for ${symbol}:`, error);
+      const isKeyMissing = error instanceof Error && error.message.includes('not configured');
+      if (!isKeyMissing) {
+        console.error(`Error fetching large transactions for ${symbol}:`, error);
+      }
       return this.generateMockTransactions(symbol, 5);
     }
   }

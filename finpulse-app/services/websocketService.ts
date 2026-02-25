@@ -295,14 +295,13 @@ class MarketWebSocketService {
 
   /**
    * Start heartbeat to keep connection alive
+   * Note: Binance WebSocket streams don't support custom JSON ping messages.
+   * Sending {type:'ping'} causes Binance to close the connection (code 1003).
+   * We rely on the browser's native WebSocket ping/pong frames and Binance's
+   * own keep-alive mechanism. If the connection drops, onclose triggers reconnect.
    */
   private startHeartbeat(): void {
-    this.stopHeartbeat();
-    this.heartbeatInterval = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, 30000); // Ping every 30 seconds
+    // No-op: Binance manages keep-alive server-side.
   }
 
   /**
