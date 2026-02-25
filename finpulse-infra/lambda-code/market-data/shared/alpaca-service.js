@@ -606,7 +606,8 @@ async function searchStocks(query, limit = 15) {
 
   try {
     // Alpaca Assets API filters by status=active and asset_class=us_equity
-    const url = `https://api.alpaca.markets/v2/assets?status=active&asset_class=us_equity`;
+    const baseUrl = credentials.apiKey.startsWith('PK') ? 'https://paper-api.alpaca.markets' : 'https://api.alpaca.markets';
+        const url = `${baseUrl}/v2/assets?status=active&asset_class=us_equity`;
     console.log(`[Alpaca] Searching stocks for: ${query}`);
 
     const response = await fetch(url, {
@@ -655,6 +656,38 @@ async function searchStocks(query, limit = 15) {
       }));
 
     console.log(`[Alpaca] Found ${results.length} stocks matching "${query}"`);
+
+    // Fallback: if no results and query looks like a valid ticker, try direct asset lookup
+    if (results.length === 0 && /^[A-Z]{1,5}$/i.test(query)) {
+      console.log(`[Alpaca] No search results, trying direct asset lookup for "${query}"`);
+      try {
+        const baseUrl2 = credentials.apiKey.startsWith('PK') ? 'https://paper-api.alpaca.markets' : 'https://api.alpaca.markets';
+          const directUrl = `${baseUrl2}/v2/assets/${encodeURIComponent(query.toUpperCase())}`;
+        const directResponse = await fetch(directUrl, {
+          headers: {
+            'APCA-API-KEY-ID': credentials.apiKey,
+            'APCA-API-SECRET-KEY': credentials.apiSecret,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (directResponse.ok) {
+          const asset = await directResponse.json();
+          if (asset && asset.tradable !== false) {
+            console.log(`[Alpaca] Direct lookup found: ${asset.symbol} (${asset.name})`);
+            return [{
+              symbol: asset.symbol,
+              name: asset.name || `${asset.symbol} Stock`,
+              exchange: asset.exchange || 'US',
+              type: 'stock',
+            }];
+          }
+        }
+      } catch (directError) {
+        console.warn('[Alpaca] Direct asset lookup failed:', directError.message);
+      }
+    }
+
     return results;
   } catch (error) {
     clearTimeout(timeout);
