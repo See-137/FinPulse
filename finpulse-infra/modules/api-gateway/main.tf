@@ -168,6 +168,14 @@ resource "aws_api_gateway_resource" "community" {
   path_part   = "community"
 }
 
+# /community/{proxy+} - catch-all for community sub-paths (posts, ticker, user)
+resource "aws_api_gateway_resource" "community_proxy" {
+  count       = var.enable_community_service ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.community[0].id
+  path_part   = "{proxy+}"
+}
+
 # /twitter (optional)
 resource "aws_api_gateway_resource" "twitter" {
   count       = var.enable_twitter_service ? 1 : 0
@@ -477,6 +485,57 @@ resource "aws_lambda_permission" "news" {
 }
 
 # =============================================================================
+# Community endpoints (optional - social features)
+# =============================================================================
+
+# ANY /community - base path
+resource "aws_api_gateway_method" "community_any" {
+  count         = var.enable_community_service ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.community[0].id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "community_any" {
+  count                   = var.enable_community_service ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.community[0].id
+  http_method             = aws_api_gateway_method.community_any[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["community"]
+}
+
+# ANY /community/{proxy+} - handles sub-paths like /community/posts, /community/ticker/{ticker}
+resource "aws_api_gateway_method" "community_proxy_any" {
+  count         = var.enable_community_service ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.community_proxy[0].id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "community_proxy_any" {
+  count                   = var.enable_community_service ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.community_proxy[0].id
+  http_method             = aws_api_gateway_method.community_proxy_any[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["community"]
+}
+
+resource "aws_lambda_permission" "community" {
+  count         = var.enable_community_service ? 1 : 0
+  statement_id  = "AllowAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_function_names["community"]
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*/*"
+}
+
+# =============================================================================
 # CORS Support
 # =============================================================================
 
@@ -502,10 +561,16 @@ locals {
     news = aws_api_gateway_resource.news[0].id
   } : {}
 
+  community_cors_resources = var.enable_community_service ? {
+    community       = aws_api_gateway_resource.community[0].id
+    community_proxy = aws_api_gateway_resource.community_proxy[0].id
+  } : {}
+
   cors_resources = merge(
     local.base_cors_resources,
     local.twitter_cors_resources,
     local.news_cors_resources,
+    local.community_cors_resources,
   )
 }
 
@@ -653,6 +718,8 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_method.twitter_any,
       aws_api_gateway_method.twitter_proxy_any,
       aws_api_gateway_method.news_any,
+      aws_api_gateway_method.community_any,
+      aws_api_gateway_method.community_proxy_any,
       aws_api_gateway_method.options,
       aws_api_gateway_integration_response.options,
     ]))
@@ -673,6 +740,8 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.twitter_any,
     aws_api_gateway_integration.twitter_proxy_any,
     aws_api_gateway_integration.news_any,
+    aws_api_gateway_integration.community_any,
+    aws_api_gateway_integration.community_proxy_any,
   ]
 }
 

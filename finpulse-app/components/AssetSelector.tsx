@@ -132,12 +132,23 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
             const cryptoData = await cryptoResponse.json();
             
             const cryptoResults: Asset[] = (cryptoData.coins || [])
-              .slice(0, 10)
+              .slice(0, 20)
               .map((coin: { symbol: string; name: string }) => ({
                 symbol: coin.symbol.toUpperCase(),
                 name: coin.name,
                 type: 'CRYPTO' as AssetType,
-              }));
+              }))
+              .sort((a: Asset, b: Asset) => {
+                const q = search.toUpperCase();
+                // Exact symbol match first
+                if (a.symbol === q && b.symbol !== q) return -1;
+                if (b.symbol === q && a.symbol !== q) return 1;
+                // Prefix match second
+                if (a.symbol.startsWith(q) && !b.symbol.startsWith(q)) return -1;
+                if (b.symbol.startsWith(q) && !a.symbol.startsWith(q)) return 1;
+                return 0;
+              })
+              .slice(0, 10);
 
             results.push(...cryptoResults);
           } catch (cryptoError) {
