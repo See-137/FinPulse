@@ -21,26 +21,11 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
 
   return (
     <div
-      className={`animate-pulse bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 bg-[length:200%_100%] ${variantClasses[variant]} ${className}`}
-      style={{
-        width,
-        height,
-        animation: 'shimmer 2s infinite linear',
-      }}
+      className={`pulse-skeleton ${variantClasses[variant]} ${className}`}
+      style={{ width, height }}
       role="status"
       aria-label="Loading"
-    >
-      <style>{`
-        @keyframes shimmer {
-          0% {
-            background-position: -200% 0;
-          }
-          100% {
-            background-position: 200% 0;
-          }
-        }
-      `}</style>
-    </div>
+    />
   );
 };
 

@@ -81,6 +81,7 @@ const AppContent: React.FC = () => {
   const [isNewsSidebarOpen, setIsNewsSidebarOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
   
   // Notification & Onboarding State
   const { showChangelog, currentChangelog, dismissChangelog } = useChangelog(user?.id);
@@ -146,9 +147,15 @@ const AppContent: React.FC = () => {
 
   // Navigate to dashboard when user becomes authenticated (session restore or OAuth)
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (user && view === 'landing' && !isAuthInitializing && !isOAuthProcessing) {
-      setView('dashboard');
+      setIsExiting(true);
+      timer = setTimeout(() => {
+        setView('dashboard');
+        setIsExiting(false);
+      }, 400);
     }
+    return () => { if (timer) clearTimeout(timer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isAuthInitializing, isOAuthProcessing]);
 
@@ -220,7 +227,11 @@ const AppContent: React.FC = () => {
   // Login handler delegates to AuthContext, then navigates to dashboard
   const handleLogin = async (email: string, name: string) => {
     await login(email, name);
-    setView('dashboard');
+    setIsExiting(true);
+    setTimeout(() => {
+      setView('dashboard');
+      setIsExiting(false);
+    }, 400);
   };
 
   // Milestone checks when usage changes
@@ -327,9 +338,13 @@ const AppContent: React.FC = () => {
       );
     }
     
-    return !showcaseDisabled
-      ? <ErrorBoundary><Suspense fallback={<LoadingSpinner size="lg" />}><LandingPageShowcase onLogin={handleLogin} initialError={oauthError} /></Suspense></ErrorBoundary>
-      : <LandingPage onLogin={handleLogin} />;
+    return (
+      <div className={`transition-opacity duration-400 ${isExiting ? 'opacity-0' : 'opacity-100'}`}>
+        {!showcaseDisabled
+          ? <ErrorBoundary><Suspense fallback={<LoadingSpinner size="lg" />}><LandingPageShowcase onLogin={handleLogin} initialError={oauthError} /></Suspense></ErrorBoundary>
+          : <LandingPage onLogin={handleLogin} />}
+      </div>
+    );
   }
   
   if (view === 'welcome' && user) return (

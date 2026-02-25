@@ -190,6 +190,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
   const [showPasswordStrength, setShowPasswordStrength] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successOverlayText, setSuccessOverlayText] = useState<{ title: string; subtitle: string }>({ title: 'Success!', subtitle: 'Email verified successfully' });
   
   // Helper to handle user-initiated mode changes (saves preference)
   const handleUserModeSwitch = (newMode: AuthMode) => {
@@ -335,7 +336,14 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
         // Sign In
         const result = await auth.signIn(email, password);
         if (result.success && result.user) {
-          onLogin(result.user.email, result.user.name);
+          setSuccessOverlayText({ title: 'Welcome back!', subtitle: 'Redirecting to your dashboard...' });
+          setShowSuccess(true);
+          const userEmail = result.user.email;
+          const userName = result.user.name;
+          setTimeout(() => {
+            setShowSuccess(false);
+            onLogin(userEmail, userName);
+          }, 1200);
         } else if (result.needsConfirmation) {
           setError('Please verify your email first. Check your inbox for the confirmation code.');
           setAuthMode('confirm');
@@ -349,6 +357,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
         const cleanCode = confirmCode.replace(/-/g, ''); // Remove formatting
         const result = await auth.confirmSignUp(email, cleanCode);
         if (result.success) {
+          setSuccessOverlayText({ title: 'Success!', subtitle: 'Email verified successfully' });
           setShowSuccess(true);
           setTimeout(() => {
             setShowSuccess(false);
@@ -406,8 +415,8 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
 
   const getFormTitle = () => {
     switch (authMode) {
-      case 'signup': return 'Start Your Pulse';
-      case 'signin': return 'Check Your Pulse';
+      case 'signup': return 'Create Account';
+      case 'signin': return 'Sign In';
       case 'confirm': return 'Verify Email';
       case 'forgot': return 'Reset Password';
       case 'reset': return 'New Password';
@@ -425,9 +434,9 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
   };
 
   return (
-    <div className="h-screen h-[100dvh] bg-[#0b0e14] flex flex-col lg:flex-row overflow-hidden selection:bg-[#00e5ff] selection:text-[#0b0e14]">
+    <div className="h-screen h-[100dvh] bg-[#0b0e14] flex max-lg:flex-col lg:flex-row overflow-hidden selection:bg-[#00e5ff] selection:text-[#0b0e14]">
       {/* Left Side: Auth Form */}
-      <div className="w-full lg:w-[35%] xl:w-[30%] h-full flex flex-col relative z-10 bg-[#0b0e14] overflow-y-auto custom-scrollbar">
+      <div className="max-lg:w-full lg:w-[35%] xl:w-[30%] h-full flex flex-col relative z-10 bg-[#0b0e14] overflow-y-auto custom-scrollbar">
         <div className="p-6 sm:p-8 lg:p-12 flex flex-col min-h-min">
             <div className="mb-8 lg:mb-10">
               <Logo />
@@ -474,7 +483,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                 {/* Name Field (signup only) */}
                 {authMode === 'signup' && (
                     <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Pulse Identity</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Full Name</label>
                     <div className="relative">
                         <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input 
@@ -492,7 +501,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                 {/* Email Field (all modes except reset/confirm) */}
                 {(authMode === 'signin' || authMode === 'signup' || authMode === 'forgot') && (
                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Secure Email</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Email</label>
                     <div className="relative">
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input
@@ -629,7 +638,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                     <div className="flex items-start gap-3">
                         <Key className="w-4 h-4 sm:w-5 h-5 text-cyan-400 shrink-0 mt-1" />
                         <div>
-                        <h4 className="text-[10px] sm:text-xs font-black text-white uppercase tracking-wider">Intelligence Access Required</h4>
+                        <h4 className="text-[10px] sm:text-xs font-black text-white uppercase tracking-wider">API Key Required</h4>
                         <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium leading-relaxed mt-1">
                             FinPulse uses high-tier models. Select an API key from a paid GCP project. 
                             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-cyan-400 ml-1 hover:underline">Billing Docs</a>
@@ -641,7 +650,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                         onClick={handleKeySelection}
                         className="w-full py-3 bg-[#00e5ff] text-[#0b0e14] font-black text-[10px] uppercase tracking-widest rounded-lg sm:rounded-xl hover:opacity-90 transition-all shadow-lg"
                     >
-                        Authorize AI Engine
+                        Select API Key
                     </button>
                     </div>
                 ) : (
@@ -662,8 +671,8 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                         </div>
                     ) : (
                         <>
-                        {authMode === 'signup' && 'Start Tracking Free'}
-                        {authMode === 'signin' && 'Check My Pulse'}
+                        {authMode === 'signup' && 'Get Started Free'}
+                        {authMode === 'signin' && 'Sign In'}
                         {authMode === 'confirm' && 'Verify Email'}
                         {authMode === 'forgot' && 'Send Reset Code'}
                         {authMode === 'reset' && 'Reset Password'}
@@ -730,7 +739,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                            onClick={() => handleUserModeSwitch('signup')}
                            className="text-[#00e5ff] text-sm font-bold hover:underline transition-all hover:scale-105"
                          >
-                           Start Tracking Free →
+                           Get Started Free →
                          </button>
                        </div>
                        <button onClick={() => { setAuthMode('forgot'); clearMessages(); }} className="text-slate-500 text-xs font-medium hover:text-slate-300 block w-full">
@@ -745,7 +754,7 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                          onClick={() => handleUserModeSwitch('signin')}
                          className="text-[#00e5ff] text-sm font-bold hover:underline transition-all hover:scale-105"
                        >
-                         Check Your Pulse →
+                         Sign In →
                        </button>
                      </div>
                    )}
@@ -795,18 +804,16 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
 
             <div className="mt-auto pt-8 flex items-center justify-between shrink-0 border-t border-white/5 pb-8 sm:pb-0">
             <p className="text-slate-600 text-[9px] sm:text-[10px] font-black uppercase tracking-widest">
-                © 2025 FinPulse
+                © 2026 FinPulse
             </p>
             <div className="flex gap-4">
-                <Lock className="w-3 h-3 text-slate-700" />
-                <Shield className="w-3 h-3 text-slate-700" />
             </div>
             </div>
         </div>
       </div>
 
       {/* Middle: Feature Selector Cards - visible on large screens */}
-      <div className="hidden lg:flex w-[200px] xl:w-[220px] flex-col justify-center py-8 px-4 border-l border-white/5" onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
+      <div className="max-lg:hidden lg:flex w-[200px] xl:w-[220px] flex-col justify-center py-8 px-4 border-l border-white/5" onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
         <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-4 px-2">Explore Features</p>
         <div className="space-y-2">
           {SHOWCASE_ITEMS.map((item, index) => (
@@ -845,39 +852,112 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
         </div>
       </div>
 
-      {/* Right Side: Interactive Showcase */}
-      <div className="hidden lg:flex flex-1 relative items-center justify-center bg-[#0b0e14] overflow-hidden h-full">
-        {/* Ambient Glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(0,229,255,0.08),transparent_70%)] pointer-events-none"></div>
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+      {/* Right Side: Interactive 3D Showcase */}
+      <div className="max-lg:hidden lg:flex flex-1 relative items-center justify-center bg-[#0b0e14] overflow-hidden h-full">
+        {/* Animated ambient orbs */}
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full pointer-events-none opacity-[0.07] blur-[120px]"
+          style={{
+            background: 'radial-gradient(circle, #00e5ff, transparent 70%)',
+            top: '20%', left: '30%',
+            animation: 'float-orb-1 12s ease-in-out infinite',
+          }}
+        />
+        <div
+          className="absolute w-[400px] h-[400px] rounded-full pointer-events-none opacity-[0.05] blur-[100px]"
+          style={{
+            background: 'radial-gradient(circle, #a855f7, transparent 70%)',
+            bottom: '15%', right: '20%',
+            animation: 'float-orb-2 15s ease-in-out infinite',
+          }}
+        />
+        <div
+          className="absolute w-[300px] h-[300px] rounded-full pointer-events-none opacity-[0.04] blur-[80px]"
+          style={{
+            background: 'radial-gradient(circle, #06b6d4, transparent 70%)',
+            top: '60%', left: '60%',
+            animation: 'float-orb-3 18s ease-in-out infinite',
+          }}
+        />
+        {/* Grid overlay with center fade */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(#ffffff 0.5px, transparent 0.5px)',
+            backgroundSize: '24px 24px',
+            opacity: 0.04,
+            maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 70%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, black 30%, transparent 70%)',
+          }}
+        />
 
-        <div className="relative w-full max-w-2xl px-12">
+        {/* 3D Perspective Card Deck */}
+        <div
+          className="relative w-full max-w-2xl px-8"
+          style={{ perspective: '1200px', perspectiveOrigin: 'center center' }}
+        >
            {SHOWCASE_ITEMS.map((item, index) => {
-             // Card-deck stacking effect - subtle peek
              const total = SHOWCASE_ITEMS.length;
              const position = (index - activeIndex + total) % total;
-             let cardClasses = '';
+
+             // 3D card positioning
+             let transform = '';
+             let opacity = 0;
+             let zIndex = 0;
+             let shadow = '';
+             let filter = '';
 
              if (position === 0) {
-               // Active card - fully visible, centered
-               cardClasses = 'opacity-100 scale-100 translate-x-0 translate-y-0 z-30';
+               // Active: front and center
+               transform = 'translateX(-50%) translateY(-50%) translateZ(0) rotateY(0deg) scale(1)';
+               opacity = 1;
+               zIndex = 30;
+               shadow = '0 25px 60px -12px rgba(0, 229, 255, 0.25), 0 0 40px -8px rgba(0, 229, 255, 0.1)';
+               filter = 'none';
              } else if (position === 1) {
-               // Next card - subtle peek behind, minimal offset
-               cardClasses = 'opacity-20 scale-[0.98] translate-x-4 translate-y-2 z-20';
+               // Next: receding to the right
+               transform = 'translateX(-20%) translateY(-48%) translateZ(-120px) rotateY(-12deg) scale(0.92)';
+               opacity = 0.45;
+               zIndex = 20;
+               shadow = '0 15px 40px -10px rgba(0, 0, 0, 0.5)';
+               filter = 'brightness(0.7)';
              } else if (position === total - 1) {
-               // Previous card - barely visible behind
-               cardClasses = 'opacity-10 scale-[0.96] -translate-x-4 translate-y-2 z-10';
+               // Previous: receding to the left
+               transform = 'translateX(-80%) translateY(-48%) translateZ(-120px) rotateY(12deg) scale(0.92)';
+               opacity = 0.45;
+               zIndex = 10;
+               shadow = '0 15px 40px -10px rgba(0, 0, 0, 0.5)';
+               filter = 'brightness(0.7)';
              } else {
-               // Other cards - hidden
-               cardClasses = 'opacity-0 scale-95 translate-y-4 z-0 pointer-events-none';
+               // Hidden: behind and scaled down
+               transform = 'translateX(-50%) translateY(-50%) translateZ(-250px) rotateY(0deg) scale(0.85)';
+               opacity = 0;
+               zIndex = 0;
+               filter = 'brightness(0.5)';
              }
 
              return (
                <div
                   key={item.id}
-                  className={`absolute inset-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out flex items-center justify-center ${cardClasses}`}
+                  className="absolute top-1/2 left-1/2 flex items-center justify-center w-full"
+                  style={{
+                    transform,
+                    opacity,
+                    zIndex,
+                    filter,
+                    transition: 'transform 800ms cubic-bezier(0.4, 0, 0.2, 1), opacity 600ms ease-out, filter 600ms ease-out',
+                    transformStyle: 'preserve-3d',
+                    willChange: 'transform, opacity',
+                    pointerEvents: position === 0 ? 'auto' : 'none',
+                  }}
                >
-                  <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-[#00e5ff]/20 border border-white/10 bg-[#151921] w-full max-w-2xl">
+                  <div
+                    className="relative rounded-3xl overflow-hidden border bg-[#151921] w-full max-w-2xl"
+                    style={{
+                      borderColor: position === 0 ? 'rgba(0, 229, 255, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                      boxShadow: shadow,
+                    }}
+                  >
                      {/* Window Chrome */}
                      <div className="h-8 bg-[#0b0e14] border-b border-white/5 flex items-center px-4 gap-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60"></div>
@@ -889,13 +969,38 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
                      <div className="min-h-[500px]">
                         <item.preview />
                      </div>
-                     {/* Overlay Gradient for polish */}
-                     <div className="absolute inset-0 bg-gradient-to-tr from-[#00e5ff]/5 to-transparent pointer-events-none"></div>
+                     {/* Overlay — stronger on inactive cards */}
+                     <div
+                       className="absolute inset-0 pointer-events-none"
+                       style={{
+                         background: position === 0
+                           ? 'linear-gradient(135deg, rgba(0,229,255,0.04) 0%, transparent 60%)'
+                           : 'linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%)',
+                       }}
+                     />
                   </div>
                </div>
              );
            })}
         </div>
+
+        {/* Keyframe animations for ambient orbs */}
+        <style>{`
+          @keyframes float-orb-1 {
+            0%, 100% { transform: translate(0, 0); }
+            33% { transform: translate(40px, -30px); }
+            66% { transform: translate(-20px, 20px); }
+          }
+          @keyframes float-orb-2 {
+            0%, 100% { transform: translate(0, 0); }
+            33% { transform: translate(-30px, 25px); }
+            66% { transform: translate(25px, -15px); }
+          }
+          @keyframes float-orb-3 {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-35px, -20px); }
+          }
+        `}</style>
       </div>
 
       {/* Success Animation Overlay */}
@@ -903,8 +1008,8 @@ export const LandingPageShowcase: React.FC<LandingPageShowcaseProps> = ({ onLogi
         <div className="fixed inset-0 flex items-center justify-center bg-[#0b0e14]/80 backdrop-blur-sm z-50 animate-in fade-in duration-300">
           <div className="bg-white/10 backdrop-blur-xl p-8 rounded-3xl border border-white/20 animate-in zoom-in-95 duration-300">
             <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4 animate-pulse" strokeWidth={2.5} />
-            <p className="text-white text-lg font-black text-center">Success!</p>
-            <p className="text-slate-400 text-sm text-center mt-2">Email verified successfully</p>
+            <p className="text-white text-lg font-black text-center">{successOverlayText.title}</p>
+            <p className="text-slate-400 text-sm text-center mt-2">{successOverlayText.subtitle}</p>
           </div>
         </div>
       )}

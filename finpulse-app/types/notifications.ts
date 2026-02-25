@@ -111,22 +111,22 @@ export const NOTIFICATION_STORAGE_KEYS = {
 
 export const PLAN_FEATURES = {
   FREE: {
-    maxAssets: 8,
-    maxAiQueries: 5,
+    maxAssets: 20,
+    maxAiQueries: 10,
     refreshRate: 60,
     features: ['stocks', 'crypto', 'basic_news', 'community'],
     locked: ['advanced_charts', 'csv_exports', 'commodities', 'ad_free']
   },
   PROPULSE: {
-    maxAssets: 20,
-    maxAiQueries: 10,
+    maxAssets: 50,
+    maxAiQueries: 50,
     refreshRate: 30,
     features: ['stocks', 'crypto', 'commodities', 'advanced_news', 'community', 'csv_exports', 'advanced_charts'],
     locked: ['api_access', 'white_label', 'priority_support']
   },
   SUPERPULSE: {
-    maxAssets: 50,
-    maxAiQueries: 50,
+    maxAssets: 9999,
+    maxAiQueries: 9999,
     refreshRate: 30,
     features: ['stocks', 'crypto', 'commodities', 'advanced_news', 'community', 'csv_exports', 'advanced_charts', 'api_access', 'priority_support', 'ad_free'],
     locked: ['white_label', 'team_workspaces']

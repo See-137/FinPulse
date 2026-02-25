@@ -72,11 +72,8 @@ export const createCheckoutSession = async (
   const variantId = LEMONSQUEEZY_VARIANT_IDS[plan];
   
   if (!variantId) {
-    paymentLogger.warn(`No variant ID configured for plan: ${plan}, using demo mode`);
-    // Demo mode fallback
-    return {
-      url: `${window.location.origin}?demo_upgrade=${plan}&session_id=demo_${Date.now()}`
-    };
+    paymentLogger.error(`No variant ID configured for plan: ${plan}`);
+    throw new Error('Payments are not yet available. Please try again later or contact support.');
   }
 
   try {
@@ -106,12 +103,7 @@ export const createCheckoutSession = async (
     return { url: data.checkoutUrl };
   } catch (error) {
     paymentLogger.error('Checkout creation failed:', error as Error);
-    
-    // Fallback to demo mode
-    paymentLogger.warn('Using demo mode for plan upgrade');
-    return {
-      url: `${window.location.origin}?demo_upgrade=${plan}&session_id=demo_${Date.now()}`
-    };
+    throw error;
   }
 };
 

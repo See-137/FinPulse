@@ -134,3 +134,49 @@ a:focus {
 .animate-slide-up {
   animation: slide-up 0.4s ease-out forwards;
 }
+
+/* Brand skeleton — "pulse" heartbeat shimmer */
+@keyframes pulse-shimmer {
+  0%, 100% {
+    opacity: 0.4;
+    background-position: -200% 0;
+  }
+  50% {
+    opacity: 0.7;
+    background-position: 200% 0;
+  }
+}
+
+.pulse-skeleton {
+  background: linear-gradient(
+    90deg,
+    #1e293b 0%,
+    rgba(0, 229, 255, 0.06) 50%,
+    #1e293b 100%
+  );
+  background-size: 200% 100%;
+  animation: pulse-shimmer 2s ease-in-out infinite;
+}
+
+:root .pulse-skeleton,
+.light .pulse-skeleton {
+  background: linear-gradient(
+    90deg,
+    #e2e8f0 0%,
+    rgba(0, 229, 255, 0.08) 50%,
+    #e2e8f0 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Pulse line draw animation for empty states */
+@keyframes draw-pulse-line {
+  0% { stroke-dashoffset: 400; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.animate-draw-pulse {
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: draw-pulse-line 2.5s ease-out forwards;
+}

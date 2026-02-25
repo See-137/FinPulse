@@ -18,7 +18,7 @@ interface DisplayArticle extends NewsArticle {
 }
 
 export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, isAuthInitializing = false }) => {
-  const [activeFilter, setActiveFilter] = useState<'Holdings' | 'Whales' | 'All'>('All');
+  const [activeFilter, setActiveFilter] = useState<'Holdings' | 'X Feed' | 'All'>('All');
   const { articles, loading, source: newsSource, refresh } = useNews({ maxArticles: 8 });
   // Subscribe to the raw per-user map + currentUserId so we only re-render when
   // holdings actually change, and memoize to keep the array reference stable.
@@ -56,7 +56,7 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, 
 
   // Render content based on filter
   const renderContent = () => {
-    if (activeFilter === 'Whales') {
+    if (activeFilter === 'X Feed') {
       return <InfluencerFeed user={user || null} holdings={holdings} onUpgradeClick={onUpgradeClick} isAuthInitializing={isAuthInitializing} />;
     }
 
@@ -168,7 +168,7 @@ export const NewsSidebar: React.FC<NewsSidebarProps> = ({ user, onUpgradeClick, 
         </div>
 
         <div className="flex bg-[#0b0e14] p-1.5 rounded-xl gap-1 border border-white/5">
-          {(['Holdings', 'Whales', 'All'] as const).map(filter => (
+          {(['Holdings', 'X Feed', 'All'] as const).map(filter => (
             <button
               key={filter}
               onClick={() => setActiveFilter(filter)}

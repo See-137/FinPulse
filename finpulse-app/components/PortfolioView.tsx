@@ -801,8 +801,20 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                 </div>
               ) : holdings.length === 0 ? (
                 <div className="card-surface p-12 rounded-[40px] text-center border-2 border-dashed border-[#00e5ff]/20 dark:border-[#00e5ff]/10">
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-[#00e5ff]/10 flex items-center justify-center border border-[#00e5ff]/20">
-                    <Plus className="w-10 h-10 text-[#00e5ff]" />
+                  {/* Heartbeat SVG — flatline that implies "add assets to bring it to life" */}
+                  <div className="w-64 h-16 mx-auto mb-6">
+                    <svg viewBox="0 0 260 60" className="w-full h-full" fill="none">
+                      <line x1="0" y1="30" x2="260" y2="30" stroke="currentColor" strokeWidth="1" className="text-slate-300 dark:text-slate-700" />
+                      <polyline
+                        points="0,30 40,30 55,30 65,8 75,52 85,20 95,38 105,30 140,30 155,30 165,8 175,52 185,20 195,38 205,30 260,30"
+                        stroke="#00e5ff"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="animate-draw-pulse"
+                        style={{ filter: 'drop-shadow(0 0 6px rgba(0, 229, 255, 0.3))' }}
+                      />
+                    </svg>
                   </div>
                   <h3 className="text-xl font-black dark:text-white mb-2">{t('emptyPortfolio.title')}</h3>
                   <p className="text-sm text-slate-500 mb-8 max-w-md mx-auto">{t('emptyPortfolio.description')}</p>

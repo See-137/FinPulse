@@ -84,21 +84,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
             </h1>
 
             <p className="text-slate-400 text-base sm:text-lg mb-8 lg:mb-10 leading-relaxed font-medium">
-                Track your global assets in a precision, read-only environment. No custody risks. No brokerage links. Just the bottom line.
+                Track stocks, crypto, and commodities in one place. See your complete financial picture at a glance.
             </p>
 
             <div className="card-surface p-6 sm:p-8 rounded-[24px] sm:rounded-[32px] border-white/5 shadow-2xl bg-[#151921]/50 backdrop-blur-xl mb-12">
                 <div className="flex items-center justify-between mb-6 sm:mb-8">
                 <div>
-                    <h3 className="text-white font-black text-lg sm:text-xl mb-1">{isSignUp ? 'Start Your Pulse' : 'Check Your Pulse'}</h3>
-                    <p className="text-slate-500 text-[10px] sm:text-xs">{isSignUp ? 'Track all your assets in one place - free' : 'Welcome back to your portfolio dashboard'}</p>
+                    <h3 className="text-white font-black text-lg sm:text-xl mb-1">{isSignUp ? 'Create Account' : 'Sign In'}</h3>
+                    <p className="text-slate-500 text-[10px] sm:text-xs">{isSignUp ? 'Start tracking your assets for free' : 'Welcome back to your dashboard'}</p>
                 </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                 {isSignUp && (
                     <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Pulse Identity</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Full Name</label>
                     <div className="relative">
                         <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input 
@@ -114,7 +114,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 )}
 
                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Secure Email</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Email</label>
                     <input
                     required
                     type="email"
@@ -145,7 +145,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                     <div className="flex items-start gap-3">
                         <Key className="w-4 h-4 sm:w-5 h-5 text-cyan-400 shrink-0 mt-1" />
                         <div>
-                        <h4 className="text-[10px] sm:text-xs font-black text-white uppercase tracking-wider">Intelligence Access Required</h4>
+                        <h4 className="text-[10px] sm:text-xs font-black text-white uppercase tracking-wider">API Key Required</h4>
                         <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium leading-relaxed mt-1">
                             FinPulse uses high-tier models. Select an API key from a paid GCP project. 
                             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-cyan-400 ml-1 hover:underline">Billing Docs</a>
@@ -158,21 +158,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                         aria-label="Authorize AI Engine with API key"
                         className="w-full py-3 bg-[#00e5ff] text-[#0b0e14] font-black text-[10px] uppercase tracking-widest rounded-lg sm:rounded-xl hover:opacity-90 transition-all shadow-lg"
                     >
-                        Authorize AI Engine
+                        Select API Key
                     </button>
                     </div>
                 ) : (
                     <button 
                     type="submit"
                     disabled={isLoading}
-                    aria-label={isSignUp ? 'Establish pulse account' : 'Connect to existing session'}
+                    aria-label={isSignUp ? 'Create your account' : 'Sign in to your account'}
                     className="w-full py-3.5 sm:py-4 bg-white text-[#0b0e14] font-black uppercase tracking-widest rounded-xl sm:rounded-2xl hover:bg-[#00e5ff] transition-all flex items-center justify-center shadow-lg gap-2 mt-4 text-[11px] sm:text-xs"
                     >
                     {isLoading ? (
                         <div className="w-5 h-5 border-2 border-[#0b0e14]/20 border-t-[#0b0e14] rounded-full animate-spin"></div>
                     ) : (
                         <>
-                        {isSignUp ? 'Start Tracking Free' : 'Check My Pulse'}
+                        {isSignUp ? 'Get Started Free' : 'Sign In'}
                         <ArrowRight className="w-4 h-4" />
                         </>
                     )}
@@ -212,7 +212,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                     aria-label={isSignUp ? 'Switch to sign in' : 'Switch to sign up'}
                     className="text-[#00e5ff] text-sm font-bold hover:underline transition-all hover:scale-105"
                   >
-                    {isSignUp ? 'Check Your Pulse →' : 'Start Tracking Free →'}
+                    {isSignUp ? 'Sign In →' : 'Get Started Free →'}
                   </button>
                 </div>
                 </div>
@@ -239,12 +239,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
 
             <div className="mt-auto pt-8 flex items-center justify-between shrink-0 border-t border-white/5 pb-8 sm:pb-0">
             <p className="text-slate-600 text-[9px] sm:text-[10px] font-black uppercase tracking-widest">
-                © 2025 FinPulse
+                © 2026 FinPulse
             </p>
-            <div className="flex gap-4">
-                <Lock className="w-3 h-3 text-slate-700" />
-                <Shield className="w-3 h-3 text-slate-700" />
-            </div>
             </div>
         </div>
       </div>
@@ -282,7 +278,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase text-slate-500 leading-none mb-1">Pulse Health</p>
-                <p className="text-sm font-black text-blue-400 leading-none">99.9% Latency</p>
+                <p className="text-sm font-black text-blue-400 leading-none">99.9% Uptime</p>
               </div>
             </div>
           </div>
