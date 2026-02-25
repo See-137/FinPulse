@@ -1,9 +1,37 @@
-import React, { useMemo } from 'react';
+import React, { Component, useMemo } from 'react';
 import { Users, Zap, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react';
 import { TweetCard } from './TweetCard';
 import { useInfluencerTweets } from '../hooks/useInfluencerTweets';
 import { influencerService } from '../services/influencerService';
 import type { User, Holding, PlanType } from '../types';
+
+/** ErrorBoundary for individual tweet cards — prevents one bad tweet from crashing the feed */
+class TweetErrorBoundary extends Component<
+  { children: React.ReactNode; tweetId: string },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn(`[TweetCard] Render error for tweet ${this.props.tweetId}:`, error.message);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-[#151921] border border-amber-500/20 rounded-2xl p-4 text-center">
+          <AlertCircle className="w-4 h-4 text-amber-500 mx-auto mb-1" />
+          <p className="text-[10px] text-slate-500">Could not render this post</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface InfluencerFeedProps {
   user: User | null;
@@ -213,11 +241,12 @@ export const InfluencerFeed: React.FC<InfluencerFeedProps> = ({
         ) : (
           // Tweet cards
           tweets.map(tweet => (
-            <TweetCard
-              key={tweet.id}
-              tweet={tweet}
-              holdingSymbols={holdingSymbols}
-            />
+            <TweetErrorBoundary key={tweet.id} tweetId={tweet.id}>
+              <TweetCard
+                tweet={tweet}
+                holdingSymbols={holdingSymbols}
+              />
+            </TweetErrorBoundary>
           ))
         )}
       </div>

@@ -7,6 +7,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { XAxis, YAxis, ResponsiveContainer, Tooltip, AreaChart, Area, BarChart, Bar, Cell, PieChart as RechartsPie, Pie } from 'recharts';
 import { TrendingUp, TrendingDown, Shield, Zap, Target, PieChart, Lock, BarChart3, Activity, Calendar, Download, Info, RefreshCw, DollarSign, Clock } from 'lucide-react';
 import { Holding, User } from '../types';
+import { usePortfolioHistory } from '../hooks/usePortfolioHistory';
 
 interface PremiumAnalyticsProps {
   holdings: Holding[];
@@ -201,7 +202,8 @@ const MetricCard: React.FC<{
   trend?: 'up' | 'down' | 'neutral';
   color?: string;
   tooltip?: string;
-}> = ({ label, value, subValue, icon, trend, color = 'cyan', tooltip }) => {
+  simulated?: boolean;
+}> = ({ label, value, subValue, icon, trend, color = 'cyan', tooltip, simulated }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   
   const colorClasses = {
@@ -229,7 +231,14 @@ const MetricCard: React.FC<{
       )}
       
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+          {simulated && (
+            <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              Simulated
+            </span>
+          )}
+        </div>
         <div className="text-slate-400">{icon}</div>
       </div>
       <div className="flex items-baseline gap-2">
@@ -261,7 +270,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
   // Time period state
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('30d');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // Get days from time period
   const periodDays = useMemo(() => {
     switch (timePeriod) {
@@ -270,9 +279,25 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
       default: return 30;
     }
   }, [timePeriod]);
-  
-  // Generate data - memoized with dependencies
-  const historicalData = useMemo(() => generateHistoricalData(holdings, periodDays), [holdings, periodDays]);
+
+  // Fetch real historical data from backend
+  const { data: realHistory, hasRealData, refetch: refetchHistory } = usePortfolioHistory(periodDays);
+
+  // Use real data when available (>=7 data points), otherwise fall back to synthetic
+  const historicalData = useMemo(() => {
+    if (hasRealData) {
+      return realHistory.map(snap => ({
+        date: new Date(snap.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        value: snap.totalValue,
+        fullDate: snap.date
+      }));
+    }
+    return generateHistoricalData(holdings, periodDays);
+  }, [hasRealData, realHistory, holdings, periodDays]);
+
+  // Track whether metrics are from real or synthetic data
+  const isEstimated = !hasRealData;
+
   const metrics = useMemo(() => calculateMetrics(holdings, historicalData), [holdings, historicalData]);
   const allocation = useMemo(() => calculateAllocation(holdings), [holdings]);
   const performers = useMemo(() => getTopPerformers(holdings), [holdings]);
@@ -289,12 +314,12 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
     return `${currencySymbol}${converted.toFixed(2)}`;
   }, [currencySymbol, exchangeRate]);
   
-  // Refresh handler
+  // Refresh handler - refetches real history data from API
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
-    // Simulate refresh
-    setTimeout(() => setIsRefreshing(false), 1000);
-  }, []);
+    refetchHistory();
+    setTimeout(() => setIsRefreshing(false), 500);
+  }, [refetchHistory]);
   
   // Export to CSV
   const handleExport = useCallback(() => {
@@ -439,6 +464,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             icon={<Activity className="w-4 h-4" />}
             tooltip="Annualized standard deviation of daily returns - measures price fluctuation risk"
             color={metrics.volatility > 30 ? 'amber' : 'cyan'}
+            simulated={isEstimated}
           />
           <MetricCard
             label="Sharpe Ratio"
@@ -447,6 +473,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             icon={<Target className="w-4 h-4" />}
             color={metrics.sharpeRatio > 1 ? 'emerald' : metrics.sharpeRatio > 0 ? 'amber' : 'rose'}
             tooltip="Risk-adjusted return metric - higher is better (>1 is good, >2 is excellent)"
+            simulated={isEstimated}
           />
           <MetricCard
             label="Max Drawdown"
@@ -455,6 +482,7 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
             icon={<Shield className="w-4 h-4" />}
             color={metrics.maxDrawdown > 20 ? 'rose' : 'cyan'}
             tooltip="Largest peak-to-trough decline in the selected period"
+            simulated={isEstimated}
           />
         </div>
 
@@ -499,9 +527,16 @@ export const PremiumAnalytics: React.FC<PremiumAnalyticsProps> = ({
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <h3 className="text-sm font-black uppercase tracking-widest text-slate-500">
-                Portfolio Value ({periodDays} Days)
+                {isEstimated ? 'Estimated' : ''} Portfolio Trend ({periodDays} Days)
               </h3>
-              <Calendar className="w-4 h-4 text-slate-500" />
+              {isEstimated && (
+                <div className="group relative">
+                  <Info className="w-4 h-4 text-amber-500 cursor-help" />
+                  <div className="absolute right-0 top-6 w-56 p-2 bg-slate-800 rounded-lg text-xs text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-white/10">
+                    Estimated from current allocation with simulated variance. Real historical data will appear after a few days of tracking.
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className={`px-2 py-1 rounded-lg ${metrics.pnlPercent >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>

@@ -33,10 +33,10 @@ export const SaaS_PLANS = {
     price: '$0',
     annualPrice: '$0',
     annualSavings: '',
-    maxAssets: 8,
-    maxAiQueries: 5,
+    maxAssets: 20,
+    maxAiQueries: 10,
     allowCommodities: false,
-    features: ['Stocks & Crypto Tracking', 'Basic Analytics', 'Community Access', 'Market News'],
+    features: ['Stocks & Crypto Tracking', 'Basic Analytics', 'Community Access', 'Market News', '20 Asset Slots'],
     color: 'slate'
   },
   PROPULSE: {
@@ -44,10 +44,10 @@ export const SaaS_PLANS = {
     price: '$9.90',
     annualPrice: '$89',
     annualSavings: '25%',
-    maxAssets: 20,
-    maxAiQueries: 10,
+    maxAssets: 50,
+    maxAiQueries: 50,
     allowCommodities: true,
-    features: ['Everything in Free', 'Commodities (Gold, Oil, etc.)', '20 Asset Slots', '10 AI Queries/day', 'CSV Exports'],
+    features: ['Everything in Free', 'Commodities (Gold, Oil, etc.)', '50 Asset Slots', '50 AI Queries/day', 'CSV Exports'],
     color: 'cyan'
   },
   SUPERPULSE: {
@@ -55,10 +55,10 @@ export const SaaS_PLANS = {
     price: '$29.90',
     annualPrice: '$249',
     annualSavings: '31%',
-    maxAssets: 50,
-    maxAiQueries: 50,
+    maxAssets: 9999,
+    maxAiQueries: 9999,
     allowCommodities: true,
-    features: ['Everything in ProPulse', 'Premium Analytics', '50 Asset Slots', '50 AI Queries/day', 'Priority Support', 'Ad-free Experience'],
+    features: ['Everything in ProPulse', 'Premium Analytics', 'Unlimited Assets', 'Unlimited AI Queries', 'Priority Support', 'Ad-free Experience'],
     color: 'purple'
   }
 };

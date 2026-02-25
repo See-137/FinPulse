@@ -237,8 +237,8 @@ export const translations = {
 
     // Empty Portfolio
     emptyPortfolio: {
-      title: 'Your Portfolio Awaits',
-      description: 'Start tracking your investments. Add your first crypto, stock, or commodity to see real-time prices and analytics.',
+      title: 'Start Your First Pulse',
+      description: 'Your dashboard is waiting for a heartbeat. Add your first crypto, stock, or commodity to bring your portfolio to life.',
       cta: 'Capture Your First Asset',
       noFilterMatch: 'No assets match your filters.',
       allocationTitle: 'Start Building',
@@ -515,8 +515,8 @@ export const translations = {
 
     // Empty Portfolio
     emptyPortfolio: {
-      title: 'התיק שלך מחכה',
-      description: 'התחל לעקוב אחר ההשקעות שלך. הוסף את הקריפטו, המניה או הסחורה הראשונה שלך.',
+      title: 'התחל את הפולס הראשון שלך',
+      description: 'הדשבורד שלך מחכה לפעימה. הוסף את הקריפטו, המניה או הסחורה הראשונה שלך כדי להחיות את התיק.',
       cta: 'לכוד את הנכס הראשון שלך',
       noFilterMatch: 'אין נכסים שתואמים את המסננים.',
       allocationTitle: 'התחל לבנות',
