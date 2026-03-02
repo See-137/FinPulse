@@ -102,7 +102,10 @@ export class WhaleAlertAPI {
 
       return data.transactions.map(this.transformTransaction);
     } catch (error) {
-      console.error('Error fetching whale transactions:', error);
+      const isFetchError = error instanceof TypeError && error.message === 'Failed to fetch';
+      if (!isFetchError) {
+        console.error('Error fetching whale transactions:', error);
+      }
       throw error;
     }
   }
