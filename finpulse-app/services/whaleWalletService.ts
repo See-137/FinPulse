@@ -61,8 +61,11 @@ export class WhaleWalletService {
       this._lastResultWasMock = false;
       return cached;
     } catch (error) {
-      const isKeyMissing = error instanceof Error && error.message.includes('not configured');
-      if (!isKeyMissing) {
+      const isExpected = error instanceof Error && (
+        error.message.includes('not configured') ||
+        error.message === 'Failed to fetch'
+      );
+      if (!isExpected) {
         console.error(`[WhaleService] Cache/fetch failed for ${symbol}, falling back to mock:`, error);
       }
       this._lastResultWasMock = true;
@@ -80,8 +83,11 @@ export class WhaleWalletService {
 
       return this.calculateMetrics(symbol, transactions);
     } catch (error) {
-      const isKeyMissing = error instanceof Error && error.message.includes('not configured');
-      if (!isKeyMissing) {
+      const isExpected = error instanceof Error && (
+        error.message.includes('not configured') ||
+        error.message === 'Failed to fetch'
+      );
+      if (!isExpected) {
         console.error(`Error fetching whale metrics for ${symbol}:`, error);
       }
       // Fallback to mock data

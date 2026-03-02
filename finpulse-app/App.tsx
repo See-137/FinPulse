@@ -466,6 +466,22 @@ const AppContent: React.FC = () => {
           </div>
         </nav>
 
+        {/* Mobile bottom tab navigation - visible below lg breakpoint */}
+        <div className="lg:hidden flex items-center justify-around bg-white/80 dark:bg-[#0b0e14]/90 backdrop-blur-md border-t border-slate-200 dark:border-white/5 px-2 py-1.5 z-20 shrink-0">
+          <button onClick={() => setActiveTab('portfolio')} aria-label="View portfolio" className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all ${activeTab === 'portfolio' ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
+            <LayoutGrid className="w-4 h-4" aria-hidden="true" />
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('nav.mirror')}</span>
+          </button>
+          <button onClick={() => setActiveTab('watchlist')} aria-label="View watchlist" className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all ${activeTab === 'watchlist' ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
+            <Star className="w-4 h-4" aria-hidden="true" />
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('nav.watchlist')}</span>
+          </button>
+          <button onClick={() => setActiveTab('community')} aria-label="View community" className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all ${activeTab === 'community' ? 'text-[#00e5ff]' : 'text-slate-500'}`}>
+            <Users className="w-4 h-4" aria-hidden="true" />
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('nav.community')}</span>
+          </button>
+        </div>
+
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
           <div className="max-w-[1200px] mx-auto w-full">
             {activeTab === 'portfolio' && (
