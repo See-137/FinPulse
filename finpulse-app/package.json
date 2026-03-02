@@ -30,7 +30,7 @@
     "@types/dompurify": "^3.0.5",
     "bottleneck": "^2.19.5",
     "dompurify": "^3.3.1",
-    "lucide-react": "^0.447.0",
+    "lucide-react": "^0.575.0",
     "marked": "^17.0.1",
     "natural": "^8.1.0",
     "openai": "^6.16.0",
