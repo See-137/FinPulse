@@ -50,7 +50,7 @@ export class TwitterAPI {
     this.bearerToken = bearerToken || apiConfig.twitter.bearerToken || '';
 
     if (!this.bearerToken && !import.meta.env.PROD) {
-      console.log('Twitter Bearer Token not configured - using mock data'); // eslint-disable-line no-console
+      console.log('Twitter Bearer Token not configured - using mock data');
     }
   }
 
