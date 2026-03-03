@@ -12,33 +12,26 @@ const crypto = require('crypto');
 // Shared Utilities from Lambda Layer (with fallback)
 // =============================================================================
 
+// Load each Layer module independently so one missing module doesn't break the others
 let envValidator, requestContext, planConfig, jwtVerifier;
-try {
-  envValidator = require('/opt/nodejs/env-validator');
-  requestContext = require('/opt/nodejs/request-context');
-  planConfig = require('/opt/nodejs/plan-config');
-  jwtVerifier = require('/opt/nodejs/jwt-verifier');
-  console.log('[Payments] Loaded shared utilities from Lambda Layer');
-} catch (e) {
-  // Minimal fallbacks
-  envValidator = {
-    ensureEnvValidated: () => true,
-    getOptionalEnv: (name, def) => process.env[name] || def,
-  };
-  requestContext = {
-    createRequestContext: (event) => ({
-      requestId: event?.requestContext?.requestId || 'unknown',
-      logger: {
-        info: (msg, data) => console.log(JSON.stringify({ level: 'INFO', message: msg, ...data })),
-        error: (msg, data) => console.error(JSON.stringify({ level: 'ERROR', message: msg, ...data })),
-      },
-    }),
-    addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
-  };
-  planConfig = { PLAN_LIMITS: { FREE: { maxAssets: 20, maxAiQueries: 10 }, PROPULSE: { maxAssets: 50, maxAiQueries: 50 }, SUPERPULSE: { maxAssets: 9999, maxAiQueries: 9999 } }, getPlanLimits: (p) => planConfig.PLAN_LIMITS[(p || 'FREE').toUpperCase()] || planConfig.PLAN_LIMITS.FREE };
-  // CRITICAL: jwtVerifier is required for secure auth. If Layer is unavailable, fail-closed.
-  jwtVerifier = null;
-}
+
+// env-validator
+try { envValidator = require('/opt/nodejs/env-validator'); }
+catch (e) { envValidator = { ensureEnvValidated: () => true, getOptionalEnv: (name, def) => process.env[name] || def }; }
+
+// request-context
+try { requestContext = require('/opt/nodejs/request-context'); }
+catch (e) { requestContext = { createRequestContext: (event) => ({ requestId: event?.requestContext?.requestId || 'unknown', logger: { info: (msg, data) => console.log(JSON.stringify({ level: 'INFO', message: msg, ...data })), error: (msg, data) => console.error(JSON.stringify({ level: 'ERROR', message: msg, ...data })) } }), addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }) }; }
+
+// plan-config (optional — not all Layer versions include it)
+try { planConfig = require('/opt/nodejs/plan-config'); }
+catch (e) { planConfig = { PLAN_LIMITS: { FREE: { maxAssets: 20, maxAiQueries: 10 }, PROPULSE: { maxAssets: 50, maxAiQueries: 50 }, SUPERPULSE: { maxAssets: 9999, maxAiQueries: 9999 } }, getPlanLimits: (p) => planConfig.PLAN_LIMITS[(p || 'FREE').toUpperCase()] || planConfig.PLAN_LIMITS.FREE }; }
+
+// jwt-verifier (CRITICAL for auth — fail-closed if missing)
+try { jwtVerifier = require('/opt/nodejs/jwt-verifier'); }
+catch (e) { console.error('[Payments] jwt-verifier not available:', e.message); jwtVerifier = null; }
+
+console.log('[Payments] Layer modules loaded:', { envValidator: !!envValidator, requestContext: !!requestContext, planConfig: !!planConfig, jwtVerifier: !!jwtVerifier });
 
 // Validate environment at cold start
 try {
