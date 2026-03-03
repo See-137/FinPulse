@@ -59,6 +59,12 @@ variable "enable_twitter_service" {
   default     = true
 }
 
+variable "enable_payments_service" {
+  description = "Enable Payments service (LemonSqueezy subscription management)"
+  type        = bool
+  default     = true
+}
+
 variable "enable_nat_gateway" {
   description = "Enable NAT Gateway (required for Lambda internet access)"
   type        = bool

@@ -89,6 +89,13 @@ export const config = {
     news: import.meta.env.VITE_ENABLE_NEWS === 'true',
   },
   
+  // LemonSqueezy product variant IDs (public identifiers, not secrets)
+  // Override via VITE_LEMONSQUEEZY_VARIANT_* env vars for different environments
+  lemonSqueezy: {
+    variantPropulse: import.meta.env.VITE_LEMONSQUEEZY_VARIANT_PROPULSE || '1229771',
+    variantSuperpulse: import.meta.env.VITE_LEMONSQUEEZY_VARIANT_SUPERPULSE || '1229849',
+  },
+
   // API endpoints
   endpoints: {
     auth: '/auth',

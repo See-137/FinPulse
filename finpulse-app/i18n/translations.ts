@@ -263,7 +263,15 @@ export const translations = {
       securePayment: 'Secure payment powered by',
       cancelAnytime: 'Cancel anytime. No hidden fees.',
     },
-    
+
+    // Subscription Banners
+    subscription: {
+      pastDue: 'Payment failed — please update your payment method to avoid losing access.',
+      cancelled: 'Your plan will end on {date}. Resubscribe anytime to keep your features.',
+      updatePayment: 'Update Payment',
+      resubscribe: 'Resubscribe',
+    },
+
     // Changelog Modal
     changelog: {
       whatsNew: "What's New",
@@ -622,7 +630,15 @@ export const translations = {
       securePayment: 'תשלום מאובטח באמצעות',
       cancelAnytime: 'בטל בכל עת. ללא עמלות נסתרות.',
     },
-    
+
+    // Subscription Banners
+    subscription: {
+      pastDue: 'התשלום נכשל — אנא עדכן את אמצעי התשלום שלך כדי למנוע איבוד גישה.',
+      cancelled: 'התוכנית שלך תסתיים ב-{date}. הירשם מחדש בכל עת כדי לשמור על התכונות.',
+      updatePayment: 'עדכן תשלום',
+      resubscribe: 'הירשם מחדש',
+    },
+
     // Changelog Modal
     changelog: {
       whatsNew: 'מה חדש',

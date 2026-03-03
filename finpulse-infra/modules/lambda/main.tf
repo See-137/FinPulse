@@ -640,6 +640,50 @@ resource "aws_lambda_function" "twitter_service" {
 }
 
 
+# 10. Payments Service (LemonSqueezy)
+# NOTE: Not in VPC (doesn't need Redis, only needs DynamoDB + Secrets Manager + internet)
+# Uses x86_64 architecture (imported from manually created function)
+resource "aws_lambda_function" "payments_service" {
+  count = var.enable_payments_service ? 1 : 0
+
+  function_name = "${var.project_name}-payments-${var.environment}"
+  role          = aws_iam_role.lambda_execution.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  architectures = ["x86_64"]
+  timeout       = 30
+  memory_size   = 256
+
+  # Shared utilities layer
+  layers = local.shared_layer_arns
+
+  filename         = data.archive_file.placeholder.output_path
+  source_code_hash = data.archive_file.placeholder.output_base64sha256
+
+  environment {
+    variables = {
+      ENVIRONMENT    = var.environment
+      ALLOWED_ORIGIN = var.allowed_origin
+    }
+  }
+
+  tags = var.tags
+
+  lifecycle {
+    ignore_changes = [
+      filename,
+      source_code_hash,
+      s3_bucket,
+      s3_key,
+      s3_object_version,
+      architectures,
+      environment,
+      layers,
+    ]
+  }
+}
+
+
 # =============================================================================
 # CloudWatch Log Groups (with retention)
 # =============================================================================
@@ -697,6 +741,13 @@ resource "aws_cloudwatch_log_group" "community" {
 resource "aws_cloudwatch_log_group" "ai" {
   count             = var.enable_ai_service ? 1 : 0
   name              = "/aws/lambda/${aws_lambda_function.ai_service[0].function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "payments" {
+  count             = var.enable_payments_service ? 1 : 0
+  name              = "/aws/lambda/${aws_lambda_function.payments_service[0].function_name}"
   retention_in_days = var.log_retention_days
   tags              = var.tags
 }

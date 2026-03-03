@@ -25,11 +25,10 @@ const paymentLogger = createLogger('Payments');
 // API base URL
 const API_BASE_URL = config.apiUrl;
 
-// LemonSqueezy Variant IDs - these map to your products in LemonSqueezy
-// Get from: LemonSqueezy Dashboard > Store > Products > [Product] > Variants
+// LemonSqueezy Variant IDs - sourced from config (with env var override + hardcoded defaults)
 export const LEMONSQUEEZY_VARIANT_IDS: Record<Exclude<PlanType, 'FREE'>, string> = {
-  PROPULSE: import.meta.env.VITE_LEMONSQUEEZY_VARIANT_PROPULSE || '',
-  SUPERPULSE: import.meta.env.VITE_LEMONSQUEEZY_VARIANT_SUPERPULSE || ''
+  PROPULSE: config.lemonSqueezy.variantPropulse,
+  SUPERPULSE: config.lemonSqueezy.variantSuperpulse,
 };
 
 // Extend Window interface for LemonSqueezy.js

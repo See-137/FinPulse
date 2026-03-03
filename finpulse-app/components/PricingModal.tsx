@@ -47,7 +47,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
     try {
       const { url } = await createCheckoutSession(user.id, user.email, plan as Exclude<PlanType, 'FREE'>, isAnnual ? 'year' : 'month');
       
-      // Check if it's a demo URL (doesn't contain stripe.com)
+      // Check if it's a demo URL (contains demo_ in the URL)
       if (url.includes('demo_upgrade') || url.includes('demo_')) {
         setIsDemoMode(true);
         // In demo mode, immediately apply the plan change
@@ -65,7 +65,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
           window.location.href = url; // Navigate to show success
         }, 500);
       } else {
-        // Real Stripe checkout
+        // Real LemonSqueezy checkout
         window.location.href = url;
       }
     } catch (err) {
@@ -93,7 +93,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
   const plans = Object.entries(SaaS_PLANS) as [PlanType, typeof SaaS_PLANS.FREE][];
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div 
         className={`bg-[#0f1318] rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-white/10 shadow-2xl ${isRTL ? 'rtl' : 'ltr'}`}
         onClick={(e) => e.stopPropagation()}
@@ -167,7 +167,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
         {/* Footer */}
         <div className="p-6 border-t border-white/5 text-center">
           <p className="text-slate-500 text-sm">
-            {t('pricing.securePayment')} <span className="text-cyan-400">Stripe</span>
+            {t('pricing.securePayment')} <span className="text-cyan-400">LemonSqueezy</span>
           </p>
           <p className="text-slate-600 text-xs mt-2">
             {t('pricing.cancelAnytime')}

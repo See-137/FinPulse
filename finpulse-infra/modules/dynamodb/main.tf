@@ -401,6 +401,31 @@ resource "aws_dynamodb_table" "api_quota" {
 }
 
 # =============================================================================
+# Subscriptions Table (LemonSqueezy subscription tracking)
+# =============================================================================
+
+resource "aws_dynamodb_table" "subscriptions" {
+  name         = "${var.project_name}-subscriptions"
+  billing_mode = var.billing_mode
+  hash_key     = "userId"
+
+  attribute {
+    name = "userId"
+    type = "S"
+  }
+
+  point_in_time_recovery {
+    enabled = var.enable_pitr
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = var.tags
+}
+
+# =============================================================================
 # User Identities Table (for SSO / OAuth providers)
 # =============================================================================
 # Supports multiple identity providers per user (Google, Apple, etc.)

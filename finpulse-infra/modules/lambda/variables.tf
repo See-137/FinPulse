@@ -79,6 +79,12 @@ variable "enable_twitter_service" {
   default     = false
 }
 
+variable "enable_payments_service" {
+  description = "Enable Payments service Lambda (LemonSqueezy)"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

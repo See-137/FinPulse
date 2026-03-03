@@ -52,6 +52,12 @@ variable "enable_twitter_service" {
   default     = false
 }
 
+variable "enable_payments_service" {
+  description = "Enable Payments service endpoints (LemonSqueezy)"
+  type        = bool
+  default     = false
+}
+
 # Caching
 variable "enable_caching" {
   description = "Enable API Gateway caching"

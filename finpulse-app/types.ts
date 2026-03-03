@@ -19,7 +19,7 @@ export interface User {
     assets: number;
     maxAssets: number;
   };
-  subscriptionStatus: 'active' | 'past_due' | 'trialing' | 'none';
+  subscriptionStatus: 'active' | 'past_due' | 'cancelled' | 'trialing' | 'none';
 }
 
 export interface Holding {
