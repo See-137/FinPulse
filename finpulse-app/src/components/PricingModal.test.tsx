@@ -159,7 +159,7 @@ describe('PricingModal', () => {
 
   it('renders footer with secure payment and cancel info', () => {
     render(<PricingModal {...defaultProps} />);
-    expect(screen.getByText('Stripe')).toBeInTheDocument();
+    expect(screen.getByText('LemonSqueezy')).toBeInTheDocument();
     expect(screen.getByText('Cancel anytime. No hidden fees.')).toBeInTheDocument();
     expect(screen.getByText(/Not financial advice/)).toBeInTheDocument();
   });

@@ -7,6 +7,7 @@ import { LandingPage } from './components/LandingPage';
 import { Footer } from './components/Footer';
 import { NotificationBell } from './components/NotificationBell';
 import { TopBanner } from './components/TopBanner';
+import { SubscriptionBanner } from './components/SubscriptionBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator';
 import { GlobalErrorHandler } from './components/GlobalErrorHandler';
@@ -368,7 +369,8 @@ const AppContent: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 relative h-full">
         <MarketTicker currency={currency} />
         <TopBanner userPlan={user?.plan || 'FREE'} onNavigate={handleNavigate} />
-        
+        {user && <SubscriptionBanner user={user} />}
+
         <nav className="h-20 flex-shrink-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#0b0e14]/50 backdrop-blur-md z-20 transition-colors gap-2">
           <div className="flex items-center gap-4 sm:gap-8 overflow-hidden min-w-0">
             <Logo className="h-6 sm:h-8 shrink-0" />

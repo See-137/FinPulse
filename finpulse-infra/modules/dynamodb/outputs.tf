@@ -95,6 +95,7 @@ output "all_table_names" {
     aws_dynamodb_table.historical_prices.name,
     aws_dynamodb_table.api_quota.name,
     aws_dynamodb_table.identities.name,
+    aws_dynamodb_table.subscriptions.name,
   ]
 }
 
@@ -104,4 +105,12 @@ output "identities_table_name" {
 
 output "identities_table_arn" {
   value = aws_dynamodb_table.identities.arn
+}
+
+output "subscriptions_table_name" {
+  value = aws_dynamodb_table.subscriptions.name
+}
+
+output "subscriptions_table_arn" {
+  value = aws_dynamodb_table.subscriptions.arn
 }

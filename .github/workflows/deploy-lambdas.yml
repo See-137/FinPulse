@@ -49,6 +49,7 @@ on:
           - admin
           - ai
           - twitter
+          - payments
 
 env:
   AWS_REGION: us-east-1
@@ -73,7 +74,7 @@ jobs:
       - name: Detect changed functions
         id: set-matrix
         run: |
-          FUNCTIONS='["auth","portfolio","market-data","news","fx","community","admin","ai","twitter"]'
+          FUNCTIONS='["auth","portfolio","market-data","news","fx","community","admin","ai","twitter","payments"]'
 
           # If manual trigger with specific function
           if [[ "${{ github.event.inputs.function }}" != "" ]] && [[ "${{ github.event.inputs.function }}" != "all" ]]; then
@@ -92,7 +93,7 @@ jobs:
 
           # Auto-detect from git diff
           CHANGED_FUNCTIONS="[]"
-          for func in auth portfolio market-data news fx community admin ai twitter; do
+          for func in auth portfolio market-data news fx community admin ai twitter payments; do
             if git diff --name-only HEAD~1 HEAD | grep -q "finpulse-infra/lambda-code/$func/"; then
               CHANGED_FUNCTIONS=$(echo $CHANGED_FUNCTIONS | jq -c ". + [\"$func\"]")
             fi

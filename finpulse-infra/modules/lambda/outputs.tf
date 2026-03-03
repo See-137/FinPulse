@@ -26,6 +26,7 @@ output "function_arns" {
     news        = var.enable_news_service ? aws_lambda_function.news_service[0].arn : null
     community   = var.enable_community_service ? aws_lambda_function.community_service[0].arn : null
     twitter     = var.enable_twitter_service ? aws_lambda_function.twitter_service[0].arn : null
+    payments    = var.enable_payments_service ? aws_lambda_function.payments_service[0].arn : null
   }
 }
 
@@ -40,6 +41,7 @@ output "function_names" {
     news        = var.enable_news_service ? aws_lambda_function.news_service[0].function_name : null
     community   = var.enable_community_service ? aws_lambda_function.community_service[0].function_name : null
     twitter     = var.enable_twitter_service ? aws_lambda_function.twitter_service[0].function_name : null
+    payments    = var.enable_payments_service ? aws_lambda_function.payments_service[0].function_name : null
   }
 }
 
@@ -54,5 +56,6 @@ output "invoke_arns" {
     news        = var.enable_news_service ? aws_lambda_function.news_service[0].invoke_arn : null
     community   = var.enable_community_service ? aws_lambda_function.community_service[0].invoke_arn : null
     twitter     = var.enable_twitter_service ? aws_lambda_function.twitter_service[0].invoke_arn : null
+    payments    = var.enable_payments_service ? aws_lambda_function.payments_service[0].invoke_arn : null
   }
 }

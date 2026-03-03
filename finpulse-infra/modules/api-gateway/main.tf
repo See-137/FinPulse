@@ -536,6 +536,75 @@ resource "aws_lambda_permission" "community" {
 }
 
 # =============================================================================
+# Payments endpoints (optional - LemonSqueezy subscription management)
+# Webhook endpoint is PUBLIC (LemonSqueezy needs to call it)
+# All other endpoints have JWT auth handled at Lambda level
+# =============================================================================
+
+# /payments
+resource "aws_api_gateway_resource" "payments" {
+  count       = var.enable_payments_service ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "payments"
+}
+
+# /payments/{proxy+} - catch-all for sub-paths (checkout, portal, subscription, webhook)
+resource "aws_api_gateway_resource" "payments_proxy" {
+  count       = var.enable_payments_service ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.payments[0].id
+  path_part   = "{proxy+}"
+}
+
+# ANY /payments - base path (no API GW auth — Lambda handles auth internally for webhook vs authenticated routes)
+resource "aws_api_gateway_method" "payments_any" {
+  count         = var.enable_payments_service ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.payments[0].id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "payments_any" {
+  count                   = var.enable_payments_service ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.payments[0].id
+  http_method             = aws_api_gateway_method.payments_any[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["payments"]
+}
+
+# ANY /payments/{proxy+} - handles sub-paths (webhook, checkout, portal, subscription/{userId})
+resource "aws_api_gateway_method" "payments_proxy_any" {
+  count         = var.enable_payments_service ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.payments_proxy[0].id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "payments_proxy_any" {
+  count                   = var.enable_payments_service ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.payments_proxy[0].id
+  http_method             = aws_api_gateway_method.payments_proxy_any[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["payments"]
+}
+
+resource "aws_lambda_permission" "payments" {
+  count         = var.enable_payments_service ? 1 : 0
+  statement_id  = "AllowAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_function_names["payments"]
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*/*"
+}
+
+# =============================================================================
 # CORS Support
 # =============================================================================
 
@@ -566,11 +635,17 @@ locals {
     community_proxy = aws_api_gateway_resource.community_proxy[0].id
   } : {}
 
+  payments_cors_resources = var.enable_payments_service ? {
+    payments       = aws_api_gateway_resource.payments[0].id
+    payments_proxy = aws_api_gateway_resource.payments_proxy[0].id
+  } : {}
+
   cors_resources = merge(
     local.base_cors_resources,
     local.twitter_cors_resources,
     local.news_cors_resources,
     local.community_cors_resources,
+    local.payments_cors_resources,
   )
 }
 
@@ -720,6 +795,8 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_method.news_any,
       aws_api_gateway_method.community_any,
       aws_api_gateway_method.community_proxy_any,
+      aws_api_gateway_method.payments_any,
+      aws_api_gateway_method.payments_proxy_any,
       aws_api_gateway_method.options,
       aws_api_gateway_integration_response.options,
     ]))
@@ -742,6 +819,8 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.news_any,
     aws_api_gateway_integration.community_any,
     aws_api_gateway_integration.community_proxy_any,
+    aws_api_gateway_integration.payments_any,
+    aws_api_gateway_integration.payments_proxy_any,
   ]
 }
 

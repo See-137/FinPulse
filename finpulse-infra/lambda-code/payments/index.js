@@ -12,11 +12,12 @@ const crypto = require('crypto');
 // Shared Utilities from Lambda Layer (with fallback)
 // =============================================================================
 
-let envValidator, requestContext, planConfig;
+let envValidator, requestContext, planConfig, jwtVerifier;
 try {
   envValidator = require('/opt/nodejs/env-validator');
   requestContext = require('/opt/nodejs/request-context');
   planConfig = require('/opt/nodejs/plan-config');
+  jwtVerifier = require('/opt/nodejs/jwt-verifier');
   console.log('[Payments] Loaded shared utilities from Lambda Layer');
 } catch (e) {
   // Minimal fallbacks
@@ -35,6 +36,8 @@ try {
     addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
   };
   planConfig = { PLAN_LIMITS: { FREE: { maxAssets: 20, maxAiQueries: 10 }, PROPULSE: { maxAssets: 50, maxAiQueries: 50 }, SUPERPULSE: { maxAssets: 9999, maxAiQueries: 9999 } }, getPlanLimits: (p) => planConfig.PLAN_LIMITS[(p || 'FREE').toUpperCase()] || planConfig.PLAN_LIMITS.FREE };
+  // CRITICAL: jwtVerifier is required for secure auth. If Layer is unavailable, fail-closed.
+  jwtVerifier = null;
 }
 
 // Validate environment at cold start
@@ -118,47 +121,39 @@ function parseCookies(cookieHeader) {
 }
 
 /**
- * Decode JWT token (without signature verification)
- * API Gateway authorizer handles real verification
+ * Extract authenticated user ID from event (SECURE)
+ * Uses Layer's verifyJwt for cryptographic signature verification.
+ * Checks: API Gateway authorizer → cookies (verified) → Authorization header (verified)
+ * Returns null (fail-closed) if Layer is unavailable or token is invalid.
  */
-function decodeJwt(token) {
-  try {
-    const cleanToken = token.replace(/^Bearer\s+/i, '');
-    const parts = cleanToken.split('.');
-    if (parts.length !== 3) return null;
-    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
-    return JSON.parse(payload);
-  } catch (e) {
-    return null;
-  }
-}
-
-/**
- * Extract authenticated user ID from event
- * Checks: API Gateway authorizer → cookies → Authorization header
- */
-function getUserIdFromEvent(event) {
-  // From API Gateway Cognito authorizer (verified)
+async function getUserIdFromEvent(event) {
+  // Priority 1: API Gateway Cognito authorizer (already verified server-side)
   if (event.requestContext?.authorizer?.claims?.sub) {
     return event.requestContext.authorizer.claims.sub;
   }
 
-  // From httpOnly cookies
+  // Layer must be available for cookie/header auth paths
+  if (!jwtVerifier) {
+    console.error('[Payments] JWT verifier not available (Layer missing). Fail-closed.');
+    return null;
+  }
+
+  // Priority 2: From httpOnly cookies (cryptographically verified)
   const cookieHeader = event.headers?.Cookie || event.headers?.cookie;
   if (cookieHeader) {
     const cookies = parseCookies(cookieHeader);
     const idToken = cookies.finpulse_id_token;
     if (idToken) {
-      const claims = decodeJwt(idToken);
-      if (claims?.sub) return claims.sub;
+      const payload = await jwtVerifier.verifyJwt(idToken, 'id');
+      if (payload?.sub) return payload.sub;
     }
   }
 
-  // From Authorization header
+  // Priority 3: From Authorization header (cryptographically verified)
   const authHeader = event.headers?.Authorization || event.headers?.authorization;
   if (authHeader) {
-    const claims = decodeJwt(authHeader);
-    if (claims?.sub) return claims.sub;
+    const payload = await jwtVerifier.verifyJwt(authHeader, 'id');
+    if (payload?.sub) return payload.sub;
   }
 
   return null;
@@ -281,8 +276,8 @@ exports.handler = async (event) => {
       };
     }
 
-    // All other endpoints require authentication
-    const userId = getUserIdFromEvent(event);
+    // All other endpoints require authentication (JWT cryptographically verified)
+    const userId = await getUserIdFromEvent(event);
     if (!userId) {
       return {
         statusCode: 401,
@@ -342,6 +337,33 @@ exports.handler = async (event) => {
  */
 async function handleCreateCheckout(body) {
   const { userId, email, variantId, plan, successUrl, cancelUrl } = body;
+
+  // --- Input Validation ---
+  const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://finpulse.me';
+
+  // Validate redirect URLs (prevent open redirect / phishing)
+  if (successUrl && !successUrl.startsWith(ALLOWED_ORIGIN)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid success URL' }) };
+  }
+  if (cancelUrl && !cancelUrl.startsWith(ALLOWED_ORIGIN)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid cancel URL' }) };
+  }
+
+  // Validate variantId against known mapping (prevent arbitrary variant injection)
+  if (!variantId || !VARIANT_TO_PLAN[variantId]) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid variant ID' }) };
+  }
+
+  // Validate plan matches the variant (prevent plan mismatch)
+  const expectedPlan = VARIANT_TO_PLAN[variantId];
+  if (plan && plan !== expectedPlan) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Plan does not match variant' }) };
+  }
+
+  // Validate email format
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid email address' }) };
+  }
 
   // Create checkout via LemonSqueezy API
   const checkoutData = {
