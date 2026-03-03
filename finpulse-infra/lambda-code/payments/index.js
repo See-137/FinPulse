@@ -359,6 +359,7 @@ async function handleCreateCheckout(body) {
   }
 
   // Create checkout via LemonSqueezy API
+  // Docs: https://docs.lemonsqueezy.com/api/checkouts/create-checkout
   const checkoutData = {
     data: {
       type: 'checkouts',
@@ -370,8 +371,6 @@ async function handleCreateCheckout(body) {
           }
         },
         checkout_options: {
-          success_url: successUrl,
-          cancel_url: cancelUrl,
           button_color: '#00e5ff'
         },
         product_options: {
