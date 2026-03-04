@@ -79,6 +79,7 @@ export async function getPosts(options?: {
     const response = await fetch(url, {
       method: 'GET',
       headers: getAuthHeaders(),
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -88,7 +89,7 @@ export async function getPosts(options?: {
     return await response.json();
   } catch (error) {
     console.error('Error fetching posts:', error);
-    // Return mock data if API fails
+    // Return empty data if API fails
     return { success: true, data: [], count: 0 };
   }
 }
@@ -101,6 +102,7 @@ export async function getPost(postId: string): Promise<Post | null> {
     const response = await fetch(`${API_BASE}/community/posts/${postId}`, {
       method: 'GET',
       headers: getAuthHeaders(),
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -124,6 +126,7 @@ export async function createPost(content: string, type: string = 'discussion'): 
     const response = await fetch(`${API_BASE}/community/posts`, {
       method: 'POST',
       headers: getAuthHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ content, type }),
     });
 
@@ -147,6 +150,7 @@ export async function likePost(postId: string): Promise<{ liked: boolean; likes:
     const response = await fetch(`${API_BASE}/community/posts/${postId}/like`, {
       method: 'POST',
       headers: getAuthHeaders(),
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -169,6 +173,7 @@ export async function addComment(postId: string, content: string): Promise<Comme
     const response = await fetch(`${API_BASE}/community/posts/${postId}/comments`, {
       method: 'POST',
       headers: getAuthHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ content }),
     });
 
@@ -192,6 +197,7 @@ export async function deletePost(postId: string): Promise<boolean> {
     const response = await fetch(`${API_BASE}/community/posts/${postId}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
+      credentials: 'include',
     });
 
     return response.ok;
@@ -209,6 +215,7 @@ export async function getPostsByTicker(ticker: string): Promise<Post[]> {
     const response = await fetch(`${API_BASE}/community/ticker/${ticker}`, {
       method: 'GET',
       headers: getAuthHeaders(),
+      credentials: 'include',
     });
 
     if (!response.ok) {
