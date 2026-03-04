@@ -152,6 +152,14 @@ resource "aws_api_gateway_resource" "ai" {
   path_part   = "ai"
 }
 
+# /ai/{proxy+} - catch-all for AI sub-paths (query)
+resource "aws_api_gateway_resource" "ai_proxy" {
+  count       = var.enable_ai_service ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.ai[0].id
+  path_part   = "{proxy+}"
+}
+
 # /news (optional)
 resource "aws_api_gateway_resource" "news" {
   count       = var.enable_news_service ? 1 : 0
@@ -485,6 +493,57 @@ resource "aws_lambda_permission" "news" {
 }
 
 # =============================================================================
+# AI endpoints (optional - market intelligence)
+# =============================================================================
+
+# ANY /ai - base path
+resource "aws_api_gateway_method" "ai_any" {
+  count         = var.enable_ai_service ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.ai[0].id
+  http_method   = "ANY"
+  authorization = "NONE" # Lambda handles JWT auth internally
+}
+
+resource "aws_api_gateway_integration" "ai_any" {
+  count                   = var.enable_ai_service ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.ai[0].id
+  http_method             = aws_api_gateway_method.ai_any[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["ai"]
+}
+
+# ANY /ai/{proxy+} - handles sub-paths like /ai/query
+resource "aws_api_gateway_method" "ai_proxy_any" {
+  count         = var.enable_ai_service ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.ai_proxy[0].id
+  http_method   = "ANY"
+  authorization = "NONE" # Lambda handles JWT auth internally
+}
+
+resource "aws_api_gateway_integration" "ai_proxy_any" {
+  count                   = var.enable_ai_service ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.ai_proxy[0].id
+  http_method             = aws_api_gateway_method.ai_proxy_any[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_invoke_arns["ai"]
+}
+
+resource "aws_lambda_permission" "ai" {
+  count         = var.enable_ai_service ? 1 : 0
+  statement_id  = "AllowAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_function_names["ai"]
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*/*"
+}
+
+# =============================================================================
 # Community endpoints (optional - social features)
 # =============================================================================
 
@@ -621,6 +680,11 @@ locals {
   }
 
   # Optional CORS resources (conditional on feature flags)
+  ai_cors_resources = var.enable_ai_service ? {
+    ai       = aws_api_gateway_resource.ai[0].id
+    ai_proxy = aws_api_gateway_resource.ai_proxy[0].id
+  } : {}
+
   twitter_cors_resources = var.enable_twitter_service ? {
     twitter       = aws_api_gateway_resource.twitter[0].id
     twitter_proxy = aws_api_gateway_resource.twitter_proxy[0].id
@@ -642,6 +706,7 @@ locals {
 
   cors_resources = merge(
     local.base_cors_resources,
+    local.ai_cors_resources,
     local.twitter_cors_resources,
     local.news_cors_resources,
     local.community_cors_resources,
@@ -790,6 +855,8 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_method.auth_any,
       aws_api_gateway_method.auth_proxy_any,
       aws_api_gateway_method.admin_any,
+      aws_api_gateway_method.ai_any,
+      aws_api_gateway_method.ai_proxy_any,
       aws_api_gateway_method.twitter_any,
       aws_api_gateway_method.twitter_proxy_any,
       aws_api_gateway_method.news_any,
@@ -814,6 +881,8 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.portfolio_any,
     aws_api_gateway_integration.auth_any,
     aws_api_gateway_integration.admin_any,
+    aws_api_gateway_integration.ai_any,
+    aws_api_gateway_integration.ai_proxy_any,
     aws_api_gateway_integration.twitter_any,
     aws_api_gateway_integration.twitter_proxy_any,
     aws_api_gateway_integration.news_any,
