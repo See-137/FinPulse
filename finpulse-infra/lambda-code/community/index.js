@@ -484,17 +484,22 @@ exports.handler = async (event) => {
     // POST /community/posts - Create post
     if (path.endsWith('/posts') && method === 'POST') {
       // Rate limit check using Redis for distributed limiting
-      const rateLimit = await redisCache.checkRateLimit(`${user.userId}:create_post`, 10, 60);
-      if (!rateLimit.allowed) {
-        return {
-          statusCode: 429,
-          headers: { ...corsHeaders, 'Retry-After': String(rateLimit.resetIn) },
-          body: JSON.stringify({ 
-            success: false, 
-            error: 'Rate limit exceeded. Please try again later.',
-            retryAfter: rateLimit.resetIn
-          })
-        };
+      // Wrapped in try/catch: if Redis is unreachable, allow the request (fail-open for rate limiting)
+      try {
+        const rateLimit = await redisCache.checkRateLimit(`${user.userId}:create_post`, 10, 60);
+        if (!rateLimit.allowed) {
+          return {
+            statusCode: 429,
+            headers: { ...corsHeaders, 'Retry-After': String(rateLimit.resetIn) },
+            body: JSON.stringify({
+              success: false,
+              error: 'Rate limit exceeded. Please try again later.',
+              retryAfter: rateLimit.resetIn
+            })
+          };
+        }
+      } catch (rateLimitErr) {
+        console.warn('[Community] Rate limit check failed (Redis unreachable), allowing request:', rateLimitErr.message);
       }
 
       // Validate input
@@ -537,17 +542,22 @@ exports.handler = async (event) => {
       const postId = pathParams.postId || path.split('/')[path.split('/').indexOf('posts') + 1];
 
       // Rate limit check using Redis for distributed limiting
-      const rateLimit = await redisCache.checkRateLimit(`${user.userId}:add_comment`, 30, 60);
-      if (!rateLimit.allowed) {
-        return {
-          statusCode: 429,
-          headers: { ...corsHeaders, 'Retry-After': String(rateLimit.resetIn) },
-          body: JSON.stringify({ 
-            success: false, 
-            error: 'Rate limit exceeded. Please try again later.',
-            retryAfter: rateLimit.resetIn
-          })
-        };
+      // Wrapped in try/catch: if Redis is unreachable, allow the request (fail-open for rate limiting)
+      try {
+        const rateLimit = await redisCache.checkRateLimit(`${user.userId}:add_comment`, 30, 60);
+        if (!rateLimit.allowed) {
+          return {
+            statusCode: 429,
+            headers: { ...corsHeaders, 'Retry-After': String(rateLimit.resetIn) },
+            body: JSON.stringify({
+              success: false,
+              error: 'Rate limit exceeded. Please try again later.',
+              retryAfter: rateLimit.resetIn
+            })
+          };
+        }
+      } catch (rateLimitErr) {
+        console.warn('[Community] Rate limit check failed (Redis unreachable), allowing request:', rateLimitErr.message);
       }
 
       // Validate input

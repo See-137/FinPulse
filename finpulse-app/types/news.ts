@@ -88,6 +88,18 @@ export const SYMBOL_KEYWORDS: Record<string, string[]> = {
   'MA': ['mastercard', 'ma'],
 };
 
+// Category-to-asset-type mapping for broader matching
+const CATEGORY_ASSET_TYPES: Record<string, string[]> = {
+  'crypto': ['BTC', 'ETH', 'SOL', 'AVAX', 'DOGE', 'XRP', 'ADA', 'DOT', 'LINK', 'MATIC', 'ATOM', 'UNI', 'LTC', 'SHIB', 'DN', 'LAVA', 'PAXG'],
+  'cryptocurrency': ['BTC', 'ETH', 'SOL', 'AVAX', 'DOGE', 'XRP', 'ADA', 'DOT', 'LINK', 'MATIC', 'ATOM', 'UNI', 'LTC', 'SHIB', 'DN', 'LAVA', 'PAXG'],
+  'blockchain': ['BTC', 'ETH', 'SOL', 'AVAX', 'DOGE', 'XRP', 'ADA', 'DOT', 'LINK', 'MATIC', 'ATOM', 'UNI', 'LTC', 'SHIB', 'DN', 'LAVA', 'PAXG'],
+  'commodities': ['GLD', 'SLV', 'USO', 'UNG', 'PAXG'],
+  'gold': ['GLD', 'PAXG'],
+  'silver': ['SLV'],
+  'technology': ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'META', 'AMD', 'INTC', 'PLTR', 'CRM'],
+  'finance': ['JPM', 'V', 'MA', 'PYPL', 'SQ', 'COIN'],
+};
+
 // Filter articles based on user's holdings
 export const filterArticlesByHoldings = (
   articles: NewsArticle[],
@@ -95,13 +107,27 @@ export const filterArticlesByHoldings = (
 ): NewsArticle[] => {
   if (symbols.length === 0) return [];
 
+  const upperSymbols = new Set(symbols.map(s => s.toUpperCase()));
+
   return articles.filter(article => {
     const text = `${article.title} ${article.description} ${article.category}`.toLowerCase();
-    return symbols.some(symbol => {
-      const upperSymbol = symbol.toUpperCase();
-      const keywords = SYMBOL_KEYWORDS[upperSymbol] || [symbol.toLowerCase()];
+
+    // 1. Direct keyword match (existing logic)
+    const keywordMatch = symbols.some(symbol => {
+      const upper = symbol.toUpperCase();
+      const keywords = SYMBOL_KEYWORDS[upper] || [symbol.toLowerCase()];
       return keywords.some(kw => text.includes(kw.toLowerCase()));
     });
+    if (keywordMatch) return true;
+
+    // 2. Category-based match: if article category maps to an asset type the user holds
+    const category = (article.category || '').toLowerCase();
+    const categorySymbols = CATEGORY_ASSET_TYPES[category];
+    if (categorySymbols) {
+      return categorySymbols.some(sym => upperSymbols.has(sym));
+    }
+
+    return false;
   });
 };
 
