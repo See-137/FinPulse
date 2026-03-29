@@ -1,0 +1,22 @@
+# README enforcement caller workflow.
+# Calls the reusable workflow from See-137/.github.
+
+name: README Check
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Weekly check: Monday 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+jobs:
+  readme-enforcement:
+    uses: See-137/.github/.github/workflows/readme-enforcement.yml@main
+    with:
+      template_style: standard
+      dry_run: false
+    permissions:
+      contents: write
