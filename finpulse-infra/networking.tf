@@ -84,6 +84,9 @@ resource "aws_nat_gateway" "main" {
   })
 
   depends_on = [aws_internet_gateway.main]
+  lifecycle {
+    ignore_changes = [] # No ignore_changes - delete the redundant second NAT
+  }
 }
 
 # =============================================================================
