@@ -40,3 +40,6 @@ finpulse-infra/sam/
 
 # Windows artifacts
 nul
+
+# Legacy/archived snapshots kept locally only — never tracked
+Finpulse early versions/
