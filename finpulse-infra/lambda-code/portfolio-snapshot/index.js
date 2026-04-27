@@ -10,7 +10,7 @@
  */
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, ScanCommand, PutCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, ScanCommand, QueryCommand, PutCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
 const https = require('https');
 
 // Environment
@@ -97,16 +97,25 @@ async function getUsersWithHoldings() {
 }
 
 /**
- * Get holdings for a user
+ * Get holdings for a user.
+ * Portfolio table key schema is (userId HASH, assetId RANGE), so a Query keyed on
+ * userId is O(holdings_for_user) — replaces the prior O(table) Scan + filter.
  */
 async function getUserHoldings(userId) {
   const db = getDocClient();
-  const result = await db.send(new ScanCommand({
-    TableName: PORTFOLIO_TABLE,
-    FilterExpression: 'userId = :uid',
-    ExpressionAttributeValues: { ':uid': userId }
-  }));
-  return result.Items || [];
+  const items = [];
+  let lastKey;
+  do {
+    const result = await db.send(new QueryCommand({
+      TableName: PORTFOLIO_TABLE,
+      KeyConditionExpression: 'userId = :uid',
+      ExpressionAttributeValues: { ':uid': userId },
+      ...(lastKey && { ExclusiveStartKey: lastKey }),
+    }));
+    if (result.Items) items.push(...result.Items);
+    lastKey = result.LastEvaluatedKey;
+  } while (lastKey);
+  return items;
 }
 
 /**

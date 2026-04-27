@@ -4,38 +4,23 @@
  */
 
 // =============================================================================
-// Shared Utilities from Lambda Layer (with fallback)
+// Shared Utilities from Lambda Layer
+// Each module loads independently so a single missing module can't break the others
+// (see commit a4f3c06 / CLAUDE.md §11).
 // =============================================================================
 
-let envValidator, requestContext, validation, redisCache;
-try {
-  envValidator = require('/opt/nodejs/env-validator');
-  requestContext = require('/opt/nodejs/request-context');
-  validation = require('/opt/nodejs/validation');
-  redisCache = require('/opt/nodejs/redis-cache');
-  console.log('[Community] Loaded shared utilities from Lambda Layer');
-} catch (e) {
-  // Fallback to local shared directory
-  try {
-    validation = require('./shared/validation');
-    redisCache = require('./shared/redis-cache');
-    console.log('[Community] Loaded shared utilities from local shared');
-  } catch (e2) {
-    // Minimal fallbacks
-    validation = {
-      validatePost: (input) => ({ valid: true, data: input }),
-      validateComment: (input) => ({ valid: true, data: input }),
-      sanitizeString: (str) => str,
-      checkRateLimit: () => ({ allowed: true, remaining: 100 })
-    };
-    redisCache = {
-      checkRateLimit: async () => ({ allowed: true, remaining: 100, resetIn: 60 })
-    };
-  }
+let envValidator, requestContext, validation, redisCache, jwtVerifier;
+
+try { envValidator = require('/opt/nodejs/env-validator'); }
+catch (e) {
   envValidator = {
     ensureEnvValidated: () => true,
     getOptionalEnv: (name, def) => process.env[name] || def,
   };
+}
+
+try { requestContext = require('/opt/nodejs/request-context'); }
+catch (e) {
   requestContext = {
     createRequestContext: (event) => ({
       requestId: event?.requestContext?.requestId || 'unknown',
@@ -47,6 +32,41 @@ try {
     addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
   };
 }
+
+try { validation = require('/opt/nodejs/validation'); }
+catch (e) {
+  try { validation = require('./shared/validation'); }
+  catch (e2) {
+    validation = {
+      validatePost: (input) => ({ valid: true, data: input }),
+      validateComment: (input) => ({ valid: true, data: input }),
+      sanitizeString: (str) => str,
+      checkRateLimit: () => ({ allowed: true, remaining: 100 })
+    };
+  }
+}
+
+try { redisCache = require('/opt/nodejs/redis-cache'); }
+catch (e) {
+  try { redisCache = require('./shared/redis-cache'); }
+  catch (e2) {
+    redisCache = {
+      checkRateLimit: async () => ({ allowed: true, remaining: 100, resetIn: 60 })
+    };
+  }
+}
+
+// jwt-verifier is CRITICAL for auth on cookie/header paths — fail-closed if missing
+try { jwtVerifier = require('/opt/nodejs/jwt-verifier'); }
+catch (e) { console.error('[Community] jwt-verifier not available:', e.message); jwtVerifier = null; }
+
+console.log('[Community] Layer modules loaded:', {
+  envValidator: !!envValidator,
+  requestContext: !!requestContext,
+  validation: !!validation,
+  redisCache: !!redisCache,
+  jwtVerifier: !!jwtVerifier,
+});
 
 // Validate environment at cold start
 try {
@@ -106,75 +126,74 @@ function parseCookies(cookieHeader) {
 }
 
 /**
- * Decode JWT token (without validation - API Gateway validates)
+ * Title-case a name derived from an email local-part: "ada.lovelace" -> "Ada Lovelace"
  */
-function decodeJwt(token) {
-  try {
-    const cleanToken = token.replace(/^Bearer\s+/i, '');
-    const parts = cleanToken.split('.');
-    if (parts.length !== 3) return null;
-    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
-    return JSON.parse(payload);
-  } catch (e) {
-    return null;
-  }
+function deriveNameFromEmail(email) {
+  if (!email) return null;
+  return email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 /**
- * Extract user from event (supports cookies, headers, and authorizer)
+ * Extract authenticated user from event (SECURE).
+ * Cookie / Authorization-header paths cryptographically verify the JWT via the Lambda Layer.
+ * Fails closed if the verifier Layer module is missing.
  */
-function getUserFromEvent(event) {
-  // From API Gateway with Cognito authorizer
+async function getUserFromEvent(event) {
+  // Priority 1: API Gateway Cognito authorizer (already verified server-side)
   if (event.requestContext?.authorizer?.claims) {
+    const claims = event.requestContext.authorizer.claims;
     return {
-      userId: event.requestContext.authorizer.claims.sub,
-      email: event.requestContext.authorizer.claims.email,
-      name: event.requestContext.authorizer.claims.name || event.requestContext.authorizer.claims.email?.split('@')[0]
+      userId: claims.sub,
+      email: claims.email || null,
+      name: claims.name || deriveNameFromEmail(claims.email) || claims['cognito:username'] || null,
     };
   }
-  
-  // From httpOnly cookies (preferred for security)
+
+  // Priority 2: dev/staging-only test bypass (NEVER in prod)
+  if (process.env.ENVIRONMENT !== 'prod' && event.headers?.['x-user-id']) {
+    return {
+      userId: event.headers['x-user-id'],
+      email: event.headers['x-user-email'] || 'test@example.com',
+      name: event.headers['x-user-name'] || 'Test User',
+    };
+  }
+
+  // Layer must be available for cookie/header auth paths — fail-closed
+  if (!jwtVerifier) {
+    console.error('[Community] JWT verifier not available (Layer missing). Fail-closed.');
+    return null;
+  }
+
+  // Priority 3: cookie (cryptographically verified)
   const cookieHeader = event.headers?.Cookie || event.headers?.cookie;
   if (cookieHeader) {
     const cookies = parseCookies(cookieHeader);
     const idToken = cookies.finpulse_id_token;
     if (idToken) {
-      const claims = decodeJwt(idToken);
-      if (claims?.sub) {
-        const email = claims.email || null;
-        const derivedName = email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
+      const payload = await jwtVerifier.verifyJwt(idToken, 'id');
+      if (payload?.sub) {
         return {
-          userId: claims.sub,
-          email: email,
-          name: claims.name || derivedName || claims['cognito:username']
+          userId: payload.sub,
+          email: payload.email || null,
+          name: payload.name || deriveNameFromEmail(payload.email) || payload['cognito:username'] || null,
         };
       }
     }
   }
-  
-  // From Authorization header (backward compatibility)
+
+  // Priority 4: Authorization header (cryptographically verified)
   const authHeader = event.headers?.Authorization || event.headers?.authorization;
   if (authHeader) {
-    const claims = decodeJwt(authHeader);
-    if (claims?.sub) {
-      const email = claims.email || null;
-      const derivedName = email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
+    const payload = await jwtVerifier.verifyJwt(authHeader, 'id');
+    if (payload?.sub) {
       return {
-        userId: claims.sub,
-        email: email,
-        name: claims.name || derivedName || claims['cognito:username']
+        userId: payload.sub,
+        email: payload.email || null,
+        name: payload.name || deriveNameFromEmail(payload.email) || payload['cognito:username'] || null,
       };
     }
   }
-  
-  // For testing (dev/staging only)
-  if (process.env.ENVIRONMENT !== 'prod' && event.headers?.['x-user-id']) {
-    return {
-      userId: event.headers['x-user-id'],
-      email: event.headers['x-user-email'] || 'test@example.com',
-      name: event.headers['x-user-name'] || 'Test User'
-    };
-  }
+
   return null;
 }
 
@@ -472,7 +491,7 @@ exports.handler = async (event) => {
     }
 
     // Protected endpoints (auth required)
-    const user = getUserFromEvent(event);
+    const user = await getUserFromEvent(event);
     if (!user && ['POST', 'PUT', 'DELETE'].includes(method)) {
       return {
         statusCode: 401,

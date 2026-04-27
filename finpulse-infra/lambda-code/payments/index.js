@@ -598,8 +598,14 @@ async function handleWebhook(event) {
 
   console.log('Webhook event:', eventName);
 
-  // Idempotency check — prevent duplicate processing on webhook retries
-  const idempotencyKey = `${eventName}:${data.id}:${data.attributes?.updated_at || 'unknown'}`;
+  // Idempotency check — prevent duplicate processing on webhook retries.
+  // Prefer LemonSqueezy's per-delivery webhook id (covered by the HMAC
+  // signature, so it can't be tampered with). Fall back to a composite
+  // key if older deliveries don't carry meta.webhook_id.
+  const webhookId = payload.meta?.webhook_id;
+  const idempotencyKey = webhookId
+    ? `lsq:${webhookId}`
+    : `${eventName}:${data.id}:${data.attributes?.updated_at || 'unknown'}`;
   if (await isWebhookProcessed(idempotencyKey)) {
     console.log('Webhook already processed, skipping:', idempotencyKey);
     return {
