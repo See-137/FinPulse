@@ -19,10 +19,13 @@ jobs:
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
     runs-on: ubuntu-latest
-    # Non-blocking: the auto-review is advisory. Auth/plugin/marketplace
-    # issues here shouldn't block PR merge — required-check status is
-    # carried by ci.yml + security.yml.
-    continue-on-error: true
+    # The auto-review is advisory. The job-level continue-on-error below stops
+    # a step failure from failing the workflow, but the *check_run* status of
+    # this job is what branch protection inspects — and a job-level setting
+    # alone doesn't change that. Step-level continue-on-error on the actual
+    # action step is what makes the job (and its check_run) report success
+    # even when the action itself errors. Required-check status is carried
+    # by ci.yml + security.yml.
     permissions:
       contents: read
       pull-requests: read
@@ -38,6 +41,7 @@ jobs:
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
+        continue-on-error: true
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
