@@ -160,6 +160,15 @@ const AppContent: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isAuthInitializing, isOAuthProcessing]);
 
+  // Bounce back to landing if dashboard view is requested without a user
+  // (effect, not render-time setState — the latter triggers a React warning
+  // in concurrent mode and causes unpredictable re-render cycles).
+  useEffect(() => {
+    if (view === 'dashboard' && !user) {
+      setView('landing');
+    }
+  }, [view, user]);
+
   // Handle demo_upgrade parameter from pricing modal
   useEffect(() => {
     if (!user) return;
@@ -358,9 +367,8 @@ const AppContent: React.FC = () => {
     </ErrorBoundary>
   );
 
-  // Safety check
+  // Safety check — useEffect above handles the view reset; render nothing this tick
   if (view === 'dashboard' && !user) {
-    setView('landing');
     return null;
   }
 

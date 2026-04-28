@@ -36,7 +36,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
         'span', 'div'
       ],
       ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
-      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+      // Restrict URI schemes: https/http/mailto/tel and only image data: URIs.
+      // The previous regex (`[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$)`) allowed any
+      // non-letter-prefixed URI, which permitted javascript: and data:text/html.
+      ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|data:image\/(?:png|jpeg|gif|webp);)/i,
     });
 
     // Apply custom styling classes

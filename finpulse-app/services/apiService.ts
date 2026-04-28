@@ -3,6 +3,7 @@
 
 import { config } from '../config';
 import { apiLogger } from './logger';
+import { tokenStorage } from './tokenStorage';
 
 interface ApiResponse<T> {
   data?: T;
@@ -12,25 +13,19 @@ interface ApiResponse<T> {
 
 class ApiService {
   private baseUrl: string;
-  private idToken: string | null = null;
 
   constructor() {
     this.baseUrl = config.apiUrl;
-    // Restore Cognito idToken from localStorage
-    this.idToken = localStorage.getItem('finpulse_id_token');
   }
 
   /**
    * Set Cognito ID token for subsequent API calls
-   * Called after successful Cognito authentication
+   * Called after successful Cognito authentication.
+   * Delegates to tokenStorage so we have one source of truth for the storage
+   * key and (future) cookie-mode handling.
    */
   setIdToken(token: string | null) {
-    this.idToken = token;
-    if (token) {
-      localStorage.setItem('finpulse_id_token', token);
-    } else {
-      localStorage.removeItem('finpulse_id_token');
-    }
+    tokenStorage.setIdToken(token);
   }
 
   /**
@@ -50,9 +45,12 @@ class ApiService {
       ...options.headers,
     };
 
-    // Step 5: Auto-include idToken in all API requests with Bearer prefix
-    if (this.idToken) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.idToken}`;
+    // Auto-include idToken in all API requests with Bearer prefix.
+    // Read fresh from tokenStorage on every request so token rotation
+    // (refresh / logout / login) is picked up without restarting the service.
+    const idToken = tokenStorage.getIdToken();
+    if (idToken) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${idToken}`;
     }
 
     return headers;
