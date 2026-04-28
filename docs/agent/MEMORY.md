@@ -43,6 +43,15 @@ Subscribe to PR activity (`mcp__github__subscribe_pr_activity`) on every PR I
 open so CI failures and auto-reviewer comments route into the active session
 for autonomous response.
 
+**Honest constraint on PR-watching:** the webhook subscription only delivers
+events into an *active* session. If the conversation idles or the session
+ends, events stop routing — I won't see CI completion or new review comments
+hours later. Don't promise the operator that I'll ping when CI finishes
+unless I will actually still be in-session at that point. If they ask "what's
+the status?" hours after the last action, treat that as the trigger to
+re-fetch state via `pull_request_read get_check_runs` rather than relying
+on remembered notifications.
+
 ---
 
 ## Project Structure
