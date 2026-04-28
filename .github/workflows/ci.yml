@@ -17,6 +17,11 @@ concurrency:
 env:
   NODE_VERSION: '20'
 
+# Tighten the default GITHUB_TOKEN scope: read-only at the workflow level.
+# CI doesn't push commits, write issues, or modify PRs.
+permissions:
+  contents: read
+
 jobs:
   # ============================================
   # Frontend CI
@@ -145,9 +150,16 @@ jobs:
           terraform_version: '1.6.0'
 
       - name: Terraform Format Check
+        id: fmt
         run: terraform fmt -check -recursive
         working-directory: finpulse-infra
         continue-on-error: true
+
+      - name: Format Status
+        if: steps.fmt.outcome == 'failure'
+        run: |
+          echo "::error::Terraform files are not properly formatted. Run 'terraform fmt -recursive' locally."
+          exit 1
 
       - name: Terraform Init
         run: terraform init -backend=false

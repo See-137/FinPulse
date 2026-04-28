@@ -30,6 +30,11 @@ env:
   AWS_REGION: us-east-1
   NODE_VERSION: '20'
 
+# Default to read-only at the workflow level. Deploy steps don't need any
+# write GITHUB_TOKEN scopes (AWS auth handled by configure-aws-credentials).
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: finpulse-app
