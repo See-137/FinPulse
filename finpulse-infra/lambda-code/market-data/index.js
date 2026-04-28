@@ -23,24 +23,25 @@
 // Shared Utilities from Lambda Layer (with fallback)
 // =============================================================================
 
-// Environment validator - checks required env vars at cold start
+// Environment validator + request context — each module loads independently
+// so a single missing module can't break the others (CLAUDE.md §11).
 let envValidator, requestContext;
-try {
-  envValidator = require('/opt/nodejs/env-validator');
-  requestContext = require('/opt/nodejs/request-context');
-  console.log('[MarketData] Loaded shared utilities from Lambda Layer');
-} catch (e) {
-  // Fallback to local shared directory for local development
-  try {
-    envValidator = require('../shared/env-validator');
-    requestContext = require('../shared/request-context');
-    console.log('[MarketData] Loaded shared utilities from local shared');
-  } catch (e2) {
-    // Minimal fallback if neither available
+
+try { envValidator = require('/opt/nodejs/env-validator'); }
+catch (e) {
+  try { envValidator = require('../shared/env-validator'); }
+  catch (e2) {
     envValidator = {
       ensureEnvValidated: () => true,
       getOptionalEnv: (name, def) => process.env[name] || def,
     };
+  }
+}
+
+try { requestContext = require('/opt/nodejs/request-context'); }
+catch (e) {
+  try { requestContext = require('../shared/request-context'); }
+  catch (e2) {
     requestContext = {
       createRequestContext: (event) => ({
         requestId: event?.requestContext?.requestId || 'unknown',
@@ -54,6 +55,11 @@ try {
     };
   }
 }
+
+console.log('[MarketData] Layer modules loaded:', {
+  envValidator: !!envValidator,
+  requestContext: !!requestContext,
+});
 
 // Validate environment at cold start
 try {

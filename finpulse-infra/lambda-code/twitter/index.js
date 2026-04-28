@@ -311,10 +311,14 @@ async function searchTweets(usernames, keywords, maxResults = 20) {
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, maxResults);
 
-    // Write to both caches on success (DynamoDB write is fire-and-forget)
+    // Write to both caches on success.
+    // Await the DynamoDB put — Lambda freezes the runtime between invocations,
+    // so an unawaited promise can be dropped before the write actually flushes,
+    // leaving the cache unpopulated and re-spending Twitter API quota next call.
+    // ddbPut has its own try/catch so a DDB failure won't bubble up.
     if (uniqueTweets.length > 0) {
         tweetsCache.set(cacheKey, { data: uniqueTweets, timestamp: Date.now() });
-        ddbPut(cacheKey, uniqueTweets, DDB_CACHE_TTL_SECONDS); // intentionally not awaited
+        await ddbPut(cacheKey, uniqueTweets, DDB_CACHE_TTL_SECONDS);
     }
 
     return uniqueTweets;

@@ -4,21 +4,23 @@
  */
 
 // =============================================================================
-// Shared Utilities from Lambda Layer (with fallback)
+// Shared Utilities from Lambda Layer
+// Each module loads in its own try/catch so a single missing module can't
+// take down jwt-verifier or env-validator (CLAUDE.md §11; cf. commit a4f3c06).
 // =============================================================================
 
 let envValidator, requestContext, jwtVerifier;
-try {
-  envValidator = require('/opt/nodejs/env-validator');
-  requestContext = require('/opt/nodejs/request-context');
-  jwtVerifier = require('/opt/nodejs/jwt-verifier');
-  console.log('[Admin] Loaded shared utilities from Lambda Layer');
-} catch (e) {
-  // Minimal fallbacks
+
+try { envValidator = require('/opt/nodejs/env-validator'); }
+catch (e) {
   envValidator = {
     ensureEnvValidated: () => true,
     getOptionalEnv: (name, def) => process.env[name] || def,
   };
+}
+
+try { requestContext = require('/opt/nodejs/request-context'); }
+catch (e) {
   requestContext = {
     createRequestContext: (event) => ({
       requestId: event?.requestContext?.requestId || 'unknown',
@@ -31,6 +33,16 @@ try {
     addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
   };
 }
+
+// jwt-verifier is CRITICAL for admin auth — fail-closed if missing
+try { jwtVerifier = require('/opt/nodejs/jwt-verifier'); }
+catch (e) { console.error('[Admin] jwt-verifier not available:', e.message); jwtVerifier = null; }
+
+console.log('[Admin] Layer modules loaded:', {
+  envValidator: !!envValidator,
+  requestContext: !!requestContext,
+  jwtVerifier: !!jwtVerifier,
+});
 
 // Validate environment at cold start
 try {
