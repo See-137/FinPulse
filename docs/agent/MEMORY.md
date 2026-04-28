@@ -52,6 +52,22 @@ the status?" hours after the last action, treat that as the trigger to
 re-fetch state via `pull_request_read get_check_runs` rather than relying
 on remembered notifications.
 
+### `continue-on-error`: step vs job (gotcha)
+
+`continue-on-error: true` on a **job** prevents a job failure from failing
+the *workflow run* — but the **check_run** that branch protection inspects
+still reflects the job's actual outcome. PRs stay `blocked` even when the
+workflow shows success.
+
+`continue-on-error: true` on a **step** lets the step fail without failing
+the job. The job reports success, the check_run reports success, branch
+protection unblocks.
+
+When you want a flaky/advisory action to not block merge, put
+`continue-on-error: true` on the **step that runs the action**, not on the
+job. The job-level setting is rarely what you actually want for required
+checks.
+
 ---
 
 ## Project Structure
