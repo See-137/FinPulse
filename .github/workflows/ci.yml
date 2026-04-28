@@ -26,12 +26,14 @@ jobs:
   # ============================================
   # Frontend CI
   # ============================================
+  # Always runs. Path-based skipping was previously gated on
+  # `contains(github.event.pull_request.changed_files, 'finpulse-app/')`,
+  # but `pull_request.changed_files` is the integer count of changed files,
+  # not a list of paths — so the filter always evaluated to false and these
+  # jobs silently skipped on every PR. Always-on is simpler and ~3 min total.
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.changed_files, 'finpulse-app/')
 
     defaults:
       run:
@@ -94,9 +96,6 @@ jobs:
   lambda:
     name: Lambda
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.changed_files, 'finpulse-infra/lambda-code/')
 
     steps:
       - name: Checkout code
@@ -136,9 +135,6 @@ jobs:
   terraform:
     name: Terraform
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.changed_files, 'finpulse-infra/')
 
     steps:
       - name: Checkout code
@@ -172,6 +168,9 @@ jobs:
   # ============================================
   # All Checks Passed (for branch protection)
   # ============================================
+  # Fails on any non-success result — including `skipped` and `cancelled`.
+  # The previous version only checked for `failure`, which let `skipped`
+  # masquerade as green when the upstream `if:` filters silently no-op'd.
   ci-complete:
     name: CI Complete
     runs-on: ubuntu-latest
@@ -181,10 +180,19 @@ jobs:
     steps:
       - name: Check results
         run: |
-          if [[ "${{ needs.frontend.result }}" == "failure" ]] || \
-             [[ "${{ needs.lambda.result }}" == "failure" ]] || \
-             [[ "${{ needs.terraform.result }}" == "failure" ]]; then
-            echo "One or more checks failed"
+          FAIL=0
+          for job in frontend lambda terraform; do
+            case "$job" in
+              frontend)  RESULT="${{ needs.frontend.result }}" ;;
+              lambda)    RESULT="${{ needs.lambda.result }}" ;;
+              terraform) RESULT="${{ needs.terraform.result }}" ;;
+            esac
+            if [[ "$RESULT" != "success" ]]; then
+              echo "::error::CI job '$job' did not succeed (result: $RESULT)"
+              FAIL=1
+            fi
+          done
+          if [[ $FAIL -eq 1 ]]; then
             exit 1
           fi
           echo "All checks passed!"
