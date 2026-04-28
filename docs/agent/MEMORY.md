@@ -1,7 +1,32 @@
 # FinPulse Agent Memory
 
 > Stable project facts, commands, and invariants. Updated automatically.
-> Last updated: 2026-02-11 (session 6 — whale hardening + auth fix + analytics audit)
+> Last updated: 2026-04-28 (operator role + workflow reference)
+
+---
+
+## Operator Role (added 2026-04-28)
+
+The repo owner operates as **DevOps / SRE / MLOps**, not a core developer. They
+do not review code line-by-line and should not be asked to. Their approval on a
+PR signals that operational gates are green, not that the diff has been read.
+
+**Implications for agents working in this repo:**
+
+- The agent owns code-correctness. Pre-flight every change with the project's
+  full gate set: `tsc --noEmit`, `npm run lint`, `npm run test`, `npm run build`,
+  `node --check` on every touched Lambda, `python3 -c "yaml.safe_load(...)"` on
+  every touched workflow.
+- The CI pipeline + `claude-code-review.yml` (auto-reviewer) provide the
+  independent second opinion. Treat their results as the primary review signal.
+- When proposing changes, lead with the **operational summary**, not the code:
+  blast radius, deploy mechanism, rollback path, observability hooks (CloudWatch
+  metric / Sentry tag that will move on regression), cost delta, and the
+  CLAUDE.md §0 autonomy gate (Level A / B / C).
+- Code-correctness gets one line: *"swaps insecure JWT verify for the Layer's,
+  identical pattern to payments commit a4f3c06."* Not pages of diff.
+- Never assume the operator will catch a code bug at review. If the auto-reviewer
+  flags a Critical, surface it explicitly and propose the fix.
 
 ---
 
