@@ -28,6 +28,21 @@ PR signals that operational gates are green, not that the diff has been read.
 - Never assume the operator will catch a code bug at review. If the auto-reviewer
   flags a Critical, surface it explicitly and propose the fix.
 
+### Auto-merge convention
+
+Every PR I open should have **auto-merge enabled** (`mcp__github__enable_pr_auto_merge`,
+SQUASH method to match the existing `(#NN)` commit-style on main). Merge fires
+automatically when all required checks pass. The operator's manual click is
+not part of the steady-state workflow.
+
+For Terraform changes that need `apply` (CLAUDE.md §2.4 Hard Stop), the agent
+posts the plan summary in chat and waits for an explicit one-word authorization
+(`apply` / `go` / `lgtm`). Silence is not authorization.
+
+Subscribe to PR activity (`mcp__github__subscribe_pr_activity`) on every PR I
+open so CI failures and auto-reviewer comments route into the active session
+for autonomous response.
+
 ---
 
 ## Project Structure
