@@ -95,12 +95,6 @@ variable "enable_xray_tracing" {
   default     = false
 }
 
-variable "enable_staging_environment" {
-  description = "Enable staging environment (API Gateway, Redis, DynamoDB, Cognito). Disabled by default (cost optimization)"
-  type        = bool
-  default     = false
-}
-
 # =============================================================================
 # Infrastructure Settings
 # =============================================================================
