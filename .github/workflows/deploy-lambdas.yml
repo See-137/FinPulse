@@ -56,6 +56,11 @@ env:
   NODE_VERSION: '20'
   LAMBDA_CODE_PATH: finpulse-infra/lambda-code
 
+# Default to read-only at the workflow level. The deploy steps don't need
+# any write GITHUB_TOKEN scopes (AWS auth is via aws-actions/configure-aws-credentials).
+permissions:
+  contents: read
+
 jobs:
   # ============================================
   # JOB 1: Detect which functions changed

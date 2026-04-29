@@ -8,17 +8,20 @@
 // Shared Utilities from Lambda Layer (with fallback)
 // =============================================================================
 
+// Each Layer module loads independently so a single missing module can't
+// break the others (CLAUDE.md §11; cf. commit a4f3c06).
 let envValidator, requestContext;
-try {
-  envValidator = require('/opt/nodejs/env-validator');
-  requestContext = require('/opt/nodejs/request-context');
-  console.log('[News] Loaded shared utilities from Lambda Layer');
-} catch (e) {
-  // Minimal fallbacks
+
+try { envValidator = require('/opt/nodejs/env-validator'); }
+catch (e) {
   envValidator = {
     ensureEnvValidated: () => true,
     getOptionalEnv: (name, def) => process.env[name] || def,
   };
+}
+
+try { requestContext = require('/opt/nodejs/request-context'); }
+catch (e) {
   requestContext = {
     createRequestContext: (event) => ({
       requestId: event?.requestContext?.requestId || 'unknown',
@@ -30,6 +33,11 @@ try {
     addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
   };
 }
+
+console.log('[News] Layer modules loaded:', {
+  envValidator: !!envValidator,
+  requestContext: !!requestContext,
+});
 
 // Validate environment at cold start
 try {

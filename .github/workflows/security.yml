@@ -51,10 +51,16 @@ jobs:
   # ============================================
   # Dependency Scanning
   # ============================================
+  # Non-blocking: dependency-review-action requires GitHub Advanced Security on
+  # private repos. Without GHAS the action errors at setup (~5s failure) on
+  # every PR, blocking merge. `npm Audit` below covers the same CVE surface
+  # via `npm audit`, and license deny on transitive deps wasn't gating
+  # anything meaningful here. Re-enable as required once GHAS is in place.
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    continue-on-error: true
 
     steps:
       - name: Checkout repository
@@ -62,6 +68,7 @@ jobs:
 
       - name: Dependency Review
         uses: actions/dependency-review-action@v4
+        continue-on-error: true
         with:
           fail-on-severity: high
           deny-licenses: GPL-3.0, AGPL-3.0

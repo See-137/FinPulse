@@ -17,16 +17,23 @@ concurrency:
 env:
   NODE_VERSION: '20'
 
+# Tighten the default GITHUB_TOKEN scope: read-only at the workflow level.
+# CI doesn't push commits, write issues, or modify PRs.
+permissions:
+  contents: read
+
 jobs:
   # ============================================
   # Frontend CI
   # ============================================
+  # Always runs. Path-based skipping was previously gated on
+  # `contains(github.event.pull_request.changed_files, 'finpulse-app/')`,
+  # but `pull_request.changed_files` is the integer count of changed files,
+  # not a list of paths — so the filter always evaluated to false and these
+  # jobs silently skipped on every PR. Always-on is simpler and ~3 min total.
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.changed_files, 'finpulse-app/')
 
     defaults:
       run:
@@ -89,9 +96,6 @@ jobs:
   lambda:
     name: Lambda
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.changed_files, 'finpulse-infra/lambda-code/')
 
     steps:
       - name: Checkout code
@@ -131,9 +135,6 @@ jobs:
   terraform:
     name: Terraform
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.changed_files, 'finpulse-infra/')
 
     steps:
       - name: Checkout code
@@ -142,12 +143,22 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: '1.6.0'
+          # 1.10.x: avoids the HashiCorp PGP-key-expired error that hits
+          # `terraform init` on 1.6.x when downloading providers (the
+          # signing key was renewed; older binaries don't trust it).
+          terraform_version: '1.10.5'
 
       - name: Terraform Format Check
+        id: fmt
         run: terraform fmt -check -recursive
         working-directory: finpulse-infra
         continue-on-error: true
+
+      - name: Format Status
+        if: steps.fmt.outcome == 'failure'
+        run: |
+          echo "::error::Terraform files are not properly formatted. Run 'terraform fmt -recursive' locally."
+          exit 1
 
       - name: Terraform Init
         run: terraform init -backend=false
@@ -160,6 +171,9 @@ jobs:
   # ============================================
   # All Checks Passed (for branch protection)
   # ============================================
+  # Fails on any non-success result — including `skipped` and `cancelled`.
+  # The previous version only checked for `failure`, which let `skipped`
+  # masquerade as green when the upstream `if:` filters silently no-op'd.
   ci-complete:
     name: CI Complete
     runs-on: ubuntu-latest
@@ -169,10 +183,19 @@ jobs:
     steps:
       - name: Check results
         run: |
-          if [[ "${{ needs.frontend.result }}" == "failure" ]] || \
-             [[ "${{ needs.lambda.result }}" == "failure" ]] || \
-             [[ "${{ needs.terraform.result }}" == "failure" ]]; then
-            echo "One or more checks failed"
+          FAIL=0
+          for job in frontend lambda terraform; do
+            case "$job" in
+              frontend)  RESULT="${{ needs.frontend.result }}" ;;
+              lambda)    RESULT="${{ needs.lambda.result }}" ;;
+              terraform) RESULT="${{ needs.terraform.result }}" ;;
+            esac
+            if [[ "$RESULT" != "success" ]]; then
+              echo "::error::CI job '$job' did not succeed (result: $RESULT)"
+              FAIL=1
+            fi
+          done
+          if [[ $FAIL -eq 1 ]]; then
             exit 1
           fi
           echo "All checks passed!"

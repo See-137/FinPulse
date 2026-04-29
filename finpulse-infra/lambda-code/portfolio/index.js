@@ -4,31 +4,28 @@
  */
 
 // =============================================================================
-// Shared Utilities from Lambda Layer (with fallback)
+// Shared Utilities from Lambda Layer
+// Each module loads independently so a single missing module can't break the
+// others (CLAUDE.md §11; cf. commit a4f3c06).
 // =============================================================================
 
 let envValidator, requestContext, validation, redisCache, rateLimiter;
-try {
-  envValidator = require('/opt/nodejs/env-validator');
-  requestContext = require('/opt/nodejs/request-context');
-  validation = require('/opt/nodejs/validation');
-  redisCache = require('/opt/nodejs/redis-cache');
-  rateLimiter = require('/opt/nodejs/rate-limiter');
-  console.log('[Portfolio] Loaded shared utilities from Lambda Layer');
-} catch (e) {
-  // Fallback to local shared directory
-  try {
-    envValidator = require('../shared/env-validator');
-    requestContext = require('../shared/request-context');
-    validation = require('./shared/validation');
-    redisCache = require('./shared/redis-cache');
-    console.log('[Portfolio] Loaded shared utilities from local shared');
-  } catch (e2) {
-    // Minimal fallbacks
+
+try { envValidator = require('/opt/nodejs/env-validator'); }
+catch (e) {
+  try { envValidator = require('../shared/env-validator'); }
+  catch (e2) {
     envValidator = {
       ensureEnvValidated: () => true,
       getOptionalEnv: (name, def) => process.env[name] || def,
     };
+  }
+}
+
+try { requestContext = require('/opt/nodejs/request-context'); }
+catch (e) {
+  try { requestContext = require('../shared/request-context'); }
+  catch (e2) {
     requestContext = {
       createRequestContext: (event) => ({
         requestId: event?.requestContext?.requestId || 'unknown',
@@ -40,17 +37,41 @@ try {
       }),
       addRequestIdHeader: (headers, id) => ({ ...headers, 'X-Request-ID': id }),
     };
+  }
+}
+
+try { validation = require('/opt/nodejs/validation'); }
+catch (e) {
+  try { validation = require('./shared/validation'); }
+  catch (e2) {
     validation = {
       validateHolding: (input) => ({ valid: true, data: input }),
       validateUserId: () => true,
-      checkRateLimit: () => ({ allowed: true, remaining: 100 })
+      checkRateLimit: () => ({ allowed: true, remaining: 100 }),
     };
-    redisCache = {
-      checkRateLimit: async () => ({ allowed: true, remaining: 100, resetIn: 60 })
-    };
-    console.log('[Portfolio] Using fallback utilities');
   }
 }
+
+try { redisCache = require('/opt/nodejs/redis-cache'); }
+catch (e) {
+  try { redisCache = require('./shared/redis-cache'); }
+  catch (e2) {
+    redisCache = {
+      checkRateLimit: async () => ({ allowed: true, remaining: 100, resetIn: 60 }),
+    };
+  }
+}
+
+try { rateLimiter = require('/opt/nodejs/rate-limiter'); }
+catch (e) { rateLimiter = { checkRateLimitForRequest: async () => ({ blocked: false }) }; }
+
+console.log('[Portfolio] Layer modules loaded:', {
+  envValidator: !!envValidator,
+  requestContext: !!requestContext,
+  validation: !!validation,
+  redisCache: !!redisCache,
+  rateLimiter: !!rateLimiter,
+});
 
 // Validate environment at cold start
 try {

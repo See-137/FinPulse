@@ -8,36 +8,65 @@ const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, DeleteCommand, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 const { CognitoIdentityProviderClient, AdminGetUserCommand, AdminUpdateUserAttributesCommand, AdminDeleteUserCommand, AdminInitiateAuthCommand } = require('@aws-sdk/client-cognito-identity-provider');
 
-// Import shared utilities from Lambda Layer (or fallback to local for development)
+// Import shared utilities from Lambda Layer.
+// Each module loads independently so a single missing module can't take
+// down jwt-verifier or env-validator (CLAUDE.md §11; cf. commit a4f3c06).
 let jwtVerifier, envValidator, requestContext, rateLimiter, validation, planConfig;
-try {
-  // Production: Load from Lambda Layer
-  jwtVerifier = require('/opt/nodejs/jwt-verifier');
-  envValidator = require('/opt/nodejs/env-validator');
-  requestContext = require('/opt/nodejs/request-context');
-  rateLimiter = require('/opt/nodejs/rate-limiter');
-  validation = require('/opt/nodejs/validation');
-  planConfig = require('/opt/nodejs/plan-config');
-} catch (e) {
-  // Development/Local: Load from shared directory
-  try {
-    jwtVerifier = require('./shared/jwt-verifier');
-    envValidator = require('./shared/env-validator');
-    requestContext = require('./shared/request-context');
-    rateLimiter = require('./shared/rate-limiter');
-    validation = require('./shared/validation');
-    planConfig = require('./shared/plan-config');
-  } catch (e2) {
-    console.warn('Shared utilities not available, using minimal fallbacks');
-    // Minimal fallbacks for backward compatibility
-    jwtVerifier = null;
-    envValidator = { ensureEnvValidated: () => true };
-    requestContext = { getRequestId: (event) => event?.requestContext?.requestId || 'unknown' };
-    rateLimiter = { checkRateLimitForRequest: async () => ({ blocked: false }) };
-    validation = null;
-    planConfig = { PLAN_LIMITS: { FREE: { maxAssets: 20, maxAiQueries: 10 }, PROPULSE: { maxAssets: 50, maxAiQueries: 50 }, SUPERPULSE: { maxAssets: 9999, maxAiQueries: 9999 } }, getPlanLimits: (p) => planConfig.PLAN_LIMITS[(p || 'FREE').toUpperCase()] || planConfig.PLAN_LIMITS.FREE };
+
+// jwt-verifier is CRITICAL for token verification — fail-closed if missing
+try { jwtVerifier = require('/opt/nodejs/jwt-verifier'); }
+catch (e) {
+  try { jwtVerifier = require('./shared/jwt-verifier'); }
+  catch (e2) { console.error('[Auth] jwt-verifier not available:', e2.message); jwtVerifier = null; }
+}
+
+try { envValidator = require('/opt/nodejs/env-validator'); }
+catch (e) {
+  try { envValidator = require('./shared/env-validator'); }
+  catch (e2) { envValidator = { ensureEnvValidated: () => true }; }
+}
+
+try { requestContext = require('/opt/nodejs/request-context'); }
+catch (e) {
+  try { requestContext = require('./shared/request-context'); }
+  catch (e2) { requestContext = { getRequestId: (event) => event?.requestContext?.requestId || 'unknown' }; }
+}
+
+try { rateLimiter = require('/opt/nodejs/rate-limiter'); }
+catch (e) {
+  try { rateLimiter = require('./shared/rate-limiter'); }
+  catch (e2) { rateLimiter = { checkRateLimitForRequest: async () => ({ blocked: false }) }; }
+}
+
+try { validation = require('/opt/nodejs/validation'); }
+catch (e) {
+  try { validation = require('./shared/validation'); }
+  catch (e2) { validation = null; }
+}
+
+try { planConfig = require('/opt/nodejs/plan-config'); }
+catch (e) {
+  try { planConfig = require('./shared/plan-config'); }
+  catch (e2) {
+    planConfig = {
+      PLAN_LIMITS: {
+        FREE: { maxAssets: 20, maxAiQueries: 10 },
+        PROPULSE: { maxAssets: 50, maxAiQueries: 50 },
+        SUPERPULSE: { maxAssets: 9999, maxAiQueries: 9999 }
+      },
+      getPlanLimits: (p) => planConfig.PLAN_LIMITS[(p || 'FREE').toUpperCase()] || planConfig.PLAN_LIMITS.FREE,
+    };
   }
 }
+
+console.log('[Auth] Layer modules loaded:', {
+  jwtVerifier: !!jwtVerifier,
+  envValidator: !!envValidator,
+  requestContext: !!requestContext,
+  rateLimiter: !!rateLimiter,
+  validation: !!validation,
+  planConfig: !!planConfig,
+});
 
 // Validate required environment variables at cold start
 envValidator.ensureEnvValidated('auth');

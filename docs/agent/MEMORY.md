@@ -1,7 +1,72 @@
 # FinPulse Agent Memory
 
 > Stable project facts, commands, and invariants. Updated automatically.
-> Last updated: 2026-02-11 (session 6 — whale hardening + auth fix + analytics audit)
+> Last updated: 2026-04-28 (operator role + workflow reference)
+
+---
+
+## Operator Role (added 2026-04-28)
+
+The repo owner operates as **DevOps / SRE / MLOps**, not a core developer. They
+do not review code line-by-line and should not be asked to. Their approval on a
+PR signals that operational gates are green, not that the diff has been read.
+
+**Implications for agents working in this repo:**
+
+- The agent owns code-correctness. Pre-flight every change with the project's
+  full gate set: `tsc --noEmit`, `npm run lint`, `npm run test`, `npm run build`,
+  `node --check` on every touched Lambda, `python3 -c "yaml.safe_load(...)"` on
+  every touched workflow.
+- The CI pipeline + `claude-code-review.yml` (auto-reviewer) provide the
+  independent second opinion. Treat their results as the primary review signal.
+- When proposing changes, lead with the **operational summary**, not the code:
+  blast radius, deploy mechanism, rollback path, observability hooks (CloudWatch
+  metric / Sentry tag that will move on regression), cost delta, and the
+  CLAUDE.md §0 autonomy gate (Level A / B / C).
+- Code-correctness gets one line: *"swaps insecure JWT verify for the Layer's,
+  identical pattern to payments commit a4f3c06."* Not pages of diff.
+- Never assume the operator will catch a code bug at review. If the auto-reviewer
+  flags a Critical, surface it explicitly and propose the fix.
+
+### Auto-merge convention
+
+Every PR I open should have **auto-merge enabled** (`mcp__github__enable_pr_auto_merge`,
+SQUASH method to match the existing `(#NN)` commit-style on main). Merge fires
+automatically when all required checks pass. The operator's manual click is
+not part of the steady-state workflow.
+
+For Terraform changes that need `apply` (CLAUDE.md §2.4 Hard Stop), the agent
+posts the plan summary in chat and waits for an explicit one-word authorization
+(`apply` / `go` / `lgtm`). Silence is not authorization.
+
+Subscribe to PR activity (`mcp__github__subscribe_pr_activity`) on every PR I
+open so CI failures and auto-reviewer comments route into the active session
+for autonomous response.
+
+**Honest constraint on PR-watching:** the webhook subscription only delivers
+events into an *active* session. If the conversation idles or the session
+ends, events stop routing — I won't see CI completion or new review comments
+hours later. Don't promise the operator that I'll ping when CI finishes
+unless I will actually still be in-session at that point. If they ask "what's
+the status?" hours after the last action, treat that as the trigger to
+re-fetch state via `pull_request_read get_check_runs` rather than relying
+on remembered notifications.
+
+### `continue-on-error`: step vs job (gotcha)
+
+`continue-on-error: true` on a **job** prevents a job failure from failing
+the *workflow run* — but the **check_run** that branch protection inspects
+still reflects the job's actual outcome. PRs stay `blocked` even when the
+workflow shows success.
+
+`continue-on-error: true` on a **step** lets the step fail without failing
+the job. The job reports success, the check_run reports success, branch
+protection unblocks.
+
+When you want a flaky/advisory action to not block merge, put
+`continue-on-error: true` on the **step that runs the action**, not on the
+job. The job-level setting is rarely what you actually want for required
+checks.
 
 ---
 

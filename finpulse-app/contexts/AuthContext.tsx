@@ -14,6 +14,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { User, PlanType, UserRole } from '../types';
 import { auth } from '../services/authService';
 import { api } from '../services/apiService';
+import { tokenStorage, TOKEN_KEYS } from '../services/tokenStorage';
 import { usePortfolioStore } from '../store/portfolioStore';
 import { SaaS_PLANS } from '../constants';
 import { trackCompleteRegistration } from '../services/analytics';
@@ -51,7 +52,7 @@ interface AuthProviderProps {
 // Constants
 // =============================================================================
 
-const USER_STORAGE_KEY = 'finpulse_user_session';
+const USER_STORAGE_KEY = TOKEN_KEYS.USER_SESSION;
 
 // =============================================================================
 // Helper Functions
@@ -84,11 +85,7 @@ function mapBackendPlanToFrontend(backendPlan: string | undefined): PlanType {
 function clearAuthData(): void {
   auth.signOut();
   api.setIdToken(null);
-  localStorage.removeItem('finpulse_id_token');
-  localStorage.removeItem('finpulse_user_session');
-  localStorage.removeItem('finpulse_auth_tokens');
-  localStorage.removeItem('finpulse_user');
-  localStorage.removeItem('finpulse_cognito_user');
+  tokenStorage.clearAllSync();
 }
 
 // =============================================================================
@@ -117,7 +114,7 @@ export function AuthProvider({ children, onUserChange }: AuthProviderProps) {
    */
   const fetchUserProfile = useCallback(async (_userId: string): Promise<{ user: User; createdAt?: string } | null> => {
     try {
-      const idToken = localStorage.getItem('finpulse_id_token');
+      const idToken = tokenStorage.getIdToken();
       if (!idToken) {
         console.log('[AuthContext] fetchUserProfile: No idToken in localStorage');
         return null;
@@ -195,7 +192,7 @@ export function AuthProvider({ children, onUserChange }: AuthProviderProps) {
           return;
         }
 
-        const idToken = localStorage.getItem('finpulse_id_token');
+        const idToken = tokenStorage.getIdToken();
         if (!idToken) {
           console.log('[AuthContext] Partial session state, cleaning up');
           clearAuthData();
@@ -258,20 +255,32 @@ export function AuthProvider({ children, onUserChange }: AuthProviderProps) {
       setIsOAuthProcessing(true);
       setOauthError(null);
 
+      // 30s wall-clock cap for the whole exchange-and-fetch flow; without this,
+      // a hung backend leaves the user staring at a spinner indefinitely.
+      const OAUTH_TIMEOUT_MS = 30_000;
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('OAUTH_TIMEOUT')), OAUTH_TIMEOUT_MS)
+      );
+
       try {
-        // Exchange code for tokens and complete sign-in
-        const result = await auth.exchangeOAuthCode(callbackResult.code);
+        const result = await Promise.race([
+          auth.exchangeOAuthCode(callbackResult.code),
+          timeoutPromise,
+        ]);
 
         // Clear the URL params
         window.history.replaceState({}, '', '/');
 
         if (result.success && result.user) {
-          const idToken = localStorage.getItem('finpulse_id_token');
+          const idToken = tokenStorage.getIdToken();
           if (idToken) {
             api.setIdToken(idToken);
           }
 
-          const profile = await fetchUserProfile(result.user.userId);
+          const profile = await Promise.race([
+            fetchUserProfile(result.user.userId),
+            timeoutPromise,
+          ]);
           if (profile) {
             setUser(profile.user);
             setUserCreatedAt(profile.createdAt);
@@ -290,7 +299,12 @@ export function AuthProvider({ children, onUserChange }: AuthProviderProps) {
         }
       } catch (error) {
         console.error('[AuthContext] OAuth callback error:', error);
-        setOauthError('Failed to complete sign-in. Please try again.');
+        const isTimeout = error instanceof Error && error.message === 'OAUTH_TIMEOUT';
+        setOauthError(
+          isTimeout
+            ? 'Sign-in timed out. Please try again.'
+            : 'Failed to complete sign-in. Please try again.'
+        );
       } finally {
         setIsOAuthProcessing(false);
       }
@@ -325,7 +339,7 @@ export function AuthProvider({ children, onUserChange }: AuthProviderProps) {
       return;
     }
 
-    const idToken = localStorage.getItem('finpulse_id_token');
+    const idToken = tokenStorage.getIdToken();
     if (idToken) {
       api.setIdToken(idToken);
     }
