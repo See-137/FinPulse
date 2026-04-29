@@ -1,3 +1,4 @@
+// Redeploy trigger: ship security review fixes from PR #63 (commit 575e0460) that were blocked at the old approval gate.
 /**
  * FinPulse Market Data Service v3.2
  * Single data source: Alpaca Markets

@@ -1,3 +1,4 @@
+// Redeploy trigger: ship security review fixes from PR #63 (commit 575e0460) that were blocked at the old approval gate.
 /**
  * FinPulse Community Service v2.0
  * Social features: posts, comments, likes, follows
