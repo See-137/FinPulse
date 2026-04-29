@@ -1805,13 +1805,16 @@ exports.handler = async (event, context) => {
           }));
           userToUpdate = result.Item;
         } else if (targetEmail) {
-          // Scan for user by email
-          const scanResult = await getDynamoClient().send(new ScanCommand({
+          // Query the email-index GSI on the users table — O(matches) instead
+          // of the O(table) Scan this used to do. The GSI is defined in
+          // modules/dynamodb/main.tf on the users table; safe to use directly.
+          const queryResult = await getDynamoClient().send(new QueryCommand({
             TableName: USERS_TABLE,
-            FilterExpression: 'email = :email',
+            IndexName: 'email-index',
+            KeyConditionExpression: 'email = :email',
             ExpressionAttributeValues: { ':email': targetEmail }
           }));
-          userToUpdate = scanResult.Items?.[0];
+          userToUpdate = queryResult.Items?.[0];
         }
 
         if (!userToUpdate) {
