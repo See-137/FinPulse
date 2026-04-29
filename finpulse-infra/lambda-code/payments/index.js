@@ -599,13 +599,27 @@ async function handleWebhook(event) {
   console.log('Webhook event:', eventName);
 
   // Idempotency check — prevent duplicate processing on webhook retries.
-  // Prefer LemonSqueezy's per-delivery webhook id (covered by the HMAC
-  // signature, so it can't be tampered with). Fall back to a composite
-  // key if older deliveries don't carry meta.webhook_id.
+  //
+  // Preference order:
+  // 1. `X-Event-Id` HTTP header — LemonSqueezy sets this on every webhook
+  //    delivery and reuses it across retries of the same logical event, so
+  //    legitimate retries dedup deterministically. Header is NOT covered by
+  //    the body-HMAC, but HMAC verification gates this code path entirely
+  //    (see verifyWebhookSignature above) so an attacker without the secret
+  //    can't reach this point.
+  // 2. `meta.webhook_id` from the body — present on newer LS deliveries,
+  //    HMAC-covered. Stronger guarantee but inconsistently populated.
+  // 3. Composite key on event name + entity id + updated_at — last-resort
+  //    fallback for anything that lacks both signals; preserves correctness
+  //    against pre-existing dedup records still inside the 7-day TTL window.
+  const eventIdHeader =
+    event.headers?.['X-Event-Id'] || event.headers?.['x-event-id'];
   const webhookId = payload.meta?.webhook_id;
-  const idempotencyKey = webhookId
-    ? `lsq:${webhookId}`
-    : `${eventName}:${data.id}:${data.attributes?.updated_at || 'unknown'}`;
+  const idempotencyKey = eventIdHeader
+    ? `lsq-evt:${eventIdHeader}`
+    : webhookId
+      ? `lsq:${webhookId}`
+      : `${eventName}:${data.id}:${data.attributes?.updated_at || 'unknown'}`;
   if (await isWebhookProcessed(idempotencyKey)) {
     console.log('Webhook already processed, skipping:', idempotencyKey);
     return {

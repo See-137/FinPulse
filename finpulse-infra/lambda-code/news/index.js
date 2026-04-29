@@ -1,3 +1,4 @@
+// Redeploy trigger: ship security review fixes from PR #63 (commit 575e0460) that were blocked at the old approval gate.
 /**
  * FinPulse News Service v2.1
  * Multi-provider news with fallback chain: GNews -> NewsAPI -> Static Fallback

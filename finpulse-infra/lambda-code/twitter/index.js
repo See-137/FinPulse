@@ -1,3 +1,4 @@
+// Redeploy trigger: ship security review fixes from PR #63 (commit 575e0460) that were blocked at the old approval gate.
 /**
  * FinPulse Twitter/X API Proxy Service
  * Proxies Twitter API v2 requests to avoid CORS issues
