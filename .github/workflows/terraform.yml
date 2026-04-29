@@ -149,6 +149,13 @@ jobs:
 
       - name: Terraform Plan
         id: plan
+        # `budget_alert_email` has no default in variables.tf and is required
+        # by aws_budgets_budget + cloudwatch alarm subscriber lists. Pass it
+        # via TF_VAR_<name> from a GitHub secret so plan can run; if the
+        # secret is unset, plan fails loud (which is what we want — silent
+        # plan failure was masking real issues for months).
+        env:
+          TF_VAR_budget_alert_email: ${{ secrets.BUDGET_ALERT_EMAIL }}
         run: |
           terraform plan -out=tfplan -detailed-exitcode 2>&1 | tee plan_output.txt || true
 
@@ -244,6 +251,12 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Apply
+        # The saved tfplan was generated with TF_VAR_budget_alert_email set
+        # at plan time; apply needs the same value available at apply time
+        # to satisfy the var reference (terraform doesn't store variable
+        # values in the plan file by default for sensitive types).
+        env:
+          TF_VAR_budget_alert_email: ${{ secrets.BUDGET_ALERT_EMAIL }}
         run: |
           echo "Applying Terraform changes..."
           terraform apply -auto-approve tfplan
