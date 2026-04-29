@@ -149,6 +149,11 @@ jobs:
 
       - name: Terraform Plan
         id: plan
+        # Non-sensitive variable values come from prod.auto.tfvars (auto-loaded
+        # by terraform). Only TRULY sensitive values pass via TF_VAR_<name>
+        # env vars from GitHub Secrets here.
+        env:
+          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           terraform plan -out=tfplan -detailed-exitcode 2>&1 | tee plan_output.txt || true
 
@@ -244,6 +249,11 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Apply
+        # Same env vars as plan — terraform apply still resolves variable
+        # values even when given a saved plan, for any sensitive vars not
+        # baked into the plan file.
+        env:
+          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           echo "Applying Terraform changes..."
           terraform apply -auto-approve tfplan
