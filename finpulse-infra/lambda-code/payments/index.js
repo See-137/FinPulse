@@ -74,7 +74,7 @@ const headers = {
 
 // AWS SDK v3 — Node 20+ runtime does not include aws-sdk v2
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, DeleteCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, DeleteCommand, ScanCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 
 let _docClient = null;
 
@@ -93,6 +93,7 @@ const dynamoDB = {
   update: (params) => ({ promise: () => getDocClient().send(new UpdateCommand(params)) }),
   delete: (params) => ({ promise: () => getDocClient().send(new DeleteCommand(params)) }),
   scan: (params) => ({ promise: () => getDocClient().send(new ScanCommand(params)) }),
+  query: (params) => ({ promise: () => getDocClient().send(new QueryCommand(params)) }),
 };
 
 const ENVIRONMENT = process.env.ENVIRONMENT || 'prod';
@@ -169,6 +170,25 @@ async function isWebhookProcessed(eventKey) {
     console.warn('Idempotency check failed, proceeding:', error.message);
     return false;
   }
+}
+
+/**
+ * Look up a userId by LemonSqueezy subscription id using the
+ * `lemonSqueezySubscriptionId-index` GSI on the subscriptions table.
+ * Replaces O(table) Scan + FilterExpression with O(matches) Query.
+ * Returns the userId, or null when no subscription matches.
+ *
+ * The GSI was added to the subscriptions table in PR #68 (Stage C).
+ */
+async function findUserIdBySubscriptionId(subscriptionId) {
+  const result = await dynamoDB.query({
+    TableName: SUBSCRIPTIONS_TABLE,
+    IndexName: 'lemonSqueezySubscriptionId-index',
+    KeyConditionExpression: 'lemonSqueezySubscriptionId = :sid',
+    ExpressionAttributeValues: { ':sid': subscriptionId },
+    Limit: 1,
+  }).promise();
+  return result.Items?.[0]?.userId || null;
 }
 
 /**
@@ -741,19 +761,12 @@ async function handleSubscriptionUpdated(payload) {
   const userId = customData.user_id;
 
   if (!userId) {
-    // Try to find by subscription ID
-    const result = await dynamoDB.scan({
-      TableName: SUBSCRIPTIONS_TABLE,
-      FilterExpression: 'lemonSqueezySubscriptionId = :sid',
-      ExpressionAttributeValues: { ':sid': data.id }
-    }).promise();
-
-    if (!result.Items || result.Items.length === 0) {
+    // Lookup via lemonSqueezySubscriptionId-index GSI (was Scan)
+    const foundUserId = await findUserIdBySubscriptionId(data.id);
+    if (!foundUserId) {
       console.error('Cannot find user for subscription:', data.id);
       return;
     }
-
-    const foundUserId = result.Items[0].userId;
     await updateSubscriptionStatus(foundUserId, attributes);
     return;
   }
@@ -796,15 +809,9 @@ async function handleSubscriptionCancelled(payload) {
   let userId = customData.user_id;
 
   if (!userId) {
-    const result = await dynamoDB.scan({
-      TableName: SUBSCRIPTIONS_TABLE,
-      FilterExpression: 'lemonSqueezySubscriptionId = :sid',
-      ExpressionAttributeValues: { ':sid': data.id }
-    }).promise();
-
-    if (result.Items && result.Items.length > 0) {
-      userId = result.Items[0].userId;
-    } else {
+    // Lookup via lemonSqueezySubscriptionId-index GSI (was Scan)
+    userId = await findUserIdBySubscriptionId(data.id);
+    if (!userId) {
       console.error('Cannot find user for cancelled subscription:', data.id);
       return;
     }
@@ -833,17 +840,9 @@ async function handleSubscriptionExpired(payload) {
   let userId = customData.user_id;
 
   if (!userId) {
-    const result = await dynamoDB.scan({
-      TableName: SUBSCRIPTIONS_TABLE,
-      FilterExpression: 'lemonSqueezySubscriptionId = :sid',
-      ExpressionAttributeValues: { ':sid': data.id }
-    }).promise();
-
-    if (result.Items && result.Items.length > 0) {
-      userId = result.Items[0].userId;
-    } else {
-      return;
-    }
+    // Lookup via lemonSqueezySubscriptionId-index GSI (was Scan)
+    userId = await findUserIdBySubscriptionId(data.id);
+    if (!userId) return;
   }
 
   // Downgrade to FREE
@@ -882,17 +881,9 @@ async function handlePaymentFailed(payload) {
   let userId = customData.user_id;
 
   if (!userId) {
-    const result = await dynamoDB.scan({
-      TableName: SUBSCRIPTIONS_TABLE,
-      FilterExpression: 'lemonSqueezySubscriptionId = :sid',
-      ExpressionAttributeValues: { ':sid': data.id }
-    }).promise();
-
-    if (result.Items && result.Items.length > 0) {
-      userId = result.Items[0].userId;
-    } else {
-      return;
-    }
+    // Lookup via lemonSqueezySubscriptionId-index GSI (was Scan)
+    userId = await findUserIdBySubscriptionId(data.id);
+    if (!userId) return;
   }
 
   // Set past_due with a timestamp for 7-day grace period.
