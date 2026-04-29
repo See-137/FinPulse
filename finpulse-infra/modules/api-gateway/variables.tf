@@ -10,6 +10,11 @@ variable "environment" {
   type        = string
 }
 
+variable "aws_region" {
+  description = "AWS region (used to scope IAM policy resource ARNs)"
+  type        = string
+}
+
 # Cognito
 variable "cognito_user_pool_arn" {
   description = "Cognito User Pool ARN for JWT authorizer"

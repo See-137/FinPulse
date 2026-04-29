@@ -10,6 +10,9 @@ terraform {
   }
 }
 
+# Account ID for scoping IAM policy resource ARNs to the current account.
+data "aws_caller_identity" "current" {}
+
 # =============================================================================
 # IAM Role for Lambda Functions
 # =============================================================================
@@ -125,7 +128,10 @@ resource "aws_iam_role_policy" "lambda_secrets" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:${var.project_name}/${var.environment}/*"
+        # Scoped to current account (replaces the prior `:*:` account
+        # wildcard that would have permitted cross-account secret reads
+        # if matching paths existed elsewhere).
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/${var.environment}/*"
       }
     ]
   })
@@ -150,6 +156,11 @@ resource "aws_iam_role_policy" "lambda_xray" {
           "xray:GetSamplingTargets",
           "xray:GetSamplingStatisticSummaries"
         ]
+        # X-Ray actions don't support resource-level permissions per AWS docs
+        # (https://docs.aws.amazon.com/IAM/latest/UserGuide/list_awsx-ray.html).
+        # The `*` is required and matches AWS's managed AWSXRayDaemonWriteAccess
+        # policy. Not a least-privilege violation — these are scoped via the
+        # role's trust policy + the actions listed above.
         Resource = "*"
       }
     ]

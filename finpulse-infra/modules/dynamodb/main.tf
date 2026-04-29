@@ -414,6 +414,26 @@ resource "aws_dynamodb_table" "subscriptions" {
     type = "S"
   }
 
+  # GSI key — the LemonSqueezy subscription id, populated by
+  # handleSubscriptionCreated in payments Lambda.
+  attribute {
+    name = "lemonSqueezySubscriptionId"
+    type = "S"
+  }
+
+  # GSI: look up subscription by LemonSqueezy subscription id.
+  # Replaces the O(table) Scan currently used by handleSubscriptionUpdated /
+  # handleSubscriptionCancelled / handleSubscriptionExpired in payments Lambda
+  # when custom_data.user_id is missing on a webhook delivery.
+  # Build is non-disruptive (additive) but takes minutes-to-hours depending
+  # on table size — Lambda code switching to Query against this index must
+  # wait until status reflects ACTIVE.
+  global_secondary_index {
+    name            = "lemonSqueezySubscriptionId-index"
+    hash_key        = "lemonSqueezySubscriptionId"
+    projection_type = "ALL"
+  }
+
   point_in_time_recovery {
     enabled = var.enable_pitr
   }
