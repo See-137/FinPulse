@@ -10,6 +10,10 @@ terraform {
   }
 }
 
+# Account ID for scoping IAM policy resource ARNs to the current account
+# (replaces the cross-account `*` wildcard).
+data "aws_caller_identity" "current" {}
+
 # =============================================================================
 # API Gateway CloudWatch Role (Account-level setting)
 # =============================================================================
@@ -47,8 +51,17 @@ resource "aws_iam_role_policy" "api_gateway_cloudwatch" {
         "logs:GetLogEvents",
         "logs:FilterLogEvents"
       ]
-      Effect   = "Allow"
-      Resource = "*"
+      Effect = "Allow"
+      # Scoped to current account + region. API Gateway writes to log groups
+      # named `API-Gateway-Execution-Logs_<api-id>/<stage>` (execution logs)
+      # and to user-specified ARNs (access logs). The current-account-and-
+      # region scope covers both without enumerating exact log-group prefixes.
+      # Tightened from the previous `Resource = "*"` which allowed cross-
+      # account writes — least-privilege fix.
+      Resource = [
+        "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:*",
+        "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:*:*"
+      ]
     }]
   })
 }
