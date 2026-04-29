@@ -118,6 +118,7 @@ module "api_gateway" {
 
   project_name              = local.project_name
   environment               = var.environment
+  aws_region                = var.aws_region
   cognito_user_pool_arn     = module.cognito.user_pool_arn
   lambda_function_names     = module.lambda.function_names
   lambda_invoke_arns        = module.lambda.invoke_arns
