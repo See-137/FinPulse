@@ -45,7 +45,7 @@ nul
 
 # Legacy snapshots kept locally only — never tracked
 Archive/
-"Finpulse early versions/"
+Finpulse early versions/
 
 # Ad-hoc debugging captures
 response.json
