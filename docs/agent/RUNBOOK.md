@@ -1,7 +1,7 @@
 # FinPulse Operational Runbook
 
 > Deployment, rollback, and incident procedures.
-> Last updated: 2026-02-11
+> Last updated: 2026-05-13
 
 ---
 
@@ -223,5 +223,95 @@ aws lambda get-function-configuration --function-name finpulse-auth-prod --query
 
 ### JWT Verification Status
 - **Current (2026-02-11)**: Decode-only fallback (`decodeJwt()`) — no signature verification
-- **Target**: Deploy Lambda Layer → `verifyJwtSecure()` uses `aws-jwt-verify` with real signature check
+- **Payments Lambda (2026-03-03)**: Uses Layer `verifyJwt()` with real signature verification (fail-closed)
+- **Target**: Deploy Lambda Layer to all Lambdas → `verifyJwtSecure()` uses `aws-jwt-verify`
 - **How to deploy Layer**: `terraform apply` with layer zip (Level C — requires explicit approval)
+
+---
+
+## 9. Payments Lambda Deployment
+
+### Deploy Code Update
+```bash
+# From finpulse-infra/ directory
+cd finpulse-infra
+
+# Zip the payments Lambda
+powershell -c "Compress-Archive -Path lambda-code/payments/* -DestinationPath lambda-deploy/payments.zip -Force"
+
+# Deploy
+MSYS_NO_PATHCONV=1 aws lambda update-function-code \
+  --function-name finpulse-payments-prod \
+  --zip-file fileb://lambda-deploy/payments.zip \
+  --region us-east-1
+
+# Verify
+MSYS_NO_PATHCONV=1 aws lambda get-function \
+  --function-name finpulse-payments-prod \
+  --query "Configuration.LastModified" \
+  --region us-east-1
+```
+
+### Check Payments Logs
+```bash
+# Recent errors
+MSYS_NO_PATHCONV=1 aws logs filter-log-events \
+  --log-group-name /aws/lambda/finpulse-payments-prod \
+  --filter-pattern "ERROR" \
+  --start-time $(date -d '1 hour ago' +%s000) \
+  --limit 20 --query 'events[*].message' --output text
+
+# Checkout events
+MSYS_NO_PATHCONV=1 aws logs filter-log-events \
+  --log-group-name /aws/lambda/finpulse-payments-prod \
+  --filter-pattern "checkout" \
+  --start-time $(date -d '1 hour ago' +%s000) \
+  --limit 20 --query 'events[*].message' --output text
+
+# Webhook events
+MSYS_NO_PATHCONV=1 aws logs filter-log-events \
+  --log-group-name /aws/lambda/finpulse-payments-prod \
+  --filter-pattern "webhook" \
+  --start-time $(date -d '1 hour ago' +%s000) \
+  --limit 20 --query 'events[*].message' --output text
+```
+
+### Check Subscriptions Table
+```bash
+MSYS_NO_PATHCONV=1 aws dynamodb scan \
+  --table-name finpulse-subscriptions \
+  --output json
+```
+
+### LemonSqueezy Post-Approval Activation
+After identity verification is approved:
+1. LS Dashboard: Turn off Test mode toggle (bottom-left sidebar)
+2. LS Dashboard: Settings → API → Create new production key
+3. Update Lambda env var with new live key:
+```bash
+# Get current env vars first
+MSYS_NO_PATHCONV=1 aws lambda get-function-configuration \
+  --function-name finpulse-payments-prod \
+  --query 'Environment.Variables' --output json
+
+# Update with new key (replace <NEW_LIVE_KEY>)
+# IMPORTANT: Must include ALL existing env vars — missing ones get deleted
+MSYS_NO_PATHCONV=1 aws lambda update-function-configuration \
+  --function-name finpulse-payments-prod \
+  --environment "Variables={LEMONSQUEEZY_API_KEY=<NEW_LIVE_KEY>,...all other vars...}"
+```
+4. LS Dashboard: Settings → Webhooks → Verify signing secret unchanged
+5. If secret changed, update Lambda `LEMONSQUEEZY_WEBHOOK_SECRET` env var
+6. Verify webhook URL still configured in live mode
+7. Test: Create checkout from finpulse.me → complete payment → verify DynamoDB updated
+
+### Payments Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| "Unauthorized" on checkout | JWT verifier not loaded or wrong Cognito Pool ID | Check Lambda logs for `[JWT]` errors; verify `COGNITO_POOL_ID` env var |
+| "No variant ID configured" | Env vars missing at build time | Check `config.ts` defaults; rebuild + deploy frontend |
+| 422 from LemonSqueezy API | Bad checkout payload format | Check `checkout_options` vs `product_options` format |
+| "Invalid webhook signature" | Signing secret mismatch | Compare LS Dashboard webhook secret vs Lambda env var |
+| DynamoDB ResourceNotFound | Wrong table name | Verify `SUBSCRIPTIONS_TABLE` env var matches actual table |
+| Stripe.js errors on LS page | LS store not activated / test mode | Check LS Dashboard identity verification + store mode |
