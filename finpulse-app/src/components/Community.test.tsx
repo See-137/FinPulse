@@ -166,13 +166,16 @@ describe('Community', () => {
     render(<Community />);
 
     await waitFor(() => {
-      // "Analysis" appears in the filter dropdown AND as a category badge on the post
-      const analysisElements = screen.getAllByText('Analysis');
-      expect(analysisElements.length).toBeGreaterThanOrEqual(1);
+      // Wait on the stricter (>=2) condition so we don't race the dropdown render.
+      // "Trade Idea" appears in the dropdown <option> AND as a category badge on post-2;
+      // the dropdown renders synchronously on first paint, the badge only after posts load.
+      const tradeIdeaElements = screen.getAllByText('Trade Idea');
+      expect(tradeIdeaElements.length).toBeGreaterThanOrEqual(2);
     });
-    // "Trade Idea" appears in the dropdown AND as a category badge
-    const tradeIdeaElements = screen.getAllByText('Trade Idea');
-    expect(tradeIdeaElements.length).toBeGreaterThanOrEqual(2);
+    // "Analysis" appears in the dropdown AND as a category badge on post-1.
+    // Tightened from >=1 to >=2 — >=1 was satisfied by the dropdown alone, masking real regressions.
+    const analysisElements = screen.getAllByText('Analysis');
+    expect(analysisElements.length).toBeGreaterThanOrEqual(2);
   });
 
   it('shows empty state when no posts and no error', async () => {
