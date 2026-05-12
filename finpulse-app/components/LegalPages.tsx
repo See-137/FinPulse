@@ -21,7 +21,7 @@ const LegalPageWrapper: React.FC<{ children: React.ReactNode; onBack: () => void
 export const TermsOfService: React.FC<LegalPageProps> = ({ onBack }) => (
   <LegalPageWrapper onBack={onBack}>
     <h1 className="text-4xl font-black mb-2">Terms of Service</h1>
-    <p className="text-slate-400 mb-8">Effective Date: January 8, 2026 | Last Updated: January 8, 2026</p>
+    <p className="text-slate-400 mb-8">Effective Date: January 8, 2026 | Last Updated: May 13, 2026</p>
     
     <div className="prose prose-invert prose-slate max-w-none space-y-6">
       <section>
@@ -180,7 +180,7 @@ export const TermsOfService: React.FC<LegalPageProps> = ({ onBack }) => (
 
       <section className="mt-8 pt-6 border-t border-white/10">
         <p className="text-xs text-slate-500">
-          FinPulse Technologies • Effective: January 8, 2026 • Version 2.0
+          FinPulse Technologies • Effective: January 8, 2026 • Version 2.1
         </p>
       </section>
     </div>
@@ -190,7 +190,7 @@ export const TermsOfService: React.FC<LegalPageProps> = ({ onBack }) => (
 export const PrivacyPolicy: React.FC<LegalPageProps> = ({ onBack }) => (
   <LegalPageWrapper onBack={onBack}>
     <h1 className="text-4xl font-black mb-2">Privacy Policy</h1>
-    <p className="text-slate-400 mb-8">Effective Date: January 8, 2026 | Last Updated: January 8, 2026</p>
+    <p className="text-slate-400 mb-8">Effective Date: January 8, 2026 | Last Updated: May 13, 2026</p>
     
     <div className="prose prose-invert prose-slate max-w-none space-y-6">
       <section>
@@ -362,7 +362,7 @@ export const PrivacyPolicy: React.FC<LegalPageProps> = ({ onBack }) => (
 
       <section className="mt-8 pt-6 border-t border-white/10">
         <p className="text-xs text-slate-500">
-          FinPulse Technologies • Effective: January 8, 2026 • Version 2.0
+          FinPulse Technologies • Effective: January 8, 2026 • Version 2.1
         </p>
       </section>
     </div>
