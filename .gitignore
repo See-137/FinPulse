@@ -27,6 +27,8 @@ npm-debug.log*
 
 # Testing
 coverage/
+playwright-report/
+test-results/
 
 # Temp files
 tmpclaude-*
@@ -40,3 +42,11 @@ finpulse-infra/sam/
 
 # Windows artifacts
 nul
+
+# Legacy snapshots kept locally only — never tracked
+Archive/
+Finpulse early versions/
+
+# Ad-hoc debugging captures
+response.json
+FINPULSE_E2E_TEST_REPORT.md
