@@ -21,7 +21,7 @@ const LegalPageWrapper: React.FC<{ children: React.ReactNode; onBack: () => void
 export const TermsOfService: React.FC<LegalPageProps> = ({ onBack }) => (
   <LegalPageWrapper onBack={onBack}>
     <h1 className="text-4xl font-black mb-2">Terms of Service</h1>
-    <p className="text-slate-400 mb-8">Effective Date: January 8, 2026 | Last Updated: January 8, 2026</p>
+    <p className="text-slate-400 mb-8">Effective Date: January 8, 2026 | Last Updated: May 13, 2026</p>
     
     <div className="prose prose-invert prose-slate max-w-none space-y-6">
       <section>
@@ -55,7 +55,7 @@ export const TermsOfService: React.FC<LegalPageProps> = ({ onBack }) => (
 
       <section>
         <h2 className="text-xl font-bold text-cyan-400">4. Payment Terms & Billing</h2>
-        <p className="text-slate-300">Payments are processed securely through Paddle.com Market Limited ("Paddle"), our Merchant of Record, or Stripe, Inc. ("Stripe"). By subscribing to a paid plan, you acknowledge and agree:</p>
+        <p className="text-slate-300">Payments are processed securely through Lemon Squeezy, LLC ("LemonSqueezy"), our Merchant of Record. By subscribing to a paid plan, you acknowledge and agree:</p>
         <ul className="list-disc list-inside text-slate-300 ml-4">
           <li>You authorize recurring monthly or annual charges to your payment method</li>
           <li>All prices are displayed in USD unless otherwise specified; local currency conversion may apply</li>
@@ -180,7 +180,7 @@ export const TermsOfService: React.FC<LegalPageProps> = ({ onBack }) => (
 
       <section className="mt-8 pt-6 border-t border-white/10">
         <p className="text-xs text-slate-500">
-          FinPulse Technologies • Effective: January 8, 2026 • Version 2.0
+          FinPulse Technologies • Effective: January 8, 2026 • Version 2.1
         </p>
       </section>
     </div>
@@ -190,7 +190,7 @@ export const TermsOfService: React.FC<LegalPageProps> = ({ onBack }) => (
 export const PrivacyPolicy: React.FC<LegalPageProps> = ({ onBack }) => (
   <LegalPageWrapper onBack={onBack}>
     <h1 className="text-4xl font-black mb-2">Privacy Policy</h1>
-    <p className="text-slate-400 mb-8">Effective Date: January 8, 2026 | Last Updated: January 8, 2026</p>
+    <p className="text-slate-400 mb-8">Effective Date: January 8, 2026 | Last Updated: May 13, 2026</p>
     
     <div className="prose prose-invert prose-slate max-w-none space-y-6">
       <section>
@@ -205,7 +205,7 @@ export const PrivacyPolicy: React.FC<LegalPageProps> = ({ onBack }) => (
           <li><strong>Account Information:</strong> Name, email address, and password (hashed)</li>
           <li><strong>Profile Data:</strong> Display name, preferences, timezone, and currency settings</li>
           <li><strong>Portfolio Data:</strong> Assets, quantities, purchase prices, and transaction history you enter</li>
-          <li><strong>Payment Information:</strong> Processed and stored by our payment processors (Paddle/Stripe); we do not store full card numbers</li>
+          <li><strong>Payment Information:</strong> Processed and stored by our payment processor (LemonSqueezy); we do not store full card numbers</li>
           <li><strong>Communications:</strong> Support tickets, feedback, and correspondence with our team</li>
           <li><strong>Community Content:</strong> Posts, comments, and strategies you share publicly</li>
         </ul>
@@ -245,7 +245,7 @@ export const PrivacyPolicy: React.FC<LegalPageProps> = ({ onBack }) => (
         <h2 className="text-xl font-bold text-cyan-400">3. Data Sharing & Third Parties</h2>
         <p className="text-slate-300"><strong>We do NOT sell your personal data.</strong> We share data only with:</p>
         <ul className="list-disc list-inside text-slate-300 ml-4">
-          <li><strong>Paddle / Stripe:</strong> Payment processing (PCI-DSS compliant)</li>
+          <li><strong>LemonSqueezy:</strong> Payment processing (PCI-DSS compliant)</li>
           <li><strong>Amazon Web Services (AWS):</strong> Cloud infrastructure and data storage (US-East region)</li>
           <li><strong>AWS Cognito:</strong> Authentication and user management</li>
           <li><strong>Google (Gemini AI):</strong> AI features — queries are sent without personal identifiers</li>
@@ -362,7 +362,7 @@ export const PrivacyPolicy: React.FC<LegalPageProps> = ({ onBack }) => (
 
       <section className="mt-8 pt-6 border-t border-white/10">
         <p className="text-xs text-slate-500">
-          FinPulse Technologies • Effective: January 8, 2026 • Version 2.0
+          FinPulse Technologies • Effective: January 8, 2026 • Version 2.1
         </p>
       </section>
     </div>
@@ -433,7 +433,7 @@ export const PricingPage: React.FC<LegalPageProps> = ({ onBack }) => (
       <div className="mt-12 text-center text-slate-400 text-sm space-y-4">
         <p className="font-medium">✓ 14-day money-back guarantee • Cancel anytime • No hidden fees</p>
         <p>All prices in USD. Taxes may apply based on your location.</p>
-        <p>Payments securely processed by <a href="https://paddle.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Paddle</a> or <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Stripe</a></p>
+        <p>Payments securely processed by <a href="https://www.lemonsqueezy.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">LemonSqueezy</a></p>
       </div>
 
       <div className="mt-12 bg-white/5 border border-white/10 rounded-2xl p-6">
