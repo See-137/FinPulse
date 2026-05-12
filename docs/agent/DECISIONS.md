@@ -1,7 +1,7 @@
 # FinPulse Architecture Decision Records
 
 > Short ADR-style decisions with rationale.
-> Last updated: 2026-02-11
+> Last updated: 2026-05-13
 
 ---
 
@@ -432,6 +432,59 @@
 - CI plan output is finally meaningful — only shows changes the agent actually made + real drift.
 - Operator's local `terraform.tfvars` and committed `prod.auto.tfvars` must be kept in sync for sensitive values too (currently just `google_client_secret`). If the operator rotates credentials, both locations need updating.
 - If the repo ever goes public or gets forked, we should re-evaluate which values stay committed.
+
+---
+
+## ADR-017: LemonSqueezy Payments Activation + Checkout Flow
+
+**Date:** 2026-03-03 (recorded retroactively 2026-05-13)
+**Status:** Accepted (pending LS identity verification)
+
+> Backfilled from an orphan working-tree edit that never reached `main` during the original session. ADR numbering preserves chronological order of *recording*, not of *decision* — the underlying work shipped via commits `e268f96`, `7e69a23`, `a4f3c06`, `278fa58` in early March 2026.
+
+**Context:** Payment system code (Lambda, DynamoDB, API Gateway, frontend) was built in prior sessions but never tested end-to-end. Multiple issues discovered during first real checkout attempt.
+
+**Decision:** Activated LemonSqueezy payments with the following fixes:
+1. Frontend variant IDs sourced from `config.ts` with hardcoded defaults (not just env vars)
+2. PricingModal z-index raised to `z-[100]` to render above asset form
+3. Lambda Layer modules loaded independently (separate try/catch per module — see ADR-018)
+4. Cognito Pool ID corrected on payments Lambda (`us-east-1_B6uXjEIKh`)
+5. LemonSqueezy checkout payload fixed (`product_options.redirect_url` instead of `checkout_options.success_url`)
+6. CI/CD restored by removing unused eslint-disable directive that blocked all deploys since Feb 25
+
+**Rationale:**
+- Each fix addressed a specific failure discovered during real user testing
+- Independent Layer module loading prevents one missing module from breaking all others
+- Hardcoded variant ID defaults ensure checkout never fails silently from missing build-time env vars
+- CI/CD fix was critical — a week of commits were never deployed
+
+**Consequences:**
+- Checkout flow works end-to-end (tested with real user, real JWT, real LS checkout session)
+- LS store was in Test mode at time of decision; status today is documented in `MEMORY.md`
+- 4 commits: `e268f96`, `7e69a23`, `a4f3c06`, `278fa58`
+
+---
+
+## ADR-018: Lambda Layer Independent Module Loading Pattern
+
+**Date:** 2026-03-03 (recorded retroactively 2026-05-13)
+**Status:** Accepted
+
+> Backfilled — see ADR-017 note. The pattern is already referenced in `CLAUDE.md §9 — Known Constraints` and in `auto-memory`; this ADR makes it a first-class decision record.
+
+**Context:** Payments Lambda loaded 4 Layer modules (`env-validator`, `request-context`, `plan-config`, `jwt-verifier`) in a single `try` block. `plan-config.js` doesn't exist in Layer v1, causing `require()` to throw and crash the entire block — all 4 modules became `undefined`, including `jwtVerifier`, which caused all authenticated requests to fail with 401.
+
+**Decision:** Load each Layer module in its own `try/catch` with inline fallback implementations. Log module availability at cold start.
+
+**Rationale:**
+- A missing optional module should not break required modules
+- Inline fallbacks ensure Lambda functions even with partial Layer availability
+- Cold-start logging (`[Payments] Layer modules loaded: {...}`) makes debugging immediate
+
+**Consequences:**
+- Payments Lambda resilient to partial Layer availability
+- Pattern should be adopted by other Lambdas (auth, portfolio, etc.)
+- `plan-config.js` should be added to Layer in future to remove the fallback
 
 ---
 
