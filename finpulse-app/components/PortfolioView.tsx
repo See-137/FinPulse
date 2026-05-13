@@ -1021,7 +1021,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ user, onUpdateUser
                          paddingAngle={5}
                          dataKey="value"
                          stroke="none"
-                         onClick={(entry) => setFilterType(filterType === entry.type ? null : entry.type)}
+                         onClick={(entry) => {
+                            const { type } = entry as unknown as { type: string };
+                            setFilterType(filterType === type ? null : type);
+                         }}
                          className="cursor-pointer outline-none"
                         >
                            {data.map((entry, index) => (
