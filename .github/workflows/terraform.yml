@@ -159,8 +159,12 @@ jobs:
         run: npm ci --omit=dev
 
       - name: Zip Lambda layer
-        working-directory: finpulse-infra/lambda-layers
-        run: zip -r shared-utils.zip shared-utils/nodejs
+        # AWS Node.js layer convention: contents must extract to /opt/nodejs/...
+        # so handlers can `require('/opt/nodejs/<module>')`. The zip therefore
+        # MUST have `nodejs/` at the root — not `shared-utils/nodejs/`.
+        # cd into shared-utils so the zip captures `nodejs/...` at root.
+        working-directory: finpulse-infra/lambda-layers/shared-utils
+        run: zip -r ../shared-utils.zip nodejs
 
       - name: Terraform Plan
         id: plan
@@ -275,8 +279,12 @@ jobs:
         run: npm ci --omit=dev
 
       - name: Zip Lambda layer
-        working-directory: finpulse-infra/lambda-layers
-        run: zip -r shared-utils.zip shared-utils/nodejs
+        # AWS Node.js layer convention: contents must extract to /opt/nodejs/...
+        # so handlers can `require('/opt/nodejs/<module>')`. The zip therefore
+        # MUST have `nodejs/` at the root — not `shared-utils/nodejs/`.
+        # cd into shared-utils so the zip captures `nodejs/...` at root.
+        working-directory: finpulse-infra/lambda-layers/shared-utils
+        run: zip -r ../shared-utils.zip nodejs
 
       - name: Terraform Apply
         # Same env vars as plan — terraform apply still resolves variable
