@@ -2,6 +2,17 @@
 # Sweet middle: DynamoDB + Cognito + Redis + Secrets + Lambda + API Gateway + CloudWatch
 
 # =============================================================================
+# GitHub Actions OIDC (federated trust for CI/CD without long-lived keys)
+# =============================================================================
+
+module "oidc" {
+  source = "./modules/oidc"
+
+  environment = var.environment
+  github_repo = "see-137/finpulse"
+}
+
+# =============================================================================
 # DynamoDB Tables
 # =============================================================================
 
