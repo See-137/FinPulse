@@ -159,8 +159,14 @@ jobs:
         run: npm ci --omit=dev
 
       - name: Zip Lambda layer
-        working-directory: finpulse-infra/lambda-layers
-        run: zip -r shared-utils.zip shared-utils/nodejs
+        # IMPORTANT: AWS Lambda Node.js layer convention requires `nodejs/` at
+        # the zip root. Running `zip` from `shared-utils/` (not its parent)
+        # avoids the `shared-utils/nodejs/...` prefix bug — otherwise Lambda
+        # extracts to `/opt/shared-utils/nodejs/...` and every
+        # `require('/opt/nodejs/<module>')` breaks at runtime.
+        # Same fix pattern as commit 78f19a5 on PR #84.
+        working-directory: finpulse-infra/lambda-layers/shared-utils
+        run: zip -r ../shared-utils.zip nodejs
 
       - name: Terraform Plan
         id: plan
@@ -275,8 +281,14 @@ jobs:
         run: npm ci --omit=dev
 
       - name: Zip Lambda layer
-        working-directory: finpulse-infra/lambda-layers
-        run: zip -r shared-utils.zip shared-utils/nodejs
+        # IMPORTANT: AWS Lambda Node.js layer convention requires `nodejs/` at
+        # the zip root. Running `zip` from `shared-utils/` (not its parent)
+        # avoids the `shared-utils/nodejs/...` prefix bug — otherwise Lambda
+        # extracts to `/opt/shared-utils/nodejs/...` and every
+        # `require('/opt/nodejs/<module>')` breaks at runtime.
+        # Same fix pattern as commit 78f19a5 on PR #84.
+        working-directory: finpulse-infra/lambda-layers/shared-utils
+        run: zip -r ../shared-utils.zip nodejs
 
       - name: Terraform Apply
         # Same env vars as plan — terraform apply still resolves variable
