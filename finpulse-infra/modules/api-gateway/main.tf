@@ -1038,6 +1038,38 @@ resource "aws_api_gateway_method_settings" "fx_rates" {
 # Note: Admin endpoints use the global throttle settings from "*/*" above
 # Admin-specific restrictive limits are enforced at the Lambda level via Cognito groups
 
+# Payments — tighter than stage default. Payments Lambda is outside the VPC
+# (no Redis-based rate limit) so the only protection at this layer is API
+# Gateway. Webhook + checkout + portal share the same /payments/{proxy+}
+# resource; LemonSqueezy webhook traffic is the main steady-state load.
+resource "aws_api_gateway_method_settings" "payments_proxy_throttle" {
+  count       = var.enable_payments_service ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  stage_name  = aws_api_gateway_stage.main.stage_name
+  method_path = "payments/{proxy+}/ANY"
+
+  settings {
+    throttling_burst_limit = var.payments_throttle_burst_limit
+    throttling_rate_limit  = var.payments_throttle_rate_limit
+    metrics_enabled        = true
+    logging_level          = var.api_gateway_logging_level
+  }
+}
+
+resource "aws_api_gateway_method_settings" "payments_base_throttle" {
+  count       = var.enable_payments_service ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  stage_name  = aws_api_gateway_stage.main.stage_name
+  method_path = "payments/ANY"
+
+  settings {
+    throttling_burst_limit = var.payments_throttle_burst_limit
+    throttling_rate_limit  = var.payments_throttle_rate_limit
+    metrics_enabled        = true
+    logging_level          = var.api_gateway_logging_level
+  }
+}
+
 # =============================================================================
 # Usage Plans (Optional - for API key-based quotas)
 # =============================================================================

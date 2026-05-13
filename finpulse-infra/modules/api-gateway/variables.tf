@@ -126,6 +126,22 @@ variable "admin_throttle_rate_limit" {
   default     = 5 # 5 requests per second for admin
 }
 
+# Payments throttling — Payments Lambda is outside the VPC (no Redis-based
+# rate limiter), so API Gateway method-level throttling is the only defense.
+# Sized for normal LemonSqueezy webhook traffic (a handful of subscription
+# events per minute) plus interactive checkout/portal load.
+variable "payments_throttle_burst_limit" {
+  description = "Burst capacity for /payments/* endpoints (requests)"
+  type        = number
+  default     = 20
+}
+
+variable "payments_throttle_rate_limit" {
+  description = "Steady-state rate limit for /payments/* endpoints (requests/second)"
+  type        = number
+  default     = 5
+}
+
 # Usage plan quota settings
 variable "user_quota_limit" {
   description = "Quota limit for authenticated users per period"
