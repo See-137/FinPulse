@@ -74,7 +74,7 @@ describe('MarketTicker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = createMockFetch();
-    globalThis.fetch = mockFetch;
+    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
   });
 
   afterEach(() => {
