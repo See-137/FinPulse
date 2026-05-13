@@ -26,11 +26,14 @@ updates:
           - "@types/react*"
       vite:
         patterns:
-          - "vite*"
+          - "vite"
+          - "vite-*"
           - "@vitejs/*"
       testing:
         patterns:
-          - "vitest*"
+          - "vitest"
+          - "vitest-*"
+          - "@vitest/*"
           - "@testing-library/*"
       linting:
         patterns:
