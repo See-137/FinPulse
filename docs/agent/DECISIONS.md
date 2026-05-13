@@ -488,6 +488,80 @@
 
 ---
 
+## ADR-019: Cognito Authorizer State Reconciliation
+**Date:** 2026-05-13
+**Status:** Accepted (records observed state, no behavior change)
+
+**Context:** Internal notes carried the claim that two Cognito authorizers exist on the production API Gateway — `uhyx3l` (v1) and `yialae` (v2) — used inconsistently across routes, with consolidation listed as open debt.
+
+Verification during the 2026-05-13 backlog sweep found only one authorizer in Terraform (`aws_api_gateway_authorizer.cognito` in `finpulse-infra/modules/api-gateway/main.tf:92`), referenced by exactly two route methods: `portfolio_any` and `admin_any`. Other authenticated routes rely on JWT verification in-Lambda (via the shared Layer's `jwt-verifier` module) rather than API Gateway authorizers.
+
+**Decision:** Treat the "two authorizers" claim as stale. The consolidation to a single Cognito authorizer happened at an unknown earlier date and is the canonical state. No code change required.
+
+**Rationale:**
+- Single source of truth = current Terraform state
+- Adding a second authorizer to "match the note" would be a regression
+- In-Lambda JWT verification is the dominant pattern in this codebase (see `finpulse-infra/lambda-layers/shared-utils/nodejs/jwt-verifier.js`) and works correctly without API GW authorizer wiring
+
+**Consequences:**
+- Auto-memory and any internal handoff notes referring to `uhyx3l` / `yialae` should be reconciled with this observed state
+- New routes should follow the existing pattern: API GW authorizer for routes that need direct claim inspection at the gateway, in-Lambda verification for everything else
+- No follow-up Terraform changes needed
+
+---
+
+## ADR-021: WAF Phantom Cost — Closed
+**Date:** 2026-05-13
+**Status:** Closed (no action; resolved on its own)
+
+**Context:** During Phase 2 of the cost optimization sweep (2026-04-11, see MEMORY.md), $11.47/month of unexplained WAF spend was flagged for AWS Support investigation. The item remained in the open-debt list pending response.
+
+Verification on 2026-05-13:
+```bash
+aws wafv2 list-web-acls --scope CLOUDFRONT --region us-east-1  # []
+aws wafv2 list-web-acls --scope REGIONAL   --region us-east-1  # []
+aws waf  list-web-acls                     --region us-east-1  # []  (Classic v1)
+aws waf-regional list-web-acls             --region us-east-1  # []  (Classic regional)
+
+aws ce get-cost-and-usage --time-period Start=2026-04-01,End=2026-05-13 \
+  --granularity MONTHLY --metrics UnblendedCost \
+  --filter '{"Dimensions":{"Key":"SERVICE","Values":["AWS WAF"]}}'
+# → $0 April, $0 May (estimated)
+```
+
+**Decision:** Close the WAF investigation. No resources, no current cost.
+
+**Rationale:**
+- No live WAF resources exist (any scope, any version)
+- Cost Explorer shows $0 WAF spend for the past 6 weeks
+- The historical $11.47/mo most likely belonged to a WAF ACL that was implicitly deleted alongside the staging-environment cleanup in Phase 1 (deleted API Gateway staging stage → cascaded any associated WAF assoc); the cost cleared the following billing cycle but the open-debt entry was never updated
+
+**Consequences:**
+- Remove "WAF $11.47/mo investigation" from MEMORY.md open-debt and NEXT.md
+- If WAF is later added intentionally (e.g. for the public landing page CloudFront distribution), it should be declared in Terraform from the start to prevent the same untracked-cost gap
+
+---
+
+## ADR-020: Payments Method-Level Throttling
+**Date:** 2026-05-13
+**Status:** Proposed (Terraform-only, awaits operator apply)
+
+**Context:** Payments Lambda is intentionally outside the VPC and therefore cannot use Redis for rate limiting (MEMORY.md Known Constraints). Its only defense against abuse is API Gateway method-level throttling. To date, `/payments/*` inherited the stage default (`*/*` method settings), which is sized for general API traffic and is far above what LemonSqueezy webhooks + the interactive checkout flow require.
+
+**Decision:** Add method-level throttling for `payments/ANY` and `payments/{proxy+}/ANY` via two new variables in the api-gateway module: `payments_throttle_burst_limit` (default 20) and `payments_throttle_rate_limit` (default 5 req/s).
+
+**Rationale:**
+- Tighter than stage default by an order of magnitude — appropriate given the legitimate-traffic profile (a few subscription events per minute)
+- Variables (not hardcoded) so operator can tune without code change
+- Matches the pattern already used for `market/prices/GET` and `fx/rates/GET`
+
+**Consequences:**
+- Operator must `terraform plan` + apply before throttling takes effect
+- LemonSqueezy webhook bursts above 20 simultaneous events will be 429'd — LemonSqueezy retries webhooks, so this is acceptable
+- If interactive checkout load grows substantially, the limits can be raised via `terraform.tfvars` overrides without redeploying code
+
+---
+
 ## Template for New Decisions
 
 ```markdown

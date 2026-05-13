@@ -159,12 +159,10 @@ jobs:
         run: npm ci --omit=dev
 
       - name: Zip Lambda layer
-        # IMPORTANT: AWS Lambda Node.js layer convention requires `nodejs/` at
-        # the zip root. Running `zip` from `shared-utils/` (not its parent)
-        # avoids the `shared-utils/nodejs/...` prefix bug — otherwise Lambda
-        # extracts to `/opt/shared-utils/nodejs/...` and every
-        # `require('/opt/nodejs/<module>')` breaks at runtime.
-        # Same fix pattern as commit 78f19a5 on PR #84.
+        # AWS Node.js layer convention: contents must extract to /opt/nodejs/...
+        # so handlers can `require('/opt/nodejs/<module>')`. The zip therefore
+        # MUST have `nodejs/` at the root — not `shared-utils/nodejs/`.
+        # cd into shared-utils so the zip captures `nodejs/...` at root.
         working-directory: finpulse-infra/lambda-layers/shared-utils
         run: zip -r ../shared-utils.zip nodejs
 
@@ -202,7 +200,7 @@ jobs:
 
       - name: Comment PR with Plan
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -281,12 +279,10 @@ jobs:
         run: npm ci --omit=dev
 
       - name: Zip Lambda layer
-        # IMPORTANT: AWS Lambda Node.js layer convention requires `nodejs/` at
-        # the zip root. Running `zip` from `shared-utils/` (not its parent)
-        # avoids the `shared-utils/nodejs/...` prefix bug — otherwise Lambda
-        # extracts to `/opt/shared-utils/nodejs/...` and every
-        # `require('/opt/nodejs/<module>')` breaks at runtime.
-        # Same fix pattern as commit 78f19a5 on PR #84.
+        # AWS Node.js layer convention: contents must extract to /opt/nodejs/...
+        # so handlers can `require('/opt/nodejs/<module>')`. The zip therefore
+        # MUST have `nodejs/` at the root — not `shared-utils/nodejs/`.
+        # cd into shared-utils so the zip captures `nodejs/...` at root.
         working-directory: finpulse-infra/lambda-layers/shared-utils
         run: zip -r ../shared-utils.zip nodejs
 
