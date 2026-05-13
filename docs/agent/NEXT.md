@@ -1,7 +1,7 @@
 # Next-Session Pickup Notes
 
 > Read this first when starting a new agent session on FinPulse.
-> Last updated: 2026-04-29 (after Stage A–D security review delivery)
+> Last updated: 2026-05-13 (after backlog execution sweep)
 
 This file is the **pointer** to what to do next. Full historical context lives in `MEMORY.md`. Decisions live in `DECISIONS.md`. Operational procedures live in `RUNBOOK.md`.
 
@@ -10,89 +10,85 @@ This file is the **pointer** to what to do next. Full historical context lives i
 ## 0. First-30-seconds checklist
 
 ```bash
-# Sync local with remote main
 git checkout main && git pull origin main
-
-# Confirm latest commits match expectations
 git log --oneline -5
-
-# Verify clean tree
 git status --short
+gh pr list --state open
 ```
 
-If anything in `git status` shows uncommitted work that wasn't yours, **stop and ask the operator** before doing anything else — the §17 rule about not assuming state still applies.
+If anything in `git status` shows uncommitted work that wasn't yours, **stop and ask the operator** before doing anything else.
 
 ---
 
-## 1. Project state as of 2026-04-29 EOD
+## 1. Project state as of 2026-05-13 EOD
 
-- **Production is current** with all Critical + High security review fixes from the local-vs-remote review (PRs #63, #65, #66, #67, #68, #69, #70, #71, #72).
-- **GSI in use:** `finpulse-subscriptions.lemonSqueezySubscriptionId-index` is ACTIVE and queried by the payments Lambda.
-- **Deploy gates removed:** push-to-main → auto-deploy. No manual approval step in `deploy.yml` or `deploy-lambdas.yml`.
-- **Auto-merge convention:** the agent uses `mcp__github__merge_pull_request` (admin override) after CI green. Do not auto-merge before required checks complete — see MEMORY.md §"Direct admin-merge".
+- **Production is current.** Frontend bumps merged: `@types/node 25`, `lucide-react 1.14`, `@sentry/react 10`. Lambda bumps: `zod 4.4.3`, `archiver 8`. GitHub Actions group bumped via #78.
+- **8 PRs opened during this sweep**, classified by gate level below.
+- **Dependabot tracking issue [#83](https://github.com/see-137/finpulse/issues/83)** updated with merged/closed/pending state.
+
+### Open PRs awaiting operator action (priority order)
+
+| PR | Title | Gate | Blocking on |
+|---|---|---|---|
+| [#87](https://github.com/see-137/finpulse/pull/87) | deps(terraform): aws ~> 6.44 (root + 6 modules) | **C — Hard Stop** | Operator must (a) patch `modules/secrets/main.tf` (permission-restricted from agent), (b) run `terraform plan` + apply |
+| [#88](https://github.com/see-137/finpulse/pull/88) | infra(oidc): GitHub Actions OIDC + workflow migration | **C — Hard Stop** | #87 must apply first; then operator applies OIDC + sets GH variables `AWS_OIDC_ROLE_DEPLOY` / `AWS_OIDC_ROLE_TERRAFORM` |
+| [#85](https://github.com/see-137/finpulse/pull/85) | infra(terraform): extract backend config to prod.tfbackend | **B** | Operator runs local `terraform init -reconfigure -backend-config=prod.tfbackend` + `state list` matches before merge |
+| [#90](https://github.com/see-137/finpulse/pull/90) | chore(infra): close 3 open-debt items (Cognito ADR, payments throttle, WAF closure) | **B** | Operator runs `terraform plan` to confirm exactly 2 new method_settings creates, no replacements |
+| [#89](https://github.com/see-137/finpulse/pull/89) | backend(admin): paginate DynamoDB scans + GDPR scope | **A** | CI green → admin-merge → redeploy admin Lambda |
+| [#84](https://github.com/see-137/finpulse/pull/84) | ci(terraform): build Lambda layer zip in plan/apply | **A** | CI green → admin-merge |
+| [#86](https://github.com/see-137/finpulse/pull/86) | chore(dependabot): fix testing/vite group patterns | **A** | CI green → admin-merge |
+| [#51](https://github.com/see-137/finpulse/pull/51) | deps(frontend): bump react group (19.2.4 → 19.2.6) | **A** + smoke | Operator runs `preview_start`, renders /portfolio /community /legal, then admin-merge |
+| [#52](https://github.com/see-137/finpulse/pull/52) | deps(frontend): bump vite group (plugin-react 5→6) | **A** + smoke | Same as #51. `vite.config.ts` uses `react()` with no Babel options → plugin-react 6.0 Babel removal does not affect us |
+
+### Closed during sweep (do not reopen)
+- #54 testing-group (peer-dep block — re-issue blocked by #86 config fix; new Dependabot PR will come next Monday)
+- #55 linting-group ESLint 10 (peer-dep blocked by `eslint-plugin-react-hooks@7.0.1`)
+- #57 typescript 6 (peer-dep blocked by `@typescript-eslint/eslint-plugin@8.x`)
+- #76 superseded by #87
 
 ---
 
-## 2. Top of the backlog (priority order)
+## 2. Top of the backlog (after closing PRs above)
 
-These are the next items worth picking up. All require operator authorization for AWS apply (CLAUDE.md §2.4).
+### 2.1 — Trim OIDC role IAM policies (follow-up to #88)
+**Why:** PR #88 attaches `AdministratorAccess` to both OIDC roles as a parity-preserving placeholder. This defeats the least-privilege intent of the migration.
 
-### 2.1 — Lambda-layer zip build step in `terraform.yml` (unblocks CI apply)
+**Approach:**
+- `github-actions-finpulse-deploy`: needs S3 PutObject + sync (frontend bucket), CloudFront CreateInvalidation, Lambda UpdateFunctionCode + GetFunction, basic CloudWatch Logs
+- `github-actions-finpulse-terraform`: needs broad read for plan + write for apply against ALL resource types Terraform manages. Hardest to trim; consider split into `terraform-plan` (read-only) and `terraform-apply` (write).
 
-**Why:** the only thing standing between us and fully CI-driven `terraform apply` is that `lambda-layers/shared-utils.zip` is gitignored (build artifact). CI's plan job hits `filebase64sha256("...")` and errors. Fixing this means Stage E and F can ship via CI without local apply.
+**Effort:** medium (~2 hours). **Gate:** Level C (IAM policy changes).
 
-**Approach:** add a step in `terraform.yml`'s `validate` and `plan` jobs that does:
-```yaml
-- name: Build Lambda layer zip
-  run: |
-    cd finpulse-infra/lambda-layers/shared-utils/nodejs
-    npm ci --omit=dev
-    cd ../..
-    zip -r shared-utils.zip shared-utils/nodejs
-```
-Test on a no-op infra PR before relying on it.
+### 2.2 — Add GSIs for admin endpoints (follow-up to #89)
+**Why:** PR #89 paginates the Scans but doesn't address the underlying inefficiency. `getRecentUsers` still has no way to do a true "recent" sort; `getAIUsage` still scans the whole ai-queries table to filter by date.
 
-**Effort:** small (~30 mins). **Gate:** Level A (workflow-only).
+**Approach:**
+- GSI on `users.createdAt` (with a sparse partition key like `user-by-date`) — enables `Query` instead of paginated `Scan`
+- GSI on `ai-queries.timestamp` — same pattern
 
-### 2.2 — Stage E: H1 OIDC migration
+**Effort:** medium (~3 hours including FE response-shape coordination). **Gate:** Level B (DynamoDB schema change).
 
-**Why:** AWS auth in `deploy.yml`, `deploy-lambdas.yml`, `terraform.yml` uses long-lived `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` GH Secrets. Industry-standard fix is OIDC + assume-role for short-lived STS tokens.
+### 2.3 — Vitest infrastructure for `lambda-code/`
+**Why:** No Lambda code in this repo has unit tests. PR #89's `paginatedScan` and `listUsers` would benefit from cursor edge-case tests. Repo currently has no test runner for `lambda-code/`.
 
-**Multi-step:**
-1. Terraform: create OIDC provider + IAM role with trust policy locked to `repo:see-137/finpulse:*`
-2. `terraform apply` (operator authorization required — Hard Stop)
-3. Verify role exists via `aws sts assume-role-with-web-identity` test
-4. Update workflows: replace `aws-access-key-id`/`aws-secret-access-key` with `role-to-assume`
-5. Verify a deploy works with the new auth
-6. Rotate (delete) the old IAM user keys
+**Approach:** Add `vitest.config.ts` at `finpulse-infra/lambda-code/`, devDependencies (vitest, `@aws-sdk/client-dynamodb`, `aws-sdk-client-mock`), add a smoke test per Lambda, wire into the `Lambda` CI job.
 
-**Effort:** medium (~2 hours of work + apply gates). **Gate:** Level C (Terraform apply + IAM mutation).
+**Effort:** medium (~3 hours). **Gate:** Level A.
 
-### 2.3 — Stage F: H4 backend `.tfbackend` file
-
-**Why:** `finpulse-infra/main.tf` line ~19 hardcodes `bucket = "finpulse-terraform-state-383349724213"`. Account id baked into code; can't reuse the module elsewhere.
-
-**Approach:** move backend config to a separate `prod.tfbackend` file passed via `terraform init -backend-config=prod.tfbackend`. CI workflow needs the same flag.
-
-**Effort:** small (~30 mins). **Gate:** Level B — touches state backend wiring; needs deliberate `terraform init -reconfigure`.
-
-### 2.4 — M5 admin Scan pagination + GDPR scope
-
-**Why:** `lambda-code/admin/index.js` has 5 list-style Scans (`getStats`, `getRecentUsers`, `getPlanDistribution`, `getAIUsage`, scan-by-userId in community endpoints). They scale linearly and `getRecentUsers` returns full email + plan + timestamps with no pagination — GDPR-relevant if these endpoints are ever exposed beyond admin.
-
-**Approach:** introduce LastEvaluatedKey-based pagination, `ProjectionExpression` to fetch only needed fields, and explicit `Limit` defaults. May involve API Gateway response shape changes — check FE callers in admin portal.
-
-**Effort:** medium (~3 hours). **Gate:** Level B (admin behavior change, touches FE coordination).
+### 2.4 — M5 admin Scan pagination follow-up
+Status: PR #89 handles this. Once merged + deployed, this item is closed.
 
 ---
 
 ## 3. Gotchas — verify before touching anything
 
-- **Operator's local `terraform.tfvars` still has `enable_staging_environment = false`.** That variable was deleted in PR #69. Terraform warns but doesn't error. Suggest the operator strips the line if it bothers them.
-- **Lambda-layer zip path is gitignored** (`finpulse-infra/.gitignore` line 16: `lambda-layers/shared-utils.zip`). Do not commit the zip; build it.
-- **CI plan workflow** runs against the operator's intended config thanks to `prod.auto.tfvars` (PR #70). If you see drift in plan output that doesn't match operator intent, suspect the tfvars file is missing a value rather than reaching for state surgery.
-- **NAT/EIP state surgery (2026-04-29)** has been done. State now matches AWS. If a future plan suggests creating a NAT gateway, **STOP** — that's a regression of this work. Verify against `aws ec2 describe-nat-gateways`.
-- **Self-approval is rejected.** GitHub MCP authenticates as See-137 (the repo owner). Do not call `pull_request_review_write` with `event: APPROVE` — it'll error. Use `merge_pull_request` directly (admin override).
+- **Permission boundary on `finpulse-infra/modules/secrets/main.tf`:** the file is not readable to the agent. Operator must patch this file by hand for any module-wide provider bump (proven during the AWS v6 sweep — PR #87 finding).
+- **`@vitest/coverage-v8` peer-dep:** the testing-group `vitest*` pattern in `.github/dependabot.yml` does NOT match `@vitest/coverage-v8` (scoped package). PR #86 fixes this. Until #86 merges, any vitest major bump will fail in CI.
+- **Lambda-layer zip path is gitignored** at `finpulse-infra/.gitignore:52` (`lambda-layers/shared-utils.zip`). CI plan/apply jobs need PR #84 merged to rebuild it.
+- **Dependabot doesn't recurse into child-module `required_providers`:** for any provider major bump, expect to update the root `main.tf` AND every child module's `required_providers` block (7 places for the AWS provider). See PR #87.
+- **`terraform.tfvars` is already clean** (no `enable_staging_environment`).
+- **`vite.config.ts` calls `react()` with no Babel options** — plugin-react 6.0's Babel removal is therefore moot for this codebase (relevant when smoke-checking #52).
+- **Self-approval rejected.** GitHub MCP authenticates as See-137. Do not call `pull_request_review_write` with `event: APPROVE` — use `gh pr merge --admin` directly.
 
 ---
 
@@ -101,14 +97,16 @@ Test on a no-op infra PR before relying on it.
 | File | What it covers |
 |---|---|
 | `docs/agent/MEMORY.md` | Stable project facts, commands, conventions, session summaries |
-| `docs/agent/DECISIONS.md` | ADR-style decisions with rationale |
+| `docs/agent/DECISIONS.md` | ADR-style decisions with rationale (now through ADR-021) |
 | `docs/agent/RUNBOOK.md` | Deployment, rollback, incident procedures |
 | `CLAUDE.md` | Operating manual: autonomy levels, Terraform rules, repo discipline |
+| `~/.claude/plans/plan-properly-how-to-zazzy-cerf.md` | Backlog execution plan that produced this PR set |
 
 ---
 
-## 5. After Stage E/F land — what changes for this file
+## 5. After current PRs land — what changes for this file
 
-- Strike out 2.1 and 2.2 from the priority list (or move under "Done").
-- Add the Medium/Low backlog items as new top-3.
-- Update §1 to note OIDC is in use and there are no long-lived AWS credentials in GitHub Secrets.
+- Strike out PRs #84, #85, #86, #89, #90 from §1 table after merge
+- Strike out #87, #88 after operator authorization + apply
+- Move §2.1 (trim OIDC policies) to top once OIDC migration completes
+- Update §1 to note "no long-lived AWS credentials in GitHub Secrets" once #88 ships + secrets are deleted
