@@ -74,6 +74,53 @@ const { ScanCommand, GetCommand, UpdateCommand, QueryCommand } = require('@aws-s
 
 const ENVIRONMENT = process.env.ENVIRONMENT || 'prod';
 
+// Safety cap on paginated scans to prevent runaway invocations. At ~1 MB per
+// DynamoDB scan page, 50 pages = ~50 MB scanned per call — enough for current
+// table sizes (users < 100k items expected). If a list response is truncated,
+// the operator can re-call with the returned nextToken to continue.
+const MAX_SCAN_PAGES = 50;
+
+// Default page size for paginated list endpoints exposed to the admin.
+const DEFAULT_LIST_LIMIT = 25;
+const MAX_LIST_LIMIT = 100;
+
+/**
+ * Run a Scan paginating internally up to MAX_SCAN_PAGES. Accumulates Items
+ * and the total ScannedCount. Used by aggregate endpoints (stats, plan
+ * distribution, AI usage) where we want a full picture, not the first page.
+ *
+ * Returns `{ items, scannedCount, truncated, lastEvaluatedKey }`.
+ * `truncated: true` means we hit MAX_SCAN_PAGES before exhausting the table —
+ * the caller should treat the aggregate as a lower bound.
+ *
+ * @param {object} scanParams - DynamoDB ScanCommand params (TableName, etc.)
+ * @returns {Promise<{items: Array, scannedCount: number, truncated: boolean, lastEvaluatedKey: object|null}>}
+ */
+async function paginatedScan(scanParams) {
+  const items = [];
+  let scannedCount = 0;
+  let lastEvaluatedKey = undefined;
+  let pages = 0;
+
+  do {
+    const result = await getDynamoClient().send(new ScanCommand({
+      ...scanParams,
+      ExclusiveStartKey: lastEvaluatedKey,
+    }));
+    if (result.Items) items.push(...result.Items);
+    scannedCount += result.ScannedCount || 0;
+    lastEvaluatedKey = result.LastEvaluatedKey;
+    pages += 1;
+  } while (lastEvaluatedKey && pages < MAX_SCAN_PAGES);
+
+  return {
+    items,
+    scannedCount,
+    truncated: !!lastEvaluatedKey, // true if we stopped before exhausting
+    lastEvaluatedKey: lastEvaluatedKey || null,
+  };
+}
+
 /**
  * CORS headers - Restricted to production domain only
  */
@@ -125,7 +172,11 @@ function isAdmin(event) {
 }
 
 /**
- * Get system statistics
+ * Get system statistics — table item counts.
+ *
+ * Uses paginated COUNT scan to handle tables larger than one 1 MB scan page.
+ * If a table is large enough to exceed MAX_SCAN_PAGES, the returned count is
+ * flagged as a lower bound via `_truncated: true`.
  */
 async function getStats() {
   const tables = [
@@ -139,12 +190,13 @@ async function getStats() {
 
   for (const table of tables) {
     try {
-      const result = await getDynamoClient().send(new ScanCommand({
+      const { scannedCount, truncated } = await paginatedScan({
         TableName: table,
-        Select: 'COUNT'
-      }));
+        Select: 'COUNT',
+      });
       const tableName = table.replace(`finpulse-`, '').replace(`-${ENVIRONMENT}`, '');
-      stats[tableName] = result.Count || 0;
+      stats[tableName] = scannedCount;
+      if (truncated) stats[`${tableName}_truncated`] = true;
     } catch (error) {
       console.error(`Failed to get count for ${table}:`, error);
     }
@@ -154,49 +206,92 @@ async function getStats() {
 }
 
 /**
- * Get recent signups
+ * List users, paginated. Pass `nextToken` (base64-encoded LastEvaluatedKey) on
+ * subsequent calls to continue. Limit is capped at MAX_LIST_LIMIT.
+ *
+ * GDPR scope: ProjectionExpression restricts fields returned to admin to the
+ * minimum set actually displayed in the admin portal. Sensitive fields like
+ * tokens, password hashes, or credit details are never projected here even if
+ * they exist on the row.
+ *
+ * Note: Scan order is partition-key order, not createdAt. To get truly
+ * "recent" users the operator should paginate fully and sort client-side, or
+ * we add a GSI on `createdAt` in a follow-up.
+ *
+ * @returns {Promise<{items: Array, nextToken: string|null, count: number}>}
  */
-async function getRecentUsers(limit = 10) {
+async function listUsers({ limit = DEFAULT_LIST_LIMIT, nextToken = null } = {}) {
+  const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || DEFAULT_LIST_LIMIT, 1), MAX_LIST_LIMIT);
+
+  let exclusiveStartKey;
+  if (nextToken) {
+    try {
+      exclusiveStartKey = JSON.parse(Buffer.from(nextToken, 'base64').toString('utf8'));
+    } catch (e) {
+      // Bad token — treat as start of scan rather than fail the whole request.
+      console.warn('[Admin] Invalid nextToken received, ignoring:', e.message);
+      exclusiveStartKey = undefined;
+    }
+  }
+
   try {
     const result = await getDynamoClient().send(new ScanCommand({
       TableName: `finpulse-users-${ENVIRONMENT}`,
-      Limit: limit * 2 // Get more to sort
+      Limit: cappedLimit,
+      ExclusiveStartKey: exclusiveStartKey,
+      // Drop fields the admin portal does not display. Reduces PII surface in
+      // logs and response payloads. Keep email since it's the primary admin
+      // lookup field; mask in CloudWatch via no-op (Lambda logs request only
+      // on error). Use #-prefixed names for reserved-word safety.
+      ProjectionExpression: '#userId, #email, #name, #plan, #createdAt',
+      ExpressionAttributeNames: {
+        '#userId': 'userId',
+        '#email': 'email',
+        '#name': 'name',
+        '#plan': 'plan',
+        '#createdAt': 'createdAt',
+      },
     }));
 
-    const sorted = (result.Items || [])
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, limit);
-
-    return sorted.map(u => ({
+    const items = (result.Items || []).map(u => ({
       userId: u.userId,
       email: u.email,
       name: u.name,
       plan: u.plan,
       createdAt: u.createdAt,
-      lastLogin: u.lastLogin
     }));
+
+    const nextTokenOut = result.LastEvaluatedKey
+      ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
+      : null;
+
+    return { items, nextToken: nextTokenOut, count: items.length };
   } catch (error) {
-    console.error('Failed to get recent users:', error);
-    return [];
+    console.error('Failed to list users:', error);
+    return { items: [], nextToken: null, count: 0 };
   }
 }
 
 /**
- * Get plan distribution
+ * Get plan distribution — paginated internally up to MAX_SCAN_PAGES.
+ *
+ * Returns the distribution plus a `_truncated` flag if the users table
+ * exceeded the safety cap before being fully scanned.
  */
 async function getPlanDistribution() {
   try {
-    const result = await getDynamoClient().send(new ScanCommand({
+    const { items, truncated } = await paginatedScan({
       TableName: `finpulse-users-${ENVIRONMENT}`,
       ProjectionExpression: '#plan',
-      ExpressionAttributeNames: { '#plan': 'plan' }
-    }));
+      ExpressionAttributeNames: { '#plan': 'plan' },
+    });
 
     const distribution = { FREE: 0, PRO: 0, ENTERPRISE: 0 };
-    for (const item of result.Items || []) {
+    for (const item of items) {
       distribution[item.plan] = (distribution[item.plan] || 0) + 1;
     }
 
+    if (truncated) distribution._truncated = true;
     return distribution;
   } catch (error) {
     console.error('Failed to get plan distribution:', error);
@@ -205,29 +300,36 @@ async function getPlanDistribution() {
 }
 
 /**
- * Get AI query usage
+ * Get AI query usage over the past N days — paginated internally.
+ *
+ * Note: FilterExpression runs *after* DynamoDB reads each page, so we still
+ * scan the full table even for a short window. A `timestamp`-keyed GSI on
+ * the ai-queries table would let us Query instead of Scan; that's a separate
+ * follow-up. Project only `timestamp` here to minimize per-page payload size.
  */
 async function getAIUsage(days = 7) {
   try {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const result = await getDynamoClient().send(new ScanCommand({
+    const { items, truncated } = await paginatedScan({
       TableName: `finpulse-ai-queries-${ENVIRONMENT}`,
       FilterExpression: '#ts >= :startDate',
+      ProjectionExpression: '#ts',
       ExpressionAttributeNames: { '#ts': 'timestamp' },
-      ExpressionAttributeValues: { ':startDate': startDate.toISOString() }
-    }));
+      ExpressionAttributeValues: { ':startDate': startDate.toISOString() },
+    });
 
     const byDay = {};
-    for (const item of result.Items || []) {
-      const day = item.timestamp.split('T')[0];
-      byDay[day] = (byDay[day] || 0) + 1;
+    for (const item of items) {
+      const day = (item.timestamp || '').split('T')[0];
+      if (day) byDay[day] = (byDay[day] || 0) + 1;
     }
 
     return {
-      total: result.Count || 0,
-      byDay
+      total: items.length,
+      byDay,
+      ...(truncated && { _truncated: true }),
     };
   } catch (error) {
     console.error('Failed to get AI usage:', error);
@@ -347,18 +449,23 @@ exports.handler = async (event) => {
       };
     }
 
-    // GET /admin/users - List recent users
+    // GET /admin/users - List users (paginated)
+    // Query params:
+    //   limit     — page size (1..MAX_LIST_LIMIT, default DEFAULT_LIST_LIMIT)
+    //   nextToken — opaque pagination cursor from previous response
     if (path.includes('/users') && method === 'GET') {
-      const limit = parseInt(event.queryStringParameters?.limit) || 10;
-      const users = await getRecentUsers(limit);
+      const limit = event.queryStringParameters?.limit;
+      const nextToken = event.queryStringParameters?.nextToken || null;
+      const { items, nextToken: nextTokenOut, count } = await listUsers({ limit, nextToken });
 
       return {
         statusCode: 200,
         headers: corsHeaders,
         body: JSON.stringify({
           success: true,
-          data: users,
-          count: users.length
+          data: items,
+          count,
+          nextToken: nextTokenOut,
         })
       };
     }
