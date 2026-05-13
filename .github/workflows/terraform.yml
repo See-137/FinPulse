@@ -144,7 +144,7 @@ jobs:
         run: aws sts get-caller-identity
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config=prod.tfbackend
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       # Build Lambda layer zip before plan — referenced via filebase64sha256()
@@ -264,7 +264,7 @@ jobs:
           path: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config=prod.tfbackend
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       # Apply needs the Lambda layer zip to upload to AWS (referenced by

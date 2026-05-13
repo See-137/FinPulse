@@ -15,13 +15,10 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket         = "finpulse-terraform-state-383349724213"
-    key            = "prod/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "terraform-state-lock"
-  }
+  # Backend config is supplied via -backend-config=prod.tfbackend so the
+  # bucket/key/region/lock table are not hardcoded and the module can be
+  # reused across environments without code changes.
+  backend "s3" {}
 }
 
 provider "aws" {
