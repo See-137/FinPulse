@@ -147,6 +147,25 @@ jobs:
         run: terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
 
+      # Build Lambda layer zip before plan — referenced via filebase64sha256()
+      # at plan time. Zip is a build artifact, not committed (see .gitignore).
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Install Lambda layer deps
+        working-directory: finpulse-infra/lambda-layers/shared-utils/nodejs
+        run: npm ci --omit=dev
+
+      - name: Zip Lambda layer
+        # AWS Node.js layer convention: contents must extract to /opt/nodejs/...
+        # so handlers can `require('/opt/nodejs/<module>')`. The zip therefore
+        # MUST have `nodejs/` at the root — not `shared-utils/nodejs/`.
+        # cd into shared-utils so the zip captures `nodejs/...` at root.
+        working-directory: finpulse-infra/lambda-layers/shared-utils
+        run: zip -r ../shared-utils.zip nodejs
+
       - name: Terraform Plan
         id: plan
         # Non-sensitive variable values come from prod.auto.tfvars (auto-loaded
@@ -247,6 +266,25 @@ jobs:
       - name: Terraform Init
         run: terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
+
+      # Apply needs the Lambda layer zip to upload to AWS (referenced by
+      # aws_lambda_layer_version.filename). Rebuild here to match plan-time hash.
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Install Lambda layer deps
+        working-directory: finpulse-infra/lambda-layers/shared-utils/nodejs
+        run: npm ci --omit=dev
+
+      - name: Zip Lambda layer
+        # AWS Node.js layer convention: contents must extract to /opt/nodejs/...
+        # so handlers can `require('/opt/nodejs/<module>')`. The zip therefore
+        # MUST have `nodejs/` at the root — not `shared-utils/nodejs/`.
+        # cd into shared-utils so the zip captures `nodejs/...` at root.
+        working-directory: finpulse-infra/lambda-layers/shared-utils
+        run: zip -r ../shared-utils.zip nodejs
 
       - name: Terraform Apply
         # Same env vars as plan — terraform apply still resolves variable
