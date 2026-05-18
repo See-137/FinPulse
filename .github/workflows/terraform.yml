@@ -150,7 +150,7 @@ jobs:
       # Build Lambda layer zip before plan — referenced via filebase64sha256()
       # at plan time. Zip is a build artifact, not committed (see .gitignore).
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -270,7 +270,7 @@ jobs:
       # Apply needs the Lambda layer zip to upload to AWS (referenced by
       # aws_lambda_layer_version.filename). Rebuild here to match plan-time hash.
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 
