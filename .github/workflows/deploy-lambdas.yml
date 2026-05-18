@@ -60,6 +60,7 @@ env:
 # any write GITHUB_TOKEN scopes (AWS auth is via aws-actions/configure-aws-credentials).
 permissions:
   contents: read
+  id-token: write  # Required for OIDC assume-role
 
 jobs:
   # ============================================
@@ -172,6 +173,10 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
+          # OIDC migration: `role-to-assume` is used when the repo variable is
+          # set. Static keys are kept as fallback during the transition; delete
+          # both after ~1 week of stable OIDC deploys.
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_DEPLOY }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
@@ -236,6 +241,10 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
+          # OIDC migration: `role-to-assume` is used when the repo variable is
+          # set. Static keys are kept as fallback during the transition; delete
+          # both after ~1 week of stable OIDC deploys.
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_DEPLOY }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}

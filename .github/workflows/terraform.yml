@@ -52,6 +52,7 @@ env:
 permissions:
   contents: read
   pull-requests: write
+  id-token: write  # Required for OIDC assume-role
 
 jobs:
   # ============================================
@@ -100,6 +101,13 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
+          # OIDC migration: `role-to-assume` is preferred when the repo variable
+          # is set (after OIDC apply). Static keys are kept as a fallback during
+          # the transition so this PR doesn't break CI before the operator
+          # finishes the migration. Delete both `aws-access-key-id` and
+          # `aws-secret-access-key` (and the matching repo secrets) once OIDC
+          # has been stable for ~1 week of deploys.
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_TERRAFORM }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
@@ -136,6 +144,13 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
+          # OIDC migration: `role-to-assume` is preferred when the repo variable
+          # is set (after OIDC apply). Static keys are kept as a fallback during
+          # the transition so this PR doesn't break CI before the operator
+          # finishes the migration. Delete both `aws-access-key-id` and
+          # `aws-secret-access-key` (and the matching repo secrets) once OIDC
+          # has been stable for ~1 week of deploys.
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_TERRAFORM }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
@@ -253,6 +268,13 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
+          # OIDC migration: `role-to-assume` is preferred when the repo variable
+          # is set (after OIDC apply). Static keys are kept as a fallback during
+          # the transition so this PR doesn't break CI before the operator
+          # finishes the migration. Delete both `aws-access-key-id` and
+          # `aws-secret-access-key` (and the matching repo secrets) once OIDC
+          # has been stable for ~1 week of deploys.
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_TERRAFORM }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
